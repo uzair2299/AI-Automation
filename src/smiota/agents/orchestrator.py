@@ -19,18 +19,19 @@ class AgentOrchestrator:
         preferred_agent: Optional[str] = None,
     ) -> AgentResult:
         """Determines the most appropriate agent or executes the requested agent directly."""
-        selected_agent_name = preferred_agent or self._classify_intent(query)
+        selected_agent_name = preferred_agent or self._classify_intent(query, context.channel)
         logger.info(f"Routing query to agent: [{selected_agent_name}] (Session: {context.session_id})")
 
         # Record incoming user turn in conversation memory
         memory = ConversationMemory(session_id=context.session_id)
         await memory.add_message(role="user", content=query)
 
+        default_fallback = "customer" if context.channel == "webchat" else "aiops"
         try:
             agent = AgentRegistry.get(selected_agent_name)
         except KeyError:
-            logger.warning(f"Requested agent '{selected_agent_name}' not found. Falling back to 'AIOps'.")
-            agent = AgentRegistry.get("aiops")
+            logger.warning(f"Requested agent '{selected_agent_name}' not found. Falling back to '{default_fallback}'.")
+            agent = AgentRegistry.get(default_fallback)
 
         result = await agent.process(query, context)
 
@@ -39,12 +40,18 @@ class AgentOrchestrator:
 
         return result
 
-    def _classify_intent(self, query: str) -> str:
+    def _classify_intent(self, query: str, channel: Optional[str] = None) -> str:
         """Classifies intent using keywords or Gemini function calling router.
 
         In production, this queries Gemini / Vertex AI with tool/agent definitions.
         """
         q = query.lower()
+        # For customer webchat channel, prioritize Customer & Smart Locker intents
+        if channel == "webchat":
+            if any(w in q for w in ["security", "cve", "vulnerability", "iam"]):
+                return "security"
+            return "customer"
+
         # 1. Security & Compliance
         if any(w in q for w in ["security", "cve", "vulnerability", "iam", "wazuh", "threat", "siem", "service account", "revoke", "quarantine", "credential"]):
             return "security"
@@ -61,3 +68,4 @@ class AgentOrchestrator:
         if any(w in q for w in ["pr", "pull request", "terraform", "code", "github", "promql", "ci/cd", "pipeline", "diff"]):
             return "developer"
         return "aiops"
+

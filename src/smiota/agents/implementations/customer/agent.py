@@ -27,7 +27,29 @@ class CustomerAgent(BaseAgent):
         import re
         q = query.lower()
 
-        # 1. Hardware State Mutation / Remote Unlock (Security Gate & HITL token required)
+        # 1. Greetings & Welcome
+        if any(q.strip() == w or q.strip().startswith(w + " ") or q.strip().startswith(w + ",") for w in ["hi", "hello", "hey", "hola", "good morning", "good afternoon", "good evening", "howdy"]):
+            return AgentResult(
+                agent_name=self.name,
+                content=(
+                    "Hello! 👋 I'm your Smiota Smart Locker Concierge.\n\n"
+                    "I can help you:\n"
+                    "• 📦 **Check package delivery status** and locker compartment numbers\n"
+                    "• 🔑 **Retrieve or resend your 6-digit pickup PIN**\n"
+                    "• 📍 **Find locker location and operating hours**\n"
+                    "• 🚪 **Resolve locker door or pickup issues**\n\n"
+                    "What would you like to check today?"
+                ),
+                requires_approval=False,
+                suggested_actions=[
+                    "Where is my package?",
+                    "Resend pickup PIN",
+                    "Locker location and hours",
+                    "Locker door did not open",
+                ],
+            )
+
+        # 2. Hardware State Mutation / Remote Unlock (Security Gate & HITL token required)
         if "unlock" in q or "open door" in q or "open locker" in q:
             return AgentResult(
                 agent_name=self.name,
@@ -44,7 +66,62 @@ class CustomerAgent(BaseAgent):
                 suggested_actions=["Verify customer identity pin", "Wait for Property Manager approval"],
             )
 
-        # 2. Package / Parcel Tracking ID Provided (e.g. SM-9821, PKG-4402, 1Z999...)
+        # 3. Locker Location & Hours
+        if any(w in q for w in ["hours", "location", "address", "where is the locker", "facility"]):
+            return AgentResult(
+                agent_name=self.name,
+                content=(
+                    "📍 **Smiota Smart Locker Facility**:\n\n"
+                    "• **Location**: Building 3, Ground Floor Lobby (East Wing by the elevators)\n"
+                    "• **Operating Hours**: Accessible **24/7** for resident package pickup\n"
+                    "• **Console**: Kiosk touchscreen is located in the center of the locker bank\n"
+                    "• **Night Access**: Use your resident key fob or mobile badge to access the lobby after 9:00 PM."
+                ),
+                requires_approval=False,
+                suggested_actions=[
+                    "Where is my package?",
+                    "Resend pickup PIN",
+                    "Locker door did not open",
+                ],
+            )
+
+        # 4. Resend Pickup PIN
+        if any(w in q for w in ["pin", "code", "pickup pin", "resend pin", "access code"]):
+            return AgentResult(
+                agent_name=self.name,
+                content=(
+                    "🔑 **Pickup PIN Assistance**:\n\n"
+                    "To retrieve or resend your 6-digit pickup PIN, please enter your **Package ID** (e.g., `SM-9821`) "
+                    "or your registered mobile phone number.\n\n"
+                    "We will instantly resend your PIN and compartment barcode via SMS and email."
+                ),
+                requires_approval=False,
+                suggested_actions=[
+                    "Track: SM-9821",
+                    "Look up by phone number",
+                    "Locker location and hours",
+                ],
+            )
+
+        # 5. Locker Door Did Not Open / Pickup Help
+        if any(w in q for w in ["did not open", "didn't open", "not opening", "door stuck", "compartment stuck", "door help", "pickup help"]):
+            return AgentResult(
+                agent_name=self.name,
+                content=(
+                    "🚪 **Locker Compartment Troubleshooting**:\n\n"
+                    "1. Confirm the 6-digit PIN entered matches your delivery notification.\n"
+                    "2. **Gently press inward on the locker door**, then release — this disengages solenoid pressure if a package is pressing against the latch.\n"
+                    "3. If the door still does not release, we can trigger a remote compartment reset or notify building maintenance."
+                ),
+                requires_approval=False,
+                suggested_actions=[
+                    "Request remote compartment unlock",
+                    "Resend pickup PIN",
+                    "Locker location and hours",
+                ],
+            )
+
+        # 6. Package / Parcel Tracking ID Provided (e.g. SM-9821, PKG-4402, 1Z999...)
         tracking_match = re.search(r'\b(sm-[0-9a-z]+|pkg-[0-9a-z]+|1z[0-9a-z]+|[a-z0-9]{8,})\b', q)
         if tracking_match:
             pkg_id = tracking_match.group(0).upper()
@@ -61,11 +138,11 @@ class CustomerAgent(BaseAgent):
                 suggested_actions=[
                     "Resend Pickup PIN via SMS",
                     "Extend pickup window (+24h)",
-                    "Door not opening / Help",
+                    "Locker door did not open",
                 ],
             )
 
-        # 3. Check Parcel / Tracking Inquiry (Prompt for Package ID or Tracking Number)
+        # 7. Check Parcel / Tracking Inquiry (Prompt for Package ID or Tracking Number)
         if any(w in q for w in ["parcel", "package", "tracking", "track", "delivery", "pickup", "where is my"]):
             return AgentResult(
                 agent_name=self.name,
@@ -83,7 +160,7 @@ class CustomerAgent(BaseAgent):
                 ],
             )
 
-        # 4. Fallback Account Lookup (Phone / Email)
+        # 8. Fallback Account Lookup (Phone / Email)
         if any(w in q for w in ["phone", "email", "don't have", "dont have", "no tracking"]):
             return AgentResult(
                 agent_name=self.name,
@@ -99,8 +176,8 @@ class CustomerAgent(BaseAgent):
                 ],
             )
 
-        # 5. Smart Locker Sensor & Hardware Diagnostics
-        if any(w in q for w in ["sensor", "door", "jammed"]):
+        # 9. Smart Locker Sensor & Hardware Diagnostics
+        if any(w in q for w in ["sensor", "jammed"]):
             return AgentResult(
                 agent_name=self.name,
                 content=(
@@ -113,20 +190,22 @@ class CustomerAgent(BaseAgent):
                 requires_approval=False,
                 suggested_actions=[
                     "Request remote compartment unlock",
-                    "Run solenoid latch test",
-                    "Create ServiceNow maintenance ticket",
+                    "Resend pickup PIN",
+                    "Locker location and hours",
                 ],
             )
 
-        # 6. General Customer Knowledge Base Fallback
+        # 10. General Customer Support Fallback
         return AgentResult(
             agent_name=self.name,
-            content=f"[Customer Support] Queried smart locker knowledge base for: '{query}'. How else can I assist you today?",
+            content=f"I'm here to help with your Smiota smart locker deliveries! Regarding '{query}', would you like me to check a package, retrieve your pickup PIN, or connect you with property concierge?",
             requires_approval=False,
             suggested_actions=[
-                "Check parcel status",
-                "Door sensor troubleshooting",
-                "Create ServiceNow ticket",
+                "Where is my package?",
+                "Resend pickup PIN",
+                "Locker location and hours",
+                "Locker door did not open",
             ],
         )
+
 

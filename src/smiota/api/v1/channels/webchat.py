@@ -106,10 +106,10 @@ async def embed_widget():
 
             <!-- Interactive Quick Reply Pill Buttons -->
             <div id="quick-replies-container" class="grid grid-cols-2 gap-2 pt-1 px-8">
-                <button onclick="sendQuickReply('Where is my package?')" class="text-xs text-indigo-600 border border-indigo-200 hover:bg-indigo-50 font-medium py-2 px-3 rounded-full transition text-center shadow-xs truncate">📦 Check parcel status</button>
-                <button onclick="sendQuickReply('Resend pickup PIN')" class="text-xs text-indigo-600 border border-indigo-200 hover:bg-indigo-50 font-medium py-2 px-3 rounded-full transition text-center shadow-xs truncate">🔑 Resend pickup PIN</button>
-                <button onclick="sendQuickReply('Locker location and hours')" class="text-xs text-indigo-600 border border-indigo-200 hover:bg-indigo-50 font-medium py-2 px-3 rounded-full transition text-center shadow-xs truncate">📍 Locker hours & location</button>
-                <button onclick="sendQuickReply('Locker door didn\'t open')" class="text-xs text-indigo-600 border border-indigo-200 hover:bg-indigo-50 font-medium py-2 px-3 rounded-full transition text-center shadow-xs truncate">❓ Locker pickup help</button>
+                <button type="button" onclick="sendQuickReply('Where is my package?')" class="text-xs text-indigo-600 border border-indigo-200 hover:bg-indigo-50 font-medium py-2 px-3 rounded-full transition text-center shadow-xs truncate">📦 Check parcel status</button>
+                <button type="button" onclick="sendQuickReply('Resend pickup PIN')" class="text-xs text-indigo-600 border border-indigo-200 hover:bg-indigo-50 font-medium py-2 px-3 rounded-full transition text-center shadow-xs truncate">🔑 Resend pickup PIN</button>
+                <button type="button" onclick="sendQuickReply('Locker location and hours')" class="text-xs text-indigo-600 border border-indigo-200 hover:bg-indigo-50 font-medium py-2 px-3 rounded-full transition text-center shadow-xs truncate">📍 Locker hours & location</button>
+                <button type="button" onclick="sendQuickReply('Locker door did not open')" class="text-xs text-indigo-600 border border-indigo-200 hover:bg-indigo-50 font-medium py-2 px-3 rounded-full transition text-center shadow-xs truncate">❓ Locker pickup help</button>
             </div>
         </div>
 
@@ -177,10 +177,18 @@ async def embed_widget():
 
         function formatMarkdown(str) {
             if (!str) return '';
-            return str
-                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                .replace(/`(.*?)`/g, '<code class="bg-indigo-50 text-indigo-700 px-1 py-0.5 rounded font-mono text-xs">$1</code>')
-                .replace(/\n/g, '<br>');
+            const parts = str.split('**');
+            let res = '';
+            for (let i = 0; i < parts.length; i++) {
+                res += (i % 2 === 1) ? ('<strong>' + parts[i] + '</strong>') : parts[i];
+            }
+            const codeParts = res.split('`');
+            let resCode = '';
+            for (let i = 0; i < codeParts.length; i++) {
+                resCode += (i % 2 === 1) ? ('<code class="bg-indigo-50 text-indigo-700 px-1 py-0.5 rounded font-mono text-xs">' + codeParts[i] + '</code>') : codeParts[i];
+            }
+            const nl = String.fromCharCode(10);
+            return resCode.split(nl).join('<br>');
         }
 
         function appendMessage(sender, text, agentName = 'AI', requiresApproval = false, suggestedActions = []) {
@@ -289,7 +297,10 @@ async def embed_widget():
             notifyParentHeight();
         }
 
+        let typingTimeout = null;
+
         function showTypingIndicator() {
+            removeTypingIndicator();
             const typingDiv = document.createElement('div');
             typingDiv.id = 'typing-indicator';
             typingDiv.className = 'flex items-center space-x-2 text-slate-400 text-xs py-1 px-8';
@@ -303,9 +314,21 @@ async def embed_widget():
             `;
             messagesContainer.appendChild(typingDiv);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+            if (typingTimeout) clearTimeout(typingTimeout);
+            typingTimeout = setTimeout(() => {
+                if (document.getElementById('typing-indicator')) {
+                    removeTypingIndicator();
+                    appendMessage('bot', "I'm taking a bit longer than expected to look that up. Please try again or provide your tracking number (e.g. SM-9821).", 'Concierge');
+                }
+            }, 10000);
         }
 
         function removeTypingIndicator() {
+            if (typingTimeout) {
+                clearTimeout(typingTimeout);
+                typingTimeout = null;
+            }
             const el = document.getElementById('typing-indicator');
             if (el) el.remove();
         }
@@ -315,8 +338,10 @@ async def embed_widget():
         // ======================================================================
         let wsSocket = null;
         let wsConnected = false;
+        let heartbeatTimer = null;
 
         function initWebSocket() {
+            if (heartbeatTimer) clearInterval(heartbeatTimer);
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             let wsUrl = `${protocol}//${window.location.host}/api/v1/chat/ws/${sessionId}`;
             if (residentId) {
@@ -330,7 +355,7 @@ async def embed_widget():
                 wsConnected = true;
                 console.log("Real-time WebSocket connected!");
                 // Keep-alive heartbeat ping every 25s
-                setInterval(() => {
+                heartbeatTimer = setInterval(() => {
                     if (wsSocket && wsSocket.readyState === WebSocket.OPEN) {
                         wsSocket.send("ping");
                     }
@@ -349,6 +374,7 @@ async def embed_widget():
 
             wsSocket.onclose = () => {
                 wsConnected = false;
+                if (heartbeatTimer) clearInterval(heartbeatTimer);
                 console.warn("WebSocket disconnected. Reconnecting in 3s...");
                 setTimeout(initWebSocket, 3000);
             };
@@ -394,7 +420,7 @@ async def embed_widget():
                 wsSocket.send(JSON.stringify({
                     text: messageText,
                     session_id: sessionId,
-                    resident_id: residentId
+                    resident_id: residentId || "resident-guest"
                 }));
             } else {
                 // HTTP REST Fallback
@@ -422,34 +448,58 @@ async def embed_widget():
         function sendQuickReply(text) {
             executeQuery(text);
         }
+        window.sendQuickReply = sendQuickReply;
+        window.executeQuery = executeQuery;
 
         function insertEmoji(emoji) {
             input.value += emoji;
             input.focus();
         }
+        window.insertEmoji = insertEmoji;
 
-        form.addEventListener('submit', (e) => {
-            e.preventDefault();
+        function handleSend() {
             const text = input.value.trim();
             if (!text) return;
             input.value = '';
             executeQuery(text);
+        }
+
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            handleSend();
+        });
+
+        sendBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            handleSend();
+        });
+
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                handleSend();
+            }
         });
 
         // Parent communication buttons
-        document.getElementById('close-btn').addEventListener('click', () => {
-            window.parent.postMessage({ type: 'close-chatbot' }, '*');
-        });
+        const closeBtn = document.getElementById('close-btn');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                window.parent.postMessage({ type: 'close-chatbot' }, '*');
+            });
+        }
 
-        document.getElementById('minimize-btn').addEventListener('click', () => {
-            window.parent.postMessage({ type: 'minimize-chatbot' }, '*');
-        });
+        const minBtn = document.getElementById('minimize-btn');
+        if (minBtn) {
+            minBtn.addEventListener('click', () => {
+                window.parent.postMessage({ type: 'minimize-chatbot' }, '*');
+            });
+        }
 
-        // Initialize WebSocket when page loads
-        window.addEventListener('load', () => {
-            notifyParentHeight();
-            initWebSocket();
-        });
+        // Initialize immediately
+        notifyParentHeight();
+        initWebSocket();
+        window.addEventListener('load', notifyParentHeight);
     </script>
 </body>
 </html>

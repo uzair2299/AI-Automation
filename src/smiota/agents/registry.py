@@ -19,6 +19,9 @@ class AgentRegistry:
     @classmethod
     def get(cls, name: str) -> BaseAgent:
         """Retrieve an agent by name or domain."""
+        if not cls._agents:
+            from smiota.agents import register_default_agents
+            register_default_agents()
         name_key = name.lower()
         if name_key not in cls._agents:
             raise KeyError(f"Agent '{name}' is not registered. Available agents: {list(cls._agents.keys())}")

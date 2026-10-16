@@ -73,12 +73,16 @@ async def websocket_chat_stream(
             req_resident_id = resident_id or "ws-resident"
             try:
                 parsed = json.loads(raw_data)
-                if isinstance(parsed, dict) and "text" in parsed:
-                    user_message = parsed.get("text", "")
-                    if "resident_id" in parsed:
-                        req_resident_id = parsed["resident_id"]
+                if isinstance(parsed, dict):
+                    if "text" in parsed and parsed["text"] is not None:
+                        user_message = str(parsed["text"])
+                    if parsed.get("resident_id"):
+                        req_resident_id = str(parsed["resident_id"])
             except Exception:
                 pass
+
+            if not req_resident_id:
+                req_resident_id = "ws-resident"
 
             if not user_message.strip():
                 continue
@@ -90,27 +94,40 @@ async def websocket_chat_stream(
                 channel="webchat",
             )
 
-            # Route to agent core
-            result = await orchestrator.route_and_execute(user_message, context)
+            try:
+                # Route to agent core
+                result = await orchestrator.route_and_execute(user_message, context)
 
-            # Stream response tokens
-            for token in result.content.split():
+                # Stream response tokens
+                for token in result.content.split():
+                    await websocket.send_json({
+                        "type": "token",
+                        "token": token + " ",
+                        "agent": result.agent_name,
+                    })
+                    await asyncio.sleep(0.02)
+
+                # Send completion envelope with actions & approval flag
+                await websocket.send_json({
+                    "type": "done",
+                    "agent": result.agent_name,
+                    "requires_approval": result.requires_approval,
+                    "suggested_actions": result.suggested_actions,
+                })
+            except Exception as agent_err:
+                logger.error(f"Error processing message in session {session_id}: {agent_err}", exc_info=True)
                 await websocket.send_json({
                     "type": "token",
-                    "token": token + " ",
-                    "agent": result.agent_name,
+                    "token": "I'm having trouble retrieving that information right now. Please try again or ask our concierge.",
+                    "agent": "Customer",
                 })
-                await asyncio.sleep(0.02)
-
-            # Send completion envelope with actions & approval flag
-            await websocket.send_json({
-                "type": "done",
-                "agent": result.agent_name,
-                "requires_approval": result.requires_approval,
-                "suggested_actions": result.suggested_actions,
-            })
+                await websocket.send_json({
+                    "type": "done",
+                    "agent": "Customer",
+                    "suggested_actions": ["Where is my package?", "Resend pickup PIN", "Locker location and hours"],
+                })
     except WebSocketDisconnect:
         await ws_manager.disconnect(session_id)
     except Exception as e:
-        logger.error(f"WebSocket error on session {session_id}: {e}", exc_info=True)
+        logger.error(f"WebSocket fatal error on session {session_id}: {e}", exc_info=True)
         await ws_manager.disconnect(session_id)
