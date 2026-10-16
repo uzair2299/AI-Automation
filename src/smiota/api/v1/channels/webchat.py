@@ -68,8 +68,8 @@ async def embed_widget():
                     <span class="absolute bottom-0 right-0 w-3 h-3 bg-emerald-400 border-2 border-indigo-600 rounded-full"></span>
                 </div>
                 <div>
-                    <h1 class="font-semibold text-base tracking-tight leading-tight">Smiota AI Concierge</h1>
-                    <p class="text-xs text-indigo-100 opacity-90">Customer, AIOps & Security AI</p>
+                    <h1 class="font-semibold text-base tracking-tight leading-tight">Smiota AI Assistant</h1>
+                    <p class="text-xs text-indigo-100 opacity-90">Smart Locker & Parcel Concierge</p>
                 </div>
             </div>
             <div class="flex items-center space-x-1.5">
@@ -94,22 +94,22 @@ async def embed_widget():
                 <div class="w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px] font-bold shrink-0 shadow-xs">AI</div>
                 <div class="bg-slate-100 text-slate-800 px-4 py-2.5 rounded-2xl rounded-bl-sm max-w-[85%] text-sm shadow-xs leading-relaxed">
                     <div class="flex items-center justify-between space-x-3 mb-1">
-                        <span class="text-[10px] font-bold uppercase tracking-wider text-indigo-600">Smiota Concierge</span>
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-indigo-600">Smiota Assistant</span>
                         <span id="initial-bot-time" class="text-[10px] text-slate-400 font-medium"></span>
                     </div>
                     <div>
                         Hi there! 👋<br>
-                        Welcome to Smiota. How can I assist you with your smart locker, parcel tracking, or support inquiry today?
+                        Welcome to Smiota. I can help you check your package deliveries, locate your locker compartment, or get your pickup PIN.
                     </div>
                 </div>
             </div>
 
             <!-- Interactive Quick Reply Pill Buttons -->
             <div id="quick-replies-container" class="grid grid-cols-2 gap-2 pt-1 px-8">
-                <button onclick="sendQuickReply('Check parcel status')" class="text-xs text-indigo-600 border border-indigo-200 hover:bg-indigo-50 font-medium py-2 px-3 rounded-full transition text-center shadow-xs truncate">📦 Check parcel status</button>
-                <button onclick="sendQuickReply('Door sensor troubleshooting')" class="text-xs text-indigo-600 border border-indigo-200 hover:bg-indigo-50 font-medium py-2 px-3 rounded-full transition text-center shadow-xs truncate">🔧 Door troubleshooting</button>
-                <button onclick="sendQuickReply('Investigate GKE high CPU')" class="text-xs text-indigo-600 border border-indigo-200 hover:bg-indigo-50 font-medium py-2 px-3 rounded-full transition text-center shadow-xs truncate">⚡ SRE / AIOps Telemetry</button>
-                <button onclick="sendQuickReply('Wazuh SIEM intrusion alert')" class="text-xs text-indigo-600 border border-indigo-200 hover:bg-indigo-50 font-medium py-2 px-3 rounded-full transition text-center shadow-xs truncate">🛡️ Security Triage</button>
+                <button onclick="sendQuickReply('Where is my package?')" class="text-xs text-indigo-600 border border-indigo-200 hover:bg-indigo-50 font-medium py-2 px-3 rounded-full transition text-center shadow-xs truncate">📦 Check parcel status</button>
+                <button onclick="sendQuickReply('Resend pickup PIN')" class="text-xs text-indigo-600 border border-indigo-200 hover:bg-indigo-50 font-medium py-2 px-3 rounded-full transition text-center shadow-xs truncate">🔑 Resend pickup PIN</button>
+                <button onclick="sendQuickReply('Locker location and hours')" class="text-xs text-indigo-600 border border-indigo-200 hover:bg-indigo-50 font-medium py-2 px-3 rounded-full transition text-center shadow-xs truncate">📍 Locker hours & location</button>
+                <button onclick="sendQuickReply('Locker door didn\'t open')" class="text-xs text-indigo-600 border border-indigo-200 hover:bg-indigo-50 font-medium py-2 px-3 rounded-full transition text-center shadow-xs truncate">❓ Locker pickup help</button>
             </div>
         </div>
 
@@ -158,8 +158,11 @@ async def embed_widget():
             </svg>
         `;
 
-        // Session ID management
-        const sessionId = "webchat-" + Math.random().toString(36).substring(2, 9);
+        // Session & Resident ID management (from URL parameters or auto-generated)
+        const urlParams = new URLSearchParams(window.location.search);
+        const sessionId = urlParams.get('session_id') || ("webchat-" + Math.random().toString(36).substring(2, 9));
+        const residentId = urlParams.get('resident_id') || urlParams.get('user_id') || null;
+
         const messagesContainer = document.getElementById('chat-messages');
         const form = document.getElementById('chat-form');
         const input = document.getElementById('chat-input');
@@ -175,9 +178,9 @@ async def embed_widget():
         function formatMarkdown(str) {
             if (!str) return '';
             return str
-                .replace(/\\*\\*(.*?)\\*\\*/g, '<strong>$1</strong>')
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
                 .replace(/`(.*?)`/g, '<code class="bg-indigo-50 text-indigo-700 px-1 py-0.5 rounded font-mono text-xs">$1</code>')
-                .replace(/\\n/g, '<br>');
+                .replace(/\n/g, '<br>');
         }
 
         function appendMessage(sender, text, agentName = 'AI', requiresApproval = false, suggestedActions = []) {
@@ -191,8 +194,8 @@ async def embed_widget():
                 if (requiresApproval) {
                     approvalBadge = `
                         <div class="mt-2.5 p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-700 text-xs flex items-center space-x-1.5">
-                            <span class="font-bold">🔒 HITL Gate:</span>
-                            <span>Action mutates infrastructure and requires admin approval.</span>
+                            <span class="font-bold">🔒 Security Gate:</span>
+                            <span>Action mutates physical locker hardware and requires verification.</span>
                         </div>
                     `;
                 }
@@ -201,10 +204,10 @@ async def embed_widget():
                     <div class="w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px] font-bold shrink-0 shadow-xs">${agentName.slice(0, 2).toUpperCase()}</div>
                     <div class="bg-slate-100 text-slate-800 px-4 py-2.5 rounded-2xl rounded-bl-sm max-w-[85%] text-sm shadow-xs leading-relaxed">
                         <div class="flex items-center justify-between space-x-3 mb-1">
-                            <span class="text-[10px] font-bold uppercase tracking-wider text-indigo-600">${agentName} Agent</span>
+                            <span class="text-[10px] font-bold uppercase tracking-wider text-indigo-600">${agentName} Assistant</span>
                             <span class="text-[10px] text-slate-400 font-medium">${timeStr}</span>
                         </div>
-                        <div>${formatMarkdown(text)}</div>
+                        <div class="bot-text-body">${formatMarkdown(text)}</div>
                         ${approvalBadge}
                     </div>
                 `;
@@ -225,6 +228,53 @@ async def embed_widget():
             notifyParentHeight();
 
             // Render dynamic suggested actions if returned
+            if (suggestedActions && suggestedActions.length > 0) {
+                renderQuickReplies(suggestedActions);
+            }
+            return div;
+        }
+
+        // Live Real-Time Token Streaming Bubble
+        let currentStreamDiv = null;
+        let currentStreamBody = null;
+        let currentStreamText = "";
+
+        function createStreamingBubble(agentName = 'AI') {
+            const timeStr = getFormattedTime();
+            currentStreamText = "";
+            const div = document.createElement('div');
+            div.className = "flex items-end space-x-2 justify-start";
+            div.innerHTML = `
+                <div class="w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px] font-bold shrink-0 shadow-xs">${agentName.slice(0, 2).toUpperCase()}</div>
+                <div class="bg-slate-100 text-slate-800 px-4 py-2.5 rounded-2xl rounded-bl-sm max-w-[85%] text-sm shadow-xs leading-relaxed">
+                    <div class="flex items-center justify-between space-x-3 mb-1">
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-indigo-600">${agentName} Assistant</span>
+                        <span class="text-[10px] text-slate-400 font-medium">${timeStr}</span>
+                    </div>
+                    <div class="streaming-content text-slate-800"></div>
+                </div>
+            `;
+            messagesContainer.appendChild(div);
+            currentStreamDiv = div;
+            currentStreamBody = div.querySelector('.streaming-content');
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            notifyParentHeight();
+            return div;
+        }
+
+        function appendPushNotification(title, message, suggestedActions = []) {
+            const div = document.createElement('div');
+            div.className = "my-2 p-3 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl shadow-xs text-xs text-slate-800";
+            div.innerHTML = `
+                <div class="flex items-center space-x-2 text-emerald-700 font-bold mb-1">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span>${title}</span>
+                </div>
+                <div class="text-slate-700 leading-relaxed">${formatMarkdown(message)}</div>
+            `;
+            messagesContainer.appendChild(div);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            notifyParentHeight();
             if (suggestedActions && suggestedActions.length > 0) {
                 renderQuickReplies(suggestedActions);
             }
@@ -252,7 +302,6 @@ async def embed_widget():
                 btn.onclick = () => sendQuickReply(act);
                 quickRepliesContainer.appendChild(btn);
             });
-            // Crucial: Move quickRepliesContainer to the very bottom of messagesContainer
             messagesContainer.appendChild(quickRepliesContainer);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
             notifyParentHeight();
@@ -268,7 +317,7 @@ async def embed_widget():
                     <span class="w-2 h-2 bg-indigo-500 rounded-full typing-dot"></span>
                     <span class="w-2 h-2 bg-indigo-500 rounded-full typing-dot"></span>
                 </div>
-                <span class="text-[11px] font-medium text-slate-400">Agent is reasoning...</span>
+                <span class="text-[11px] font-medium text-slate-400">Assistant is checking...</span>
             `;
             messagesContainer.appendChild(typingDiv);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
@@ -279,8 +328,81 @@ async def embed_widget():
             if (el) el.remove();
         }
 
+        // ======================================================================
+        // Real-Time WebSocket Implementation
+        // ======================================================================
+        let wsSocket = null;
+        let wsConnected = false;
+
+        function initWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            let wsUrl = `${protocol}//${window.location.host}/api/v1/chat/ws/${sessionId}`;
+            if (residentId) {
+                wsUrl += `?resident_id=${encodeURIComponent(residentId)}`;
+            }
+
+            console.log("Connecting real-time chat socket to:", wsUrl);
+            wsSocket = new WebSocket(wsUrl);
+
+            wsSocket.onopen = () => {
+                wsConnected = true;
+                console.log("Real-time WebSocket connected!");
+                // Keep-alive heartbeat ping every 25s
+                setInterval(() => {
+                    if (wsSocket && wsSocket.readyState === WebSocket.OPEN) {
+                        wsSocket.send("ping");
+                    }
+                }, 25000);
+            };
+
+            wsSocket.onmessage = (event) => {
+                if (event.data === "pong") return;
+                try {
+                    const msg = JSON.parse(event.data);
+                    handleIncomingSocketPayload(msg);
+                } catch(e) {
+                    console.error("Failed to parse WebSocket JSON payload:", e);
+                }
+            };
+
+            wsSocket.onclose = () => {
+                wsConnected = false;
+                console.warn("WebSocket disconnected. Reconnecting in 3s...");
+                setTimeout(initWebSocket, 3000);
+            };
+
+            wsSocket.onerror = (err) => {
+                console.warn("WebSocket error occurred:", err);
+            };
+        }
+
+        function handleIncomingSocketPayload(msg) {
+            if (msg.type === "token") {
+                removeTypingIndicator();
+                if (!currentStreamDiv) {
+                    createStreamingBubble(msg.agent || "AI");
+                }
+                currentStreamText += msg.token;
+                if (currentStreamBody) {
+                    currentStreamBody.innerHTML = formatMarkdown(currentStreamText);
+                }
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            } else if (msg.type === "done") {
+                removeTypingIndicator();
+                markLastUserMessageDelivered();
+                if (msg.suggested_actions) {
+                    renderQuickReplies(msg.suggested_actions);
+                }
+                currentStreamDiv = null;
+                currentStreamBody = null;
+                currentStreamText = "";
+            } else if (msg.type === "notification") {
+                // Real-time Push Event from RabbitMQ (Courier Drop, Locker Status)
+                appendPushNotification(msg.title || "Locker Update", msg.message || "", msg.suggested_actions || []);
+            }
+        }
+
         async function executeQuery(messageText) {
-            // Hide old quick replies while query is being processed
             if (quickRepliesContainer) {
                 quickRepliesContainer.innerHTML = '';
                 quickRepliesContainer.style.display = 'none';
@@ -288,24 +410,33 @@ async def embed_widget():
             appendMessage('user', messageText);
             showTypingIndicator();
 
-            try {
-                const response = await fetch('/api/v1/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        message: messageText,
-                        channel: 'webchat',
-                        session_id: sessionId
-                    })
-                });
-
-                const data = await response.json();
-                removeTypingIndicator();
-                markLastUserMessageDelivered();
-                appendMessage('bot', data.response, data.agent_used, data.requires_approval, data.suggested_actions);
-            } catch (err) {
-                removeTypingIndicator();
-                appendMessage('bot', 'Network error communicating with Smiota AI Core.', 'Error');
+            if (wsConnected && wsSocket && wsSocket.readyState === WebSocket.OPEN) {
+                // Send via Real-Time WebSocket
+                wsSocket.send(JSON.stringify({
+                    text: messageText,
+                    session_id: sessionId,
+                    resident_id: residentId
+                }));
+            } else {
+                // HTTP REST Fallback
+                try {
+                    const response = await fetch('/api/v1/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            message: messageText,
+                            channel: 'webchat',
+                            session_id: sessionId
+                        })
+                    });
+                    const data = await response.json();
+                    removeTypingIndicator();
+                    markLastUserMessageDelivered();
+                    appendMessage('bot', data.response, data.agent_used, data.requires_approval, data.suggested_actions);
+                } catch (err) {
+                    removeTypingIndicator();
+                    appendMessage('bot', 'Network error communicating with Smiota AI Core.', 'Error');
+                }
             }
         }
 
@@ -335,8 +466,11 @@ async def embed_widget():
             window.parent.postMessage({ type: 'minimize-chatbot' }, '*');
         });
 
-        // Initial height notification
-        window.addEventListener('load', notifyParentHeight);
+        // Initialize WebSocket when page loads
+        window.addEventListener('load', () => {
+            notifyParentHeight();
+            initWebSocket();
+        });
     </script>
 </body>
 </html>

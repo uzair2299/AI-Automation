@@ -44,19 +44,48 @@ async def send_message(
     )
 
 
+from typing import Optional
+from fastapi import Query
+from smiota.api.v1.websocket_manager import ws_manager
+import json
+
+
 @router.websocket("/ws/{session_id}")
-async def websocket_chat_stream(websocket: WebSocket, session_id: str):
-    """Real-time WebSocket endpoint for instant token streaming and agent responses."""
-    await websocket.accept()
+async def websocket_chat_stream(
+    websocket: WebSocket,
+    session_id: str,
+    resident_id: Optional[str] = Query(None),
+):
+    """Real-time WebSocket endpoint for instant token streaming, agent responses, and RabbitMQ push alerts."""
+    await ws_manager.connect(session_id, websocket, resident_id)
     orchestrator = AgentOrchestrator()
-    logger.info(f"WebSocket client connected for session: {session_id}")
 
     try:
         while True:
-            user_message = await websocket.receive_text()
+            raw_data = await websocket.receive_text()
+            # Handle heartbeat ping
+            if raw_data.strip() == "ping":
+                await websocket.send_text("pong")
+                continue
+
+            # Parse plain text or JSON envelope
+            user_message = raw_data
+            req_resident_id = resident_id or "ws-resident"
+            try:
+                parsed = json.loads(raw_data)
+                if isinstance(parsed, dict) and "text" in parsed:
+                    user_message = parsed.get("text", "")
+                    if "resident_id" in parsed:
+                        req_resident_id = parsed["resident_id"]
+            except Exception:
+                pass
+
+            if not user_message.strip():
+                continue
+
             context = AgentContext(
                 session_id=session_id,
-                user_id="ws-client",
+                user_id=req_resident_id,
                 tenant_id="default",
                 channel="webchat",
             )
@@ -71,7 +100,7 @@ async def websocket_chat_stream(websocket: WebSocket, session_id: str):
                     "token": token + " ",
                     "agent": result.agent_name,
                 })
-                await asyncio.sleep(0.03)
+                await asyncio.sleep(0.02)
 
             # Send completion envelope with actions & approval flag
             await websocket.send_json({
@@ -81,4 +110,7 @@ async def websocket_chat_stream(websocket: WebSocket, session_id: str):
                 "suggested_actions": result.suggested_actions,
             })
     except WebSocketDisconnect:
-        logger.info(f"WebSocket session {session_id} disconnected.")
+        await ws_manager.disconnect(session_id)
+    except Exception as e:
+        logger.error(f"WebSocket error on session {session_id}: {e}", exc_info=True)
+        await ws_manager.disconnect(session_id)

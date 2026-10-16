@@ -22,6 +22,10 @@ import smiota.mcp.servers.qa.tools             # noqa: F401
 import smiota.mcp.servers.customer.tools       # noqa: F401
 
 
+from smiota.core.rabbitmq import RabbitMQService
+from smiota.workflows.pubsub_listener import launch_listener_daemon
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application startup and shutdown lifecycle management."""
@@ -34,10 +38,14 @@ async def lifespan(app: FastAPI):
     # 2. Setup Telemetry & OpenTelemetry Tracing
     setup_telemetry(app)
 
+    # 3. Launch background RabbitMQ event listener for real-time WebSocket push
+    launch_listener_daemon()
+
     logger.info("Smiota Agent Core + MCP successfully initialized and ready to serve requests.")
     yield
 
     logger.info("Shutting down Smiota AI Platform services...")
+    await RabbitMQService.close()
     await close_cache()
     await close_db()
 
