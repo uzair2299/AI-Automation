@@ -17,20 +17,27 @@ class GeminiProvider:
         self._initialized = False
 
     def _get_vertex_client(self):
-        """Lazy-initialize official Google GenAI Vertex AI client."""
+        """Lazy-initialize official Google GenAI Vertex AI client or Gemini API Key client."""
         if not self._initialized:
             self._initialized = True
             try:
+                import os
                 from google import genai
-                # Connect to Vertex AI backend on GCP using project & region
-                self._client = genai.Client(
-                    vertexai=True,
-                    project=self.settings.GCP_PROJECT_ID,
-                    location=self.settings.GCP_REGION,
-                )
-                logger.info(
-                    f"Initialized Vertex AI Client (Project: {self.settings.GCP_PROJECT_ID}, Region: {self.settings.GCP_REGION})"
-                )
+                api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+                if api_key:
+                    self._client = genai.Client(api_key=api_key)
+                    self.model_name = "gemini-1.5-flash"
+                    logger.info("Initialized Google GenAI Client with GEMINI_API_KEY")
+                else:
+                    # Connect to Vertex AI backend on GCP using project & region
+                    self._client = genai.Client(
+                        vertexai=True,
+                        project=self.settings.GCP_PROJECT_ID,
+                        location=self.settings.GCP_REGION,
+                    )
+                    logger.info(
+                        f"Initialized Vertex AI Client (Project: {self.settings.GCP_PROJECT_ID}, Region: {self.settings.GCP_REGION})"
+                    )
             except Exception as e:
                 logger.info(
                     f"Vertex AI Client running in local mock mode (GCP credentials not configured: {e})"

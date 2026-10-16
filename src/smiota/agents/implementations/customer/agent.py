@@ -122,7 +122,7 @@ class CustomerAgent(BaseAgent):
             )
 
         # 6. Package / Parcel Tracking ID Provided (e.g. SM-9821, PKG-4402, 1Z999...)
-        tracking_match = re.search(r'\b(sm-[0-9a-z]+|pkg-[0-9a-z]+|1z[0-9a-z]+|[a-z0-9]{8,})\b', q)
+        tracking_match = re.search(r'\b(sm-[0-9a-z]+|pkg-[0-9a-z]+|1z[0-9a-z]+|[0-9]{8,}|(?=[a-z]*[0-9])(?=[0-9]*[a-z])[a-z0-9]{8,})\b', q)
         if tracking_match:
             pkg_id = tracking_match.group(0).upper()
             return AgentResult(
@@ -195,17 +195,36 @@ class CustomerAgent(BaseAgent):
                 ],
             )
 
-        # 10. General Customer Support Fallback
-        return AgentResult(
-            agent_name=self.name,
-            content=f"I'm here to help with your Smiota smart locker deliveries! Regarding '{query}', would you like me to check a package, retrieve your pickup PIN, or connect you with property concierge?",
-            requires_approval=False,
-            suggested_actions=[
-                "Where is my package?",
-                "Resend pickup PIN",
-                "Locker location and hours",
-                "Locker door did not open",
-            ],
-        )
+        # 10. Open-Ended Inquiry -> Invoke Gemini / Vertex AI
+        try:
+            from smiota.llm.provider import GeminiProvider
+            llm = GeminiProvider()
+            llm_reply = await llm.generate_completion(
+                prompt=f"Resident query: {query}\nProvide a helpful, polite, and concise answer for the resident.",
+                system_instruction=self.system_prompt,
+            )
+            return AgentResult(
+                agent_name=self.name,
+                content=llm_reply,
+                requires_approval=False,
+                suggested_actions=[
+                    "Where is my package?",
+                    "Resend pickup PIN",
+                    "Locker location and hours",
+                    "Locker door did not open",
+                ],
+            )
+        except Exception:
+            return AgentResult(
+                agent_name=self.name,
+                content=f"I'm here to help with your Smiota smart locker deliveries! Regarding '{query}', would you like me to check a package, retrieve your pickup PIN, or connect you with property concierge?",
+                requires_approval=False,
+                suggested_actions=[
+                    "Where is my package?",
+                    "Resend pickup PIN",
+                    "Locker location and hours",
+                    "Locker door did not open",
+                ],
+            )
 
 
