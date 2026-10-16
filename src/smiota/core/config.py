@@ -30,9 +30,9 @@ class BaseAppSettings(BaseSettings):
     CORS_ORIGINS: list[str] = ["*"]
 
     # GCP & Vertex AI Configuration
-    GCP_PROJECT_ID: str = "smiota-cloud-prod"
+    GCP_PROJECT_ID: str = "vertex-ai-510710"
     GCP_REGION: str = "us-central1"
-    GEMINI_MODEL: str = "gemini-1.5-pro-002"
+    GEMINI_MODEL: str = "gemini-2.5-flash"
     GEMINI_EMBEDDING_MODEL: str = "text-embedding-004"
 
     # Database, Cache & Message Broker

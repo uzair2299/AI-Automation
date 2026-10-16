@@ -13,7 +13,7 @@ data:
   PROJECT_NAME: "Smiota AI Platform"
   GCP_PROJECT_ID: "smiota-cloud-prod"
   GCP_REGION: "us-central1"
-  GEMINI_MODEL: "gemini-1.5-pro-002"
+  GEMINI_MODEL: "gemini-2.5-flash"
   GEMINI_EMBEDDING_MODEL: "text-embedding-004"
   MCP_READ_ONLY_DEFAULT: "true"
   REQUIRE_HUMAN_APPROVAL_FOR_REMEDIATION: "true"

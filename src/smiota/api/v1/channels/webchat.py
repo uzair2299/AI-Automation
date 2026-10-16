@@ -321,7 +321,7 @@ async def embed_widget():
                     removeTypingIndicator();
                     appendMessage('bot', "I'm taking a bit longer than expected to look that up. Please try again or provide your tracking number (e.g. SM-9821).", 'Concierge');
                 }
-            }, 10000);
+            }, 30000);
         }
 
         function removeTypingIndicator() {

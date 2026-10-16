@@ -11,32 +11,43 @@ class GeminiProvider:
 
     def __init__(self):
         self.settings = get_settings()
-        self.model_name = self.settings.GEMINI_MODEL
-        self.embedding_model = self.settings.GEMINI_EMBEDDING_MODEL
+        self.embedding_model = getattr(self.settings, "GEMINI_EMBEDDING_MODEL", "text-embedding-004")
         self._client = None
-        self._initialized = False
+
+    @property
+    def model_name(self) -> str:
+        import os
+        return os.environ.get("GEMINI_MODEL") or getattr(self.settings, "GEMINI_MODEL", "gemini-2.5-flash") or "gemini-2.5-flash"
+
+    @property
+    def project_id(self) -> str:
+        import os
+        return os.environ.get("GCP_PROJECT_ID") or getattr(self.settings, "GCP_PROJECT_ID", "vertex-ai-510710") or "vertex-ai-510710"
+
+    @property
+    def location(self) -> str:
+        import os
+        return os.environ.get("GCP_REGION") or getattr(self.settings, "GCP_REGION", "us-central1") or "us-central1"
 
     def _get_vertex_client(self):
         """Lazy-initialize official Google GenAI Vertex AI client or Gemini API Key client."""
-        if not self._initialized:
-            self._initialized = True
+        if self._client is None:
             try:
                 import os
                 from google import genai
                 api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
                 if api_key:
                     self._client = genai.Client(api_key=api_key)
-                    self.model_name = "gemini-1.5-flash"
                     logger.info("Initialized Google GenAI Client with GEMINI_API_KEY")
                 else:
                     # Connect to Vertex AI backend on GCP using project & region
                     self._client = genai.Client(
                         vertexai=True,
-                        project=self.settings.GCP_PROJECT_ID,
-                        location=self.settings.GCP_REGION,
+                        project=self.project_id,
+                        location=self.location,
                     )
                     logger.info(
-                        f"Initialized Vertex AI Client (Project: {self.settings.GCP_PROJECT_ID}, Region: {self.settings.GCP_REGION})"
+                        f"Initialized Vertex AI Client (Project: {self.project_id}, Region: {self.location}, Model: {self.model_name})"
                     )
             except Exception as e:
                 logger.info(
