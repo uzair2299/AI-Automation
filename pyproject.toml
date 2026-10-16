@@ -1,0 +1,49 @@
+[project]
+name = "smiota-ai"
+version = "0.1.0"
+description = "Smiota AI Platform - AIOps, DevSecOps and Customer AI with MCP & Multi-Agent Orchestration"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115.0, <1.0.0",
+    "uvicorn[standard]>=0.31.0, <1.0.0",
+    "pydantic>=2.9.2, <3.0.0",
+    "pydantic-settings>=2.5.2, <3.0.0",
+    "google-cloud-aiplatform>=1.68.0",
+    "google-genai>=0.1.1",
+    "mcp>=1.0.0",
+    "httpx>=0.27.2",
+    "redis>=5.1.1",
+    "sqlalchemy>=2.0.35",
+    "asyncpg>=0.29.0",
+    "greenlet>=3.0.0",
+    "alembic>=1.13.3",
+    "opentelemetry-api>=1.27.0",
+    "opentelemetry-sdk>=1.27.0",
+    "opentelemetry-instrumentation-fastapi>=0.48b0",
+    "prometheus-client>=0.21.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.3",
+    "pytest-asyncio>=0.24.0",
+    "ruff>=0.6.9",
+    "mypy>=1.11.2",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/smiota"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["src"]

@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: smiota-agent-core-service
+  labels:
+    app: smiota-agent-core
+    component: api
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 8000
+      name: http
+      protocol: TCP
+  selector:
+    app: smiota-agent-core
+    component: api

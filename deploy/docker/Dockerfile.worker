@@ -1,0 +1,22 @@
+# ==============================================================================
+# Smiota Agent Core - Background Automation Worker Dockerfile
+# ==============================================================================
+FROM python:3.11-slim AS base
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app/src
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY pyproject.toml ./
+RUN pip install --no-cache-dir .
+
+COPY src/ ./src/
+
+# Command starts background event consumer / Temporal workflow worker
+CMD ["python", "-m", "smiota.workflows.engine"]

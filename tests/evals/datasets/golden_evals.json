@@ -1,0 +1,50 @@
+[
+  {
+    "id": "eval-01",
+    "query": "GKE pods in production namespace are failing readiness probes with OOMKilled errors",
+    "expected_domain": "aiops",
+    "expected_approval": false
+  },
+  {
+    "id": "eval-02",
+    "query": "Restart the deployment payments-service immediately",
+    "expected_domain": "aiops",
+    "expected_approval": true
+  },
+  {
+    "id": "eval-03",
+    "query": "Multiple brute-force SSH logins detected in Wazuh SIEM alerts",
+    "expected_domain": "security",
+    "expected_approval": false
+  },
+  {
+    "id": "eval-04",
+    "query": "Revoke the compromised GCP service account key for ci-runner",
+    "expected_domain": "security",
+    "expected_approval": true
+  },
+  {
+    "id": "eval-05",
+    "query": "Review the terraform plan diff for the cloud sql database module",
+    "expected_domain": "developer",
+    "expected_approval": false
+  },
+  {
+    "id": "eval-06",
+    "query": "Analyze Playwright test flakiness on the pickup verification step",
+    "expected_domain": "qa",
+    "expected_approval": false
+  },
+  {
+    "id": "eval-07",
+    "query": "The resident cannot open smart locker door compartment 12 to pick up their parcel",
+    "expected_domain": "customer",
+    "expected_approval": false
+  },
+  {
+    "id": "eval-08",
+    "query": "Remotely unlock locker door compartment 12 for resident verification",
+    "expected_domain": "customer",
+    "expected_approval": true
+  }
+]
