@@ -262,24 +262,6 @@ async def embed_widget():
             return div;
         }
 
-        function appendPushNotification(title, message, suggestedActions = []) {
-            const div = document.createElement('div');
-            div.className = "my-2 p-3 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl shadow-xs text-xs text-slate-800";
-            div.innerHTML = `
-                <div class="flex items-center space-x-2 text-emerald-700 font-bold mb-1">
-                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                    <span>${title}</span>
-                </div>
-                <div class="text-slate-700 leading-relaxed">${formatMarkdown(message)}</div>
-            `;
-            messagesContainer.appendChild(div);
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-            notifyParentHeight();
-            if (suggestedActions && suggestedActions.length > 0) {
-                renderQuickReplies(suggestedActions);
-            }
-        }
-
         function markLastUserMessageDelivered() {
             const ticks = document.querySelectorAll('.user-tick-status');
             if (ticks.length > 0) {
@@ -396,9 +378,6 @@ async def embed_widget():
                 currentStreamDiv = null;
                 currentStreamBody = null;
                 currentStreamText = "";
-            } else if (msg.type === "notification") {
-                // Real-time Push Event from RabbitMQ (Courier Drop, Locker Status)
-                appendPushNotification(msg.title || "Locker Update", msg.message || "", msg.suggested_actions || []);
             }
         }
 
