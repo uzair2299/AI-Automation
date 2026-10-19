@@ -45,6 +45,8 @@ class BaseAppSettings(BaseSettings):
     JWT_SECRET_KEY: str = "smiota-dev-secret-key-change-in-prod"
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+    SAVED_SESSION_TOKEN: str = "350ab6f7-7dfb-468c-a68a-f7b150b489f3"
+    SMIOTA_SERVER_BASE_URL: str = "https://dev.smiotaapps.com/smiota"
 
     # Model Context Protocol & Safety Gates
     MCP_READ_ONLY_DEFAULT: bool = True

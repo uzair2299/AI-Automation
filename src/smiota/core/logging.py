@@ -38,6 +38,12 @@ def setup_logging() -> logging.Logger:
     settings = get_settings()
     log_level = getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO if not settings.DEBUG else logging.DEBUG)
 
+    if sys.platform == "win32":
+        try:
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
     handler = logging.StreamHandler(sys.stdout)
     handler.addFilter(CorrelationFilter())
 
@@ -55,6 +61,21 @@ def setup_logging() -> logging.Logger:
     # Remove any default handlers to avoid duplicate log entries
     root_logger.handlers.clear()
     root_logger.addHandler(handler)
+
+    # File handler: write all application logs to logs/smiota.log
+    try:
+        import os
+        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+        logs_dir = os.path.join(base_dir, "logs")
+        os.makedirs(logs_dir, exist_ok=True)
+        file_handler = logging.FileHandler(os.path.join(logs_dir, "smiota.log"), encoding="utf-8")
+        file_handler.addFilter(CorrelationFilter())
+        file_handler.setFormatter(
+            logging.Formatter("%(asctime)s [%(levelname)s] [%(name)s] [%(correlation_id)s] %(message)s")
+        )
+        root_logger.addHandler(file_handler)
+    except Exception as e:
+        sys.stderr.write(f"Warning: could not initialize file logger: {e}\n")
 
     logger = logging.getLogger("smiota")
     logger.setLevel(log_level)
