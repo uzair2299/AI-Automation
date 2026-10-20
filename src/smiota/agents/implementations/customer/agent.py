@@ -220,13 +220,18 @@ class CustomerAgent(BaseAgent):
             is_uuid = bool(uuid_match)
             pkg_id = uuid_match.group(0).lower() if is_uuid else tracking_match.group(0)
             try:
-                from smiota.database.sql_generator import TextToSQLEngine
                 from smiota.services.package_service import package_service
-                engine = TextToSQLEngine()
-                sql = await engine.generate_sql(
-                    query,
-                    user_context={"resident_id": context.user_id, "channel": context.channel, "tenant_id": context.tenant_id},
-                )
+
+                # Optional Text-to-SQL audit log (non-blocking)
+                try:
+                    from smiota.database.sql_generator import TextToSQLEngine
+                    engine = TextToSQLEngine()
+                    await engine.generate_sql(
+                        query,
+                        user_context={"resident_id": context.user_id, "channel": context.channel, "tenant_id": context.tenant_id},
+                    )
+                except Exception as sql_err:
+                    logger.debug(f"Optional Text-to-SQL audit log skipped: {sql_err}")
 
                 # Query Smiota Server endpoint:
                 # - If standard RFC-4122 UUID: GET /api/v1/packages?uuid=...
@@ -298,13 +303,18 @@ class CustomerAgent(BaseAgent):
         if phone_match or email_match:
             identifier = phone_match.group(0) if phone_match else email_match.group(0)
             try:
-                from smiota.database.sql_generator import TextToSQLEngine
                 from smiota.services.package_service import package_service
-                engine = TextToSQLEngine()
-                sql = await engine.generate_sql(
-                    query,
-                    user_context={"resident_id": context.user_id, "channel": context.channel, "tenant_id": context.tenant_id},
-                )
+
+                # Optional Text-to-SQL audit log (non-blocking)
+                try:
+                    from smiota.database.sql_generator import TextToSQLEngine
+                    engine = TextToSQLEngine()
+                    await engine.generate_sql(
+                        query,
+                        user_context={"resident_id": context.user_id, "channel": context.channel, "tenant_id": context.tenant_id},
+                    )
+                except Exception as sql_err:
+                    logger.debug(f"Optional Text-to-SQL audit log skipped: {sql_err}")
 
                 # Query Smiota Server endpoint: GET /api/v1/packages?byNameOrNumber=...
                 api_result = await package_service.get_packages(by_name_or_number=identifier)

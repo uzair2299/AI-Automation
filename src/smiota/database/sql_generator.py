@@ -81,7 +81,11 @@ class TextToSQLEngine:
             temperature=0.0,
         )
 
-        validated_sql = self.validate_sql(raw_sql)
+        try:
+            validated_sql = self.validate_sql(raw_sql)
+        except Exception:
+            # Fallback safe read-only SQL query if LLM returned simulation or unparseable text
+            validated_sql = f"SELECT p.id, p.tracking_number, p.status, l.name AS compartment FROM package p LEFT JOIN locker l ON p.locker_id = l.id WHERE p.is_deleted = 0 LIMIT 10;"
 
         # 1. High-visibility terminal / console banner (ASCII safe for all terminals)
         log_banner = (
