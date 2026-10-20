@@ -8,11 +8,13 @@ from smiota.api.v1.rag import router as rag_router
 from smiota.api.v1.channels.teams import router as teams_router
 from smiota.api.v1.channels.ide import router as ide_router
 from smiota.api.v1.channels.webchat import router as webchat_router
+from smiota.api.v1.auth import router as auth_router
 
 api_v1_router = APIRouter()
 
-# Core Agent & Operational routes
+# Core Agent, Auth & Operational routes
 api_v1_router.include_router(health_router)
+api_v1_router.include_router(auth_router)
 api_v1_router.include_router(chat_router)
 api_v1_router.include_router(approvals_router)
 api_v1_router.include_router(agents_router)

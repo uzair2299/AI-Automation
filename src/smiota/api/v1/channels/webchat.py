@@ -327,6 +327,48 @@ async def embed_widget(
         const sessionId = urlParams.get('session_id') || ("webchat-" + Math.random().toString(36).substring(2, 9));
         const residentId = urlParams.get('resident_id') || urlParams.get('user_id') || null;
 
+        // Chatbot Authentication State & One-Time Code Exchange
+        let chatSessionToken = null;
+        let authenticatedUser = null;
+
+        async function exchangeBootstrapCode(bootstrapCode) {
+            if (!bootstrapCode) return;
+            try {
+                console.log("Exchanging bootstrap code for chatbot session...");
+                const res = await fetch('/api/v1/auth/exchange', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code: bootstrapCode })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    chatSessionToken = data.access_token;
+                    authenticatedUser = data.user;
+                    console.log("Chatbot session established for user:", data.user?.user_id);
+                    window.parent.postMessage({ type: 'auth-success', user: data.user, session_id: data.session_id }, '*');
+                } else {
+                    console.warn("Bootstrap code exchange rejected with status:", res.status);
+                    window.parent.postMessage({ type: 'auth-failed', status: res.status }, '*');
+                }
+            } catch (err) {
+                console.error("Error exchanging bootstrap code:", err);
+            }
+        }
+
+        // Listen for postMessage from parent host application
+        window.addEventListener('message', (event) => {
+            if (!event.data) return;
+            if (event.data.type === 'auth-code' && event.data.code) {
+                exchangeBootstrapCode(event.data.code);
+            }
+        });
+
+        // Auto-exchange if code query parameter is provided in iframe URL (?code=...)
+        const initialCode = urlParams.get('code');
+        if (initialCode) {
+            exchangeBootstrapCode(initialCode);
+        }
+
         const messagesContainer = document.getElementById('chat-messages');
         const form = document.getElementById('chat-form');
         const input = document.getElementById('chat-input');
@@ -589,9 +631,13 @@ async def embed_widget(
             } else {
                 // HTTP REST Fallback
                 try {
+                    const reqHeaders = { 'Content-Type': 'application/json' };
+                    if (chatSessionToken) {
+                        reqHeaders['Authorization'] = 'Bearer ' + chatSessionToken;
+                    }
                     const response = await fetch('/api/v1/chat', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: reqHeaders,
                         body: JSON.stringify({
                             message: messageText,
                             channel: 'webchat',

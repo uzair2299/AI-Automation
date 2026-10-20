@@ -4,14 +4,24 @@ from smiota.main import app
 
 client = TestClient(app)
 
+from smiota.core.security import create_session_token
+chat_token, _, _ = create_session_token(
+    user_id="user-123",
+    tenant_id="smiota-internal",
+    roles=["developer", "sre"],
+    email="dev@smiota.com",
+)
+AUTH_HEADERS = {"Authorization": f"Bearer {chat_token}"}
+
 
 def test_chat_aiops_routing():
     response = client.post(
         "/api/v1/chat",
         json={
             "message": "Investigate CPU memory spike in GKE pods",
-            "channel": "webchat",
+            "channel": "teams",
         },
+        headers=AUTH_HEADERS,
     )
     assert response.status_code == 200
     data = response.json()
@@ -27,6 +37,7 @@ def test_chat_remediation_flagging():
             "message": "Restart production deployment smiota-api now",
             "channel": "teams",
         },
+        headers=AUTH_HEADERS,
     )
     assert response.status_code == 200
     data = response.json()
@@ -41,6 +52,7 @@ def test_chat_customer_agent_routing():
             "message": "Check package status in locker compartment 4",
             "channel": "webchat",
         },
+        headers=AUTH_HEADERS,
     )
     assert response.status_code == 200
     data = response.json()

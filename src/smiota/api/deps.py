@@ -1,19 +1,48 @@
-"""FastAPI dependency injection utilities."""
-from typing import AsyncGenerator
-from fastapi import Depends
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import Header
 
-from smiota.core.security import AuthenticatedUser, get_current_user_stub
 from smiota.agents.orchestrator import AgentOrchestrator
-from smiota.core.database import get_db_session
-from smiota.core.cache import get_cache_service, CacheService
-from smiota.rag.retriever import KnowledgeRetriever
+from smiota.core.exceptions import AuthenticationError
+from smiota.core.security import AuthenticatedUser, verify_session_token
 from smiota.mcp.client import MCPClient
+from smiota.rag.retriever import KnowledgeRetriever
+from smiota.services.auth_service import SmiotaBackendAuthService, backend_auth_service
 
 
-async def get_current_user() -> AuthenticatedUser:
-    """Dependency returning authenticated user and roles."""
-    return await get_current_user_stub()
+def get_backend_auth_service() -> SmiotaBackendAuthService:
+    """Dependency returning the Spring Boot internal auth service client."""
+    return backend_auth_service
+
+
+async def get_current_user(
+    authorization: str | None = Header(None, alias="Authorization"),
+) -> AuthenticatedUser:
+    """Dependency returning authenticated user and roles from signed JWT session token.
+
+    Rejects requests with missing, invalid, or expired session credentials.
+    """
+    if not authorization:
+        raise AuthenticationError(
+            "Authentication credentials were not provided. Missing 'Authorization: Bearer <session_token>' header."
+        )
+
+    parts = authorization.strip().split(" ", 1)
+    if len(parts) != 2 or parts[0].lower() != "bearer":
+        raise AuthenticationError(
+            "Invalid authorization header format. Expected 'Authorization: Bearer <session_token>'."
+        )
+
+    token = parts[1].strip()
+    if not token:
+        raise AuthenticationError("Bearer token is empty.")
+
+    payload = verify_session_token(token)
+    return AuthenticatedUser(
+        user_id=payload["sub"],
+        tenant_id=payload["tenant_id"],
+        roles=payload.get("roles", ["user"]),
+        email=payload.get("email", ""),
+        session_id=payload.get("session_id"),
+    )
 
 
 def get_orchestrator() -> AgentOrchestrator:

@@ -82,6 +82,10 @@ def create_app() -> FastAPI:
     # 4. Mount API v1 router
     app.include_router(api_v1_router, prefix=settings.API_V1_PREFIX)
 
+    # 5. Direct root mount for auth exchange endpoint (/auth/exchange)
+    from smiota.api.v1.auth import router as auth_router
+    app.include_router(auth_router)
+
     return app
 
 

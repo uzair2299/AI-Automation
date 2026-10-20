@@ -9,6 +9,8 @@ from smiota.core.exceptions import (
     AgentNotFoundError,
     ResourceNotFoundError,
     AuthorizationError,
+    AuthenticationError,
+    BackendServiceUnavailableError,
 )
 
 
@@ -16,7 +18,13 @@ async def smiota_exception_handler(request: Request, exc: SmiotaException) -> JS
     """Handle custom Smiota exceptions with appropriate HTTP status codes."""
     status_code = 500
 
-    if isinstance(exc, PromptInjectionDetectedError):
+    if isinstance(exc, AuthenticationError):
+        status_code = 401
+        error_code = "AUTHENTICATION_FAILED"
+    elif isinstance(exc, BackendServiceUnavailableError):
+        status_code = 503
+        error_code = "BACKEND_UNAVAILABLE"
+    elif isinstance(exc, PromptInjectionDetectedError):
         status_code = 400
         error_code = "SAFETY_GUARDRAIL_VIOLATION"
     elif isinstance(exc, RemediationApprovalRequiredError):

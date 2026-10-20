@@ -18,7 +18,15 @@ async def send_message(
     current_user: AuthenticatedUser = Depends(get_current_user),
     orchestrator: AgentOrchestrator = Depends(get_orchestrator),
 ):
-    session_id = payload.session_id or f"sess-{uuid.uuid4().hex[:8]}"
+    session_id = payload.session_id or current_user.session_id or f"sess-{uuid.uuid4().hex[:8]}"
+
+    # Prevent client-supplied metadata from overriding verified identity & tenant
+    sanitized_metadata = dict(payload.metadata or {})
+    sanitized_metadata.pop("user_id", None)
+    sanitized_metadata.pop("tenant_id", None)
+    sanitized_metadata.pop("roles", None)
+    if current_user.email:
+        sanitized_metadata.setdefault("user_email", current_user.email)
 
     context = AgentContext(
         session_id=session_id,
@@ -26,7 +34,7 @@ async def send_message(
         tenant_id=current_user.tenant_id,
         channel=payload.channel,
         roles=current_user.roles,
-        metadata=payload.metadata,
+        metadata=sanitized_metadata,
     )
 
     result = await orchestrator.route_and_execute(

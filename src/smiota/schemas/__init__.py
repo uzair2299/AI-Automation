@@ -29,8 +29,16 @@ from smiota.schemas.rag import (
     VectorSearchResponse,
 )
 from smiota.schemas.health import ComponentHealth, SystemHealthResponse
+from smiota.schemas.auth import (
+    AuthExchangeRequest,
+    AuthExchangeResponse,
+    UserIdentityInfo,
+)
 
 __all__ = [
+    "AuthExchangeRequest",
+    "AuthExchangeResponse",
+    "UserIdentityInfo",
     "ChatMessageRequest",
     "ChatMessageResponse",
     "ApprovalStatus",

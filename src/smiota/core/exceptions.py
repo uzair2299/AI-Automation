@@ -66,3 +66,9 @@ class AuthenticationError(SmiotaException):
 class AuthorizationError(SmiotaException):
     """Raised when user lacks permissions for an action or tool."""
     pass
+
+
+class BackendServiceUnavailableError(SmiotaException):
+    """Raised when an internal upstream service (e.g. Spring Boot) is unreachable or times out."""
+    pass
+
