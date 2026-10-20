@@ -2,7 +2,7 @@
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 
-BOT_MASCOT_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="50 38 120 155" width="100%" height="100%" class="ai-bot-svg" role="img" aria-label="AI Assistant Bot">
+BOT_MASCOT_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="60 40 100 148" width="100%" height="100%" class="ai-bot-svg" role="img" aria-label="AI Assistant Bot">
   <defs>
     <!-- Robot Head 3D Spherical Lighting Gradient -->
     <linearGradient id="robot-head-grad" x1="20%" y1="10%" x2="85%" y2="95%">
@@ -100,12 +100,13 @@ BOT_MASCOT_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="50 38 120 1
     <rect x="81" y="70" width="58" height="38" rx="19" fill="url(#robot-visor-grad)"/>
     <path d="M 85 86 C 85 76 92 72 101 71 L 115 71 C 99 74 92 79 89 90 Z" fill="url(#visor-glare-grad)"/>
 
-    <!-- Glowing Cyan Curved Eyes -->
+    <!-- Glowing Cyan Left Eye (Steady) -->
     <g filter="url(#cyan-neon-glow)">
       <rect x="90.5" y="80.5" width="10.5" height="14.5" rx="5.25" fill="#00f5d4"/>
       <circle cx="94" cy="84" r="1.8" fill="#ffffff"/>
     </g>
-    <g filter="url(#cyan-neon-glow)">
+    <!-- Glowing Cyan Right Eye (Playful Wink Animation) -->
+    <g class="mascot-eye-wink" filter="url(#cyan-neon-glow)">
       <rect x="119" y="80.5" width="10.5" height="14.5" rx="5.25" fill="#00f5d4"/>
       <circle cx="122.5" cy="84" r="1.8" fill="#ffffff"/>
     </g>
@@ -199,6 +200,12 @@ async def embed_widget(
         .ai-bot-svg { width: 100%; height: 100%; overflow: visible; }
         .mascot-svg-shadow { animation: shadowPulse 4s ease-in-out infinite; transform-box: fill-box; transform-origin: 110px 180px; }
         .mascot-svg-robot { animation: botHover 4s ease-in-out infinite; transform-box: fill-box; transform-origin: 110px 105px; }
+        .mascot-eye-wink { animation: eyeWink 3.8s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 50%; }
+
+        @keyframes eyeWink {
+            0%, 42%, 58%, 100% { transform: scaleY(1); }
+            49%, 51% { transform: scaleY(0.08); }
+        }
 
         @keyframes botHover {
             0%, 100% { transform: translateY(0); }
@@ -218,11 +225,11 @@ async def embed_widget(
         <!-- Header: Violet-to-Indigo Gradient -->
         <div class="bg-gradient-to-r from-violet-600 to-indigo-600 px-5 py-3.5 text-white flex items-center justify-between shrink-0 shadow-sm">
             <div class="flex items-center space-x-3">
-                <div class="relative">
-                    <div class="w-10 h-10 relative flex items-center justify-center drop-shadow-sm hover:scale-105 transition-transform">
+                <div class="relative shrink-0">
+                    <div class="w-11 h-11 rounded-full bg-white/20 backdrop-blur-md border border-white/40 shadow-sm flex items-center justify-center p-1 hover:scale-105 transition-transform">
                         __BOT_SVG__
                     </div>
-                    <span class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 border-2 border-indigo-600 rounded-full shadow-xs"></span>
+                    <span class="absolute bottom-0 right-0 w-3 h-3 bg-emerald-400 border-2 border-indigo-600 rounded-full shadow-xs"></span>
                 </div>
                 <div>
                     <h1 class="font-semibold text-base tracking-tight leading-tight">Smiota AI Assistant</h1>
@@ -248,7 +255,7 @@ async def embed_widget(
 
             <!-- Bot Welcome Message -->
             <div class="flex items-end space-x-2">
-                <div class="w-8 h-8 shrink-0 flex items-center justify-center relative">__BOT_SVG__</div>
+                <div class="w-9 h-9 rounded-full bg-indigo-50 border border-indigo-200/90 shadow-xs flex items-center justify-center p-1 shrink-0 relative">__BOT_SVG__</div>
                 <div class="bg-slate-100 text-slate-800 px-4 py-3 rounded-2xl rounded-bl-sm max-w-[85%] text-sm shadow-xs leading-relaxed">
                     <div class="flex items-center justify-between space-x-3 mb-1">
                         <span class="text-[10px] font-bold uppercase tracking-wider text-indigo-600" id="bot-sender-name">__ASSISTANT_NAME__</span>
@@ -380,7 +387,7 @@ async def embed_widget(
                 }
 
                 div.innerHTML = `
-                    <div class="w-8 h-8 shrink-0 flex items-center justify-center relative">${botAvatarSvg}</div>
+                    <div class="w-9 h-9 rounded-full bg-indigo-50 border border-indigo-200/90 shadow-xs flex items-center justify-center p-1 shrink-0 relative">${botAvatarSvg}</div>
                     <div class="bg-slate-100 text-slate-800 px-4 py-2.5 rounded-2xl rounded-bl-sm max-w-[85%] text-sm shadow-xs leading-relaxed">
                         <div class="flex items-center justify-between space-x-3 mb-1">
                             <span class="text-[10px] font-bold uppercase tracking-wider text-indigo-600">${agentName} Assistant</span>
