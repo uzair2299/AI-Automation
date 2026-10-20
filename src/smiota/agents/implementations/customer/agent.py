@@ -215,10 +215,32 @@ class CustomerAgent(BaseAgent):
 
         # 6. Package UUID or Parcel Tracking ID Provided
         uuid_match = re.search(r'\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b', query)
-        tracking_match = re.search(r'\b(sm-[0-9a-z]+|pkg-[0-9a-z]+|1z[0-9a-z]+|[0-9]{8,}|(•=[a-z]*[0-9])(•=[0-9]*[a-z])[a-z0-9]{8,})\b', q)
-        if uuid_match or tracking_match:
-            is_uuid = bool(uuid_match)
-            pkg_id = uuid_match.group(0).lower() if is_uuid else tracking_match.group(0)
+        explicit_match = re.search(
+            r'(?:tracking|package|parcel|uuid|number|id|#)\s*(?:is|number|id|#)?\s*[:=\s]\s*([a-zA-Z0-9_-]{6,50})',
+            query,
+            re.IGNORECASE,
+        )
+        tracking_match = re.search(
+            r'\b(sm-[0-9a-zA-Z_-]+|pkg-[0-9a-zA-Z_-]+|1z[0-9a-zA-Z]+|[0-9]{8,35}|[0-9a-fA-F]{12,32}|[a-zA-Z0-9]{8,35})\b',
+            q,
+        )
+
+        pkg_id = None
+        is_uuid = False
+
+        if uuid_match:
+            pkg_id = uuid_match.group(0).lower()
+            is_uuid = True
+        elif explicit_match:
+            candidate = explicit_match.group(1).strip()
+            if candidate.lower() not in ["status", "number", "details", "update", "pickup", "here", "there", "please"]:
+                pkg_id = candidate.lower()
+        elif tracking_match:
+            candidate = tracking_match.group(0).strip()
+            if candidate.lower() not in ["delivery", "customer", "tracking", "package", "building", "resident"]:
+                pkg_id = candidate.lower()
+
+        if pkg_id:
             try:
                 from smiota.services.package_service import package_service
 
