@@ -417,7 +417,7 @@ async def embed_widget(
             const div = document.createElement('div');
             div.className = "flex items-end space-x-2 justify-start";
             div.innerHTML = `
-                <div class="w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px] font-bold shrink-0 shadow-xs">${agentName.slice(0, 2).toUpperCase()}</div>
+                <div class="w-9 h-9 rounded-full bg-indigo-50 border border-indigo-200/90 shadow-xs flex items-center justify-center p-1 shrink-0 relative">${botAvatarSvg}</div>
                 <div class="bg-slate-100 text-slate-800 px-4 py-2.5 rounded-2xl rounded-bl-sm max-w-[85%] text-sm shadow-xs leading-relaxed">
                     <div class="flex items-center justify-between space-x-3 mb-1">
                         <span class="text-[10px] font-bold uppercase tracking-wider text-indigo-600">${agentName} Assistant</span>
