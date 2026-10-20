@@ -2,6 +2,124 @@
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 
+BOT_MASCOT_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="50 38 120 155" width="100%" height="100%" class="ai-bot-svg" role="img" aria-label="AI Assistant Bot">
+  <defs>
+    <!-- Robot Head 3D Spherical Lighting Gradient -->
+    <linearGradient id="robot-head-grad" x1="20%" y1="10%" x2="85%" y2="95%">
+      <stop offset="0%" stop-color="#dbe8fd"/>
+      <stop offset="30%" stop-color="#b7d3fc"/>
+      <stop offset="75%" stop-color="#81adfa"/>
+      <stop offset="100%" stop-color="#5d94f2"/>
+    </linearGradient>
+
+    <!-- Visor Deep Navy Shield -->
+    <linearGradient id="robot-visor-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#2e3d82"/>
+      <stop offset="50%" stop-color="#1e2962"/>
+      <stop offset="100%" stop-color="#131a42"/>
+    </linearGradient>
+
+    <!-- Visor Glass Glare / Sheen -->
+    <linearGradient id="visor-glare-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.35"/>
+      <stop offset="40%" stop-color="#ffffff" stop-opacity="0.1"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+
+    <!-- Torso 3D Gradient -->
+    <linearGradient id="robot-torso-grad" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#cce0fc"/>
+      <stop offset="50%" stop-color="#92bdfa"/>
+      <stop offset="100%" stop-color="#6399f3"/>
+    </linearGradient>
+
+    <!-- Arms Capsule Gradient -->
+    <linearGradient id="robot-arm-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#d0e3fc"/>
+      <stop offset="100%" stop-color="#79a9f7"/>
+    </linearGradient>
+
+    <!-- Cyan Neon Glow Filter -->
+    <filter id="cyan-neon-glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Ground Shadow Blur Filter -->
+    <filter id="ground-shadow-blur" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="2.5"/>
+    </filter>
+  </defs>
+
+  <!-- 1. Ground Shadow (Breathing Scale & Opacity) -->
+  <g class="mascot-svg-shadow">
+    <ellipse cx="110" cy="180" rx="32" ry="6" fill="#222b5e" opacity="0.55" filter="url(#ground-shadow-blur)"/>
+  </g>
+
+  <!-- 2. Central Robot Mascot -->
+  <g class="mascot-svg-robot">
+    <!-- Thruster Tail Cone & Core Glow -->
+    <path d="M 103 146 L 110 162 L 117 146 Z" fill="#6399f3"/>
+    <ellipse cx="110" cy="162.5" rx="5.5" ry="2.8" fill="#00f5d4" filter="url(#cyan-neon-glow)"/>
+
+    <!-- Torso -->
+    <rect x="92" y="120" width="36" height="30" rx="15" fill="url(#robot-torso-grad)"/>
+    <path d="M 94 130 C 94 123 99 122 106 121 C 98 123 94 128 94 135 Z" fill="#ffffff" opacity="0.4"/>
+
+    <!-- Chest Glowing Reactor Button -->
+    <circle cx="110" cy="131" r="3.5" fill="#00f5d4" filter="url(#cyan-neon-glow)"/>
+    <circle cx="110" cy="131" r="1.5" fill="#ffffff"/>
+
+    <!-- Floating Arms -->
+    <g transform="rotate(-16 76 126)">
+      <rect x="68" y="121" width="17" height="10.5" rx="5.25" fill="url(#robot-arm-grad)"/>
+      <ellipse cx="72" cy="124" rx="4" ry="2" fill="#ffffff" opacity="0.45"/>
+    </g>
+    <g transform="rotate(16 144 126)">
+      <rect x="135" y="121" width="17" height="10.5" rx="5.25" fill="url(#robot-arm-grad)"/>
+      <ellipse cx="140" cy="124" rx="4" ry="2" fill="#ffffff" opacity="0.45"/>
+    </g>
+
+    <!-- Antenna Stem & Neon Bulb -->
+    <line x1="124" y1="68" x2="134" y2="47" stroke="#00f5d4" stroke-width="3" stroke-linecap="round" filter="url(#cyan-neon-glow)"/>
+    <circle cx="134" cy="47" r="4" fill="#00f5d4" filter="url(#cyan-neon-glow)"/>
+    <circle cx="133" cy="46" r="1.8" fill="#ffffff"/>
+
+    <!-- Head Dome Shell -->
+    <rect x="72" y="60" width="76" height="58" rx="29" fill="url(#robot-head-grad)"/>
+    <ellipse cx="92" cy="70" rx="16" ry="7" fill="#ffffff" opacity="0.45" transform="rotate(-15 92 70)"/>
+
+    <!-- Headset Ear Cushions -->
+    <rect x="70" y="86" width="5.5" height="13" rx="2.75" fill="#1a2356"/>
+    <rect x="144.5" y="86" width="5.5" height="13" rx="2.75" fill="#1a2356"/>
+
+    <!-- Face Visor Screen -->
+    <rect x="81" y="70" width="58" height="38" rx="19" fill="url(#robot-visor-grad)"/>
+    <path d="M 85 86 C 85 76 92 72 101 71 L 115 71 C 99 74 92 79 89 90 Z" fill="url(#visor-glare-grad)"/>
+
+    <!-- Glowing Cyan Curved Eyes -->
+    <g filter="url(#cyan-neon-glow)">
+      <rect x="90.5" y="80.5" width="10.5" height="14.5" rx="5.25" fill="#00f5d4"/>
+      <circle cx="94" cy="84" r="1.8" fill="#ffffff"/>
+    </g>
+    <g filter="url(#cyan-neon-glow)">
+      <rect x="119" y="80.5" width="10.5" height="14.5" rx="5.25" fill="#00f5d4"/>
+      <circle cx="122.5" cy="84" r="1.8" fill="#ffffff"/>
+    </g>
+
+    <!-- Cheerful Smile -->
+    <path d="M 104 97 Q 110 102.5 116 97 Z" fill="#ffffff"/>
+
+    <!-- Headset Boom Microphone -->
+    <path d="M 147 94 C 147 107 134 110.5 124 105.5" fill="none" stroke="#00f5d4" stroke-width="2.6" stroke-linecap="round" filter="url(#cyan-neon-glow)"/>
+    <circle cx="123.5" cy="105.5" r="3.2" fill="#00f5d4" filter="url(#cyan-neon-glow)"/>
+    <circle cx="122.5" cy="104.5" r="1.2" fill="#ffffff"/>
+  </g>
+</svg>"""
+
 router = APIRouter(prefix="/webchat", tags=["Channels - Smiota Web Chat"])
 
 
@@ -76,6 +194,20 @@ async def embed_widget(
             0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
             40% { transform: scale(1); opacity: 1; }
         }
+    
+        /* Central Mascot Robot SVG & Micro-Animations */
+        .ai-bot-svg { width: 100%; height: 100%; overflow: visible; }
+        .mascot-svg-shadow { animation: shadowPulse 4s ease-in-out infinite; transform-box: fill-box; transform-origin: 110px 180px; }
+        .mascot-svg-robot { animation: botHover 4s ease-in-out infinite; transform-box: fill-box; transform-origin: 110px 105px; }
+
+        @keyframes botHover {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-4px); }
+        }
+        @keyframes shadowPulse {
+            0%, 100% { transform: scaleX(1); opacity: 0.55; }
+            50% { transform: scaleX(0.85); opacity: 0.32; }
+        }
     </style>
 </head>
 <body class="h-full bg-slate-100 flex flex-col overflow-hidden font-sans antialiased m-0 p-0">
@@ -87,10 +219,10 @@ async def embed_widget(
         <div class="bg-gradient-to-r from-violet-600 to-indigo-600 px-5 py-3.5 text-white flex items-center justify-between shrink-0 shadow-sm">
             <div class="flex items-center space-x-3">
                 <div class="relative">
-                    <div class="w-10 h-10 rounded-full bg-white/20 p-1 border border-white/30 flex items-center justify-center font-bold text-base shadow-sm">
-                        AI
+                    <div class="w-10 h-10 relative flex items-center justify-center drop-shadow-sm hover:scale-105 transition-transform">
+                        __BOT_SVG__
                     </div>
-                    <span class="absolute bottom-0 right-0 w-3 h-3 bg-emerald-400 border-2 border-indigo-600 rounded-full"></span>
+                    <span class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 border-2 border-indigo-600 rounded-full shadow-xs"></span>
                 </div>
                 <div>
                     <h1 class="font-semibold text-base tracking-tight leading-tight">Smiota AI Assistant</h1>
@@ -116,7 +248,7 @@ async def embed_widget(
 
             <!-- Bot Welcome Message -->
             <div class="flex items-end space-x-2">
-                <div class="w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px] font-bold shrink-0 shadow-xs">AI</div>
+                <div class="w-8 h-8 shrink-0 flex items-center justify-center relative">__BOT_SVG__</div>
                 <div class="bg-slate-100 text-slate-800 px-4 py-3 rounded-2xl rounded-bl-sm max-w-[85%] text-sm shadow-xs leading-relaxed">
                     <div class="flex items-center justify-between space-x-3 mb-1">
                         <span class="text-[10px] font-bold uppercase tracking-wider text-indigo-600" id="bot-sender-name">__ASSISTANT_NAME__</span>
@@ -163,6 +295,7 @@ async def embed_widget(
             return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         }
 
+        const botAvatarSvg = `__BOT_SVG__`;
         const now = new Date();
         const initialTime = getFormattedTime();
         document.getElementById('timestamp-tag').innerText = 'Today, ' + initialTime;
@@ -247,7 +380,7 @@ async def embed_widget(
                 }
 
                 div.innerHTML = `
-                    <div class="w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px] font-bold shrink-0 shadow-xs">${agentName.slice(0, 2).toUpperCase()}</div>
+                    <div class="w-8 h-8 shrink-0 flex items-center justify-center relative">${botAvatarSvg}</div>
                     <div class="bg-slate-100 text-slate-800 px-4 py-2.5 rounded-2xl rounded-bl-sm max-w-[85%] text-sm shadow-xs leading-relaxed">
                         <div class="flex items-center justify-between space-x-3 mb-1">
                             <span class="text-[10px] font-bold uppercase tracking-wider text-indigo-600">${agentName} Assistant</span>
@@ -548,7 +681,7 @@ async def embed_widget(
         .replace("__WELCOME_TITLE__", active_title)
         .replace("__WELCOME_MESSAGE__", active_msg)
         .replace("__SUBTITLE__", active_subtitle)
-        .replace("__ASSISTANT_NAME__", active_name)
+        .replace("__ASSISTANT_NAME__", active_name).replace("__BOT_SVG__", BOT_MASCOT_SVG)
     )
     return HTMLResponse(content=rendered_html)
 
