@@ -8,7 +8,17 @@ router = APIRouter(prefix="/webchat", tags=["Channels - Smiota Web Chat"])
 @router.get("/config", summary="Web Chat client bootstrap config")
 async def webchat_config():
     """Client bootstrap metadata for webchat embeds."""
+    from smiota.core.config import get_settings
+    settings = get_settings()
     return {
+        "assistant_name": getattr(settings, "WEBCHAT_ASSISTANT_NAME", "Smiota Assistant"),
+        "subtitle": getattr(settings, "WEBCHAT_SUBTITLE", "Smart Locker & Parcel Concierge"),
+        "welcome_title": getattr(settings, "WEBCHAT_WELCOME_TITLE", "Welcome to Smiota!"),
+        "welcome_message": getattr(
+            settings,
+            "WEBCHAT_WELCOME_MESSAGE",
+            "Hi there! How can I help you today?",
+        ),
         "features": {
             "streaming": True,
             "websocket": True,
@@ -25,8 +35,23 @@ async def webchat_config():
 
 @router.get("/embed", response_class=HTMLResponse, summary="Embeddable Iframe Chatbot Widget")
 @router.get("/ui", response_class=HTMLResponse, summary="Embeddable Iframe Chatbot Widget (Alias)")
-async def embed_widget():
+async def embed_widget(
+    welcome_title: str | None = None,
+    welcome_msg: str | None = None,
+    subtitle: str | None = None,
+    assistant_name: str | None = None,
+):
     """Renders the production-ready chatbot widget optimized for iframe embedding."""
+    from smiota.core.config import get_settings
+    settings = get_settings()
+    active_title = welcome_title or getattr(settings, "WEBCHAT_WELCOME_TITLE", "Welcome to Smiota!")
+    active_msg = welcome_msg or getattr(
+        settings,
+        "WEBCHAT_WELCOME_MESSAGE",
+        "Hi there! I can help you track your package deliveries, get your pickup PIN, or locate your smart locker compartment. How can I help you today?",
+    )
+    active_subtitle = subtitle or getattr(settings, "WEBCHAT_SUBTITLE", "Smart Locker & Parcel Concierge")
+    active_name = assistant_name or getattr(settings, "WEBCHAT_ASSISTANT_NAME", "Smiota Assistant")
     html_content = """<!DOCTYPE html>
 <html lang="en" class="h-full">
 <head>
@@ -69,7 +94,7 @@ async def embed_widget():
                 </div>
                 <div>
                     <h1 class="font-semibold text-base tracking-tight leading-tight">Smiota AI Assistant</h1>
-                    <p class="text-xs text-indigo-100 opacity-90">Smart Locker & Parcel Concierge</p>
+                    <p class="text-xs text-indigo-100 opacity-90" id="header-subtitle">__SUBTITLE__</p>
                 </div>
             </div>
             <div class="flex items-center space-x-1.5">
@@ -92,24 +117,24 @@ async def embed_widget():
             <!-- Bot Welcome Message -->
             <div class="flex items-end space-x-2">
                 <div class="w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px] font-bold shrink-0 shadow-xs">AI</div>
-                <div class="bg-slate-100 text-slate-800 px-4 py-2.5 rounded-2xl rounded-bl-sm max-w-[85%] text-sm shadow-xs leading-relaxed">
+                <div class="bg-slate-100 text-slate-800 px-4 py-3 rounded-2xl rounded-bl-sm max-w-[85%] text-sm shadow-xs leading-relaxed">
                     <div class="flex items-center justify-between space-x-3 mb-1">
-                        <span class="text-[10px] font-bold uppercase tracking-wider text-indigo-600">Smiota Assistant</span>
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-indigo-600" id="bot-sender-name">__ASSISTANT_NAME__</span>
                         <span id="initial-bot-time" class="text-[10px] text-slate-400 font-medium"></span>
                     </div>
-                    <div>
-                        Hi there! 👋<br>
-                        Welcome to Smiota. I can help you check your package deliveries, locate your locker compartment, or get your pickup PIN.
+                    <div id="welcome-message-body">
+                        <div class="font-semibold text-slate-900 mb-1" id="welcome-title-text">__WELCOME_TITLE__ 👋</div>
+                        <div class="text-slate-600 text-xs sm:text-sm" id="welcome-msg-text">__WELCOME_MESSAGE__</div>
                     </div>
                 </div>
             </div>
 
             <!-- Interactive Quick Reply Pill Buttons -->
             <div id="quick-replies-container" class="grid grid-cols-2 gap-2 pt-1 px-8">
-                <button type="button" onclick="sendQuickReply('Where is my package?')" class="text-xs text-indigo-600 border border-indigo-200 hover:bg-indigo-50 font-medium py-2 px-3 rounded-full transition text-center shadow-xs truncate">📦 Check parcel status</button>
-                <button type="button" onclick="sendQuickReply('Resend pickup PIN')" class="text-xs text-indigo-600 border border-indigo-200 hover:bg-indigo-50 font-medium py-2 px-3 rounded-full transition text-center shadow-xs truncate">🔑 Resend pickup PIN</button>
-                <button type="button" onclick="sendQuickReply('Locker location and hours')" class="text-xs text-indigo-600 border border-indigo-200 hover:bg-indigo-50 font-medium py-2 px-3 rounded-full transition text-center shadow-xs truncate">📍 Locker hours & location</button>
-                <button type="button" onclick="sendQuickReply('Locker door did not open')" class="text-xs text-indigo-600 border border-indigo-200 hover:bg-indigo-50 font-medium py-2 px-3 rounded-full transition text-center shadow-xs truncate">❓ Locker pickup help</button>
+                <button type="button" onclick="sendQuickReply('Where is my package?')" class="text-xs text-indigo-600 border border-indigo-200 hover:bg-indigo-50 font-medium py-2 px-3 rounded-full transition text-center shadow-xs truncate">📦 Track package</button>
+                <button type="button" onclick="sendQuickReply('Resend pickup PIN')" class="text-xs text-indigo-600 border border-indigo-200 hover:bg-indigo-50 font-medium py-2 px-3 rounded-full transition text-center shadow-xs truncate">🔑 Get pickup PIN</button>
+                <button type="button" onclick="sendQuickReply('What does Smiota offer?')" class="text-xs text-indigo-600 border border-indigo-200 hover:bg-indigo-50 font-medium py-2 px-3 rounded-full transition text-center shadow-xs truncate">🏢 Smiota smart lockers</button>
+                <button type="button" onclick="sendQuickReply('Locker door did not open')" class="text-xs text-indigo-600 border border-indigo-200 hover:bg-indigo-50 font-medium py-2 px-3 rounded-full transition text-center shadow-xs truncate">🚪 Locker door help</button>
             </div>
         </div>
 
@@ -160,6 +185,19 @@ async def embed_widget():
 
         // Session & Resident ID management (from URL parameters or auto-generated)
         const urlParams = new URLSearchParams(window.location.search);
+        // Client-side URL query parameter hydration for title and message
+        if (urlParams.get('welcome_title')) {
+            const el = document.getElementById('welcome-title-text');
+            if (el) el.innerText = urlParams.get('welcome_title') + ' 👋';
+        }
+        if (urlParams.get('welcome_msg')) {
+            const el = document.getElementById('welcome-msg-text');
+            if (el) el.innerText = urlParams.get('welcome_msg');
+        }
+        if (urlParams.get('subtitle')) {
+            const el = document.getElementById('header-subtitle');
+            if (el) el.innerText = urlParams.get('subtitle');
+        }
         const sessionId = urlParams.get('session_id') || ("webchat-" + Math.random().toString(36).substring(2, 9));
         const residentId = urlParams.get('resident_id') || urlParams.get('user_id') || null;
 
@@ -504,7 +542,15 @@ async def embed_widget():
 </body>
 </html>
 """
-    return HTMLResponse(content=html_content)
+    # Inject configurable values into the HTML template
+    rendered_html = (
+        html_content
+        .replace("__WELCOME_TITLE__", active_title)
+        .replace("__WELCOME_MESSAGE__", active_msg)
+        .replace("__SUBTITLE__", active_subtitle)
+        .replace("__ASSISTANT_NAME__", active_name)
+    )
+    return HTMLResponse(content=rendered_html)
 
 
 @router.get("/demo", response_class=HTMLResponse, summary="Live Iframe Host Demonstration Page")

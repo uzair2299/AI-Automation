@@ -41,6 +41,14 @@ class BaseAppSettings(BaseSettings):
     RABBITMQ_URL: str = "amqp://SMIOTA:Password-1@shortline.proxy.rlwy.net:45560/"
     RABBITMQ_EXCHANGE: str = "smiota.events"
 
+    # Web Chat & Concierge Customization (Configurable via Environment)
+    WEBCHAT_ASSISTANT_NAME: str = "Smiota Assistant"
+    WEBCHAT_SUBTITLE: str = "Smart Locker & Parcel Concierge"
+    WEBCHAT_WELCOME_TITLE: str = "Welcome to Smiota!"
+    WEBCHAT_WELCOME_MESSAGE: str = (
+        "Hi there! I can help you track packages, get your pickup PIN, or assist with your smart locker. How can I help you today?"
+    )
+
     # Security & Auth
     JWT_SECRET_KEY: str = "smiota-dev-secret-key-change-in-prod"
     JWT_ALGORITHM: str = "HS256"

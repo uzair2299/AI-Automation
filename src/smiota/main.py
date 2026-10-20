@@ -31,6 +31,10 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
     logger.info(f"Initializing {settings.PROJECT_NAME} in [{settings.ENVIRONMENT}] mode...")
 
+    # 0. Ensure Google Cloud / Vertex AI credentials setup (local or Railway/Docker)
+    from smiota.llm.provider import _ensure_gcp_credentials
+    _ensure_gcp_credentials()
+
     # 1. Register specialized AI Agents (AIOps, Security, Developer, QA, Customer)
     register_default_agents()
 

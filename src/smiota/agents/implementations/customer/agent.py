@@ -99,7 +99,7 @@ class CustomerAgent(BaseAgent):
 
     def _get_suggested_actions(self, packages: list) -> list[str]:
         if not packages:
-            return ["Where is my package?", "Look up by phone number", "Contact support concierge"]
+            return ["Where is my package•", "Look up by phone number", "Contact support concierge"]
         
         status = (packages[0].get("statusName") or "").lower()
         if any(w in status for w in ["released", "picked up", "delivered", "collected"]):
@@ -130,11 +130,11 @@ class CustomerAgent(BaseAgent):
                     "• 🔑 **Retrieve or resend your 6-digit pickup PIN**\n"
                     "• 📍 **Find locker location and operating hours**\n"
                     "• 🚪 **Resolve locker door or pickup issues**\n\n"
-                    "What would you like to check today?"
+                    "What would you like to check today•"
                 ),
                 requires_approval=False,
                 suggested_actions=[
-                    "Where is my package?",
+                    "Where is my package•",
                     "Resend pickup PIN",
                     "Locker location and hours",
                     "Locker door did not open",
@@ -171,7 +171,7 @@ class CustomerAgent(BaseAgent):
                 ),
                 requires_approval=False,
                 suggested_actions=[
-                    "Where is my package?",
+                    "Where is my package•",
                     "Resend pickup PIN",
                     "Locker door did not open",
                 ],
@@ -215,7 +215,7 @@ class CustomerAgent(BaseAgent):
 
         # 6. Package UUID or Parcel Tracking ID Provided
         uuid_match = re.search(r'\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b', query)
-        tracking_match = re.search(r'\b(sm-[0-9a-z]+|pkg-[0-9a-z]+|1z[0-9a-z]+|[0-9]{8,}|(?=[a-z]*[0-9])(?=[0-9]*[a-z])[a-z0-9]{8,})\b', q)
+        tracking_match = re.search(r'\b(sm-[0-9a-z]+|pkg-[0-9a-z]+|1z[0-9a-z]+|[0-9]{8,}|(•=[a-z]*[0-9])(•=[0-9]*[a-z])[a-z0-9]{8,})\b', q)
         if uuid_match or tracking_match:
             is_uuid = bool(uuid_match)
             pkg_id = uuid_match.group(0).lower() if is_uuid else tracking_match.group(0)
@@ -234,8 +234,8 @@ class CustomerAgent(BaseAgent):
                     logger.debug(f"Optional Text-to-SQL audit log skipped: {sql_err}")
 
                 # Query Smiota Server endpoint:
-                # - If standard RFC-4122 UUID: GET /api/v1/packages?uuid=...
-                # - If Tracking Number / Name: GET /api/v1/packages?byNameOrNumber=...
+                # - If standard RFC-4122 UUID: GET /api/v1/packages•uuid=...
+                # - If Tracking Number / Name: GET /api/v1/packages•byNameOrNumber=...
                 if is_uuid:
                     api_result = await package_service.get_packages(uuid=pkg_id)
                 else:
@@ -249,7 +249,7 @@ class CustomerAgent(BaseAgent):
                             "Please try again in a few moments or contact your property management office for assistance."
                         ),
                         requires_approval=False,
-                        suggested_actions=["Where is my package?", "Resend pickup PIN", "Locker location and hours"],
+                        suggested_actions=["Where is my package•", "Resend pickup PIN", "Locker location and hours"],
                     )
 
                 packages = api_result.get("packages", [])
@@ -265,7 +265,7 @@ class CustomerAgent(BaseAgent):
                             f"Please double-check the {id_label}, or contact your property management office if you need further help."
                         ),
                         requires_approval=False,
-                        suggested_actions=["Where is my package?", "Look up by phone number", "Contact support concierge"],
+                        suggested_actions=["Where is my package•", "Look up by phone number", "Contact support concierge"],
                     )
 
                 if len(packages) == 1:
@@ -294,11 +294,11 @@ class CustomerAgent(BaseAgent):
                         "Please try again shortly or contact your property concierge."
                     ),
                     requires_approval=False,
-                    suggested_actions=["Where is my package?", "Contact support concierge"],
+                    suggested_actions=["Where is my package•", "Contact support concierge"],
                 )
 
         # 7. Resident Phone or Email Lookup Provided (e.g. user provides email or phone to trace parcels)
-        phone_match = re.search(r'(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}', q)
+        phone_match = re.search(r'(\+•\d{1,3}[-.\s]•)•\(•\d{3}\)•[-.\s]•\d{3}[-.\s]•\d{4}', q)
         email_match = re.search(r'[\w\.-]+@[\w\.-]+\.\w+', q)
         if phone_match or email_match:
             identifier = phone_match.group(0) if phone_match else email_match.group(0)
@@ -316,7 +316,7 @@ class CustomerAgent(BaseAgent):
                 except Exception as sql_err:
                     logger.debug(f"Optional Text-to-SQL audit log skipped: {sql_err}")
 
-                # Query Smiota Server endpoint: GET /api/v1/packages?byNameOrNumber=...
+                # Query Smiota Server endpoint: GET /api/v1/packages•byNameOrNumber=...
                 api_result = await package_service.get_packages(by_name_or_number=identifier)
                 if not api_result.get("success"):
                     return AgentResult(
@@ -326,7 +326,7 @@ class CustomerAgent(BaseAgent):
                             "Please try again shortly or contact your property concierge."
                         ),
                         requires_approval=False,
-                        suggested_actions=["Where is my package?", "Resend pickup PIN", "Locker location and hours"],
+                        suggested_actions=["Where is my package•", "Resend pickup PIN", "Locker location and hours"],
                     )
 
                 packages = api_result.get("packages", [])
@@ -341,7 +341,7 @@ class CustomerAgent(BaseAgent):
                             "Please confirm the contact details or check with your property management office."
                         ),
                         requires_approval=False,
-                        suggested_actions=["Where is my package?", "Look up by phone number", "Contact support concierge"],
+                        suggested_actions=["Where is my package•", "Look up by phone number", "Contact support concierge"],
                     )
 
                 if len(packages) == 1:
@@ -370,7 +370,7 @@ class CustomerAgent(BaseAgent):
                         "Please try again shortly or contact your property concierge."
                     ),
                     requires_approval=False,
-                    suggested_actions=["Where is my package?", "Contact support concierge"],
+                    suggested_actions=["Where is my package•", "Contact support concierge"],
                 )
 
         # 8. Check Parcel / Tracking Inquiry (Prompt for Package ID or Tracking Number if none given)
@@ -439,7 +439,7 @@ class CustomerAgent(BaseAgent):
                 content=llm_reply,
                 requires_approval=False,
                 suggested_actions=[
-                    "Where is my package?",
+                    "Where is my package•",
                     "Resend pickup PIN",
                     "Locker location and hours",
                     "Locker door did not open",
@@ -448,10 +448,10 @@ class CustomerAgent(BaseAgent):
         except Exception:
             return AgentResult(
                 agent_name=self.name,
-                content=f"I'm here to help with your Smiota smart locker deliveries! Regarding '{query}', would you like me to check a package, retrieve your pickup PIN, or connect you with property concierge?",
+                content=f"I'm here to help with your Smiota smart locker deliveries! Regarding '{query}', would you like me to check a package, retrieve your pickup PIN, or connect you with property concierge•",
                 requires_approval=False,
                 suggested_actions=[
-                    "Where is my package?",
+                    "Where is my package•",
                     "Resend pickup PIN",
                     "Locker location and hours",
                     "Locker door did not open",
