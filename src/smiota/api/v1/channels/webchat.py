@@ -236,14 +236,7 @@ async def embed_widget(
                     <p class="text-xs text-indigo-100 opacity-90" id="header-subtitle">__SUBTITLE__</p>
                 </div>
             </div>
-            <div class="flex items-center space-x-1.5">
-                <button id="minimize-btn" class="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center transition text-white/80 hover:text-white" title="Minimize">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path></svg>
-                </button>
-                <button id="close-btn" class="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center transition text-white/80 hover:text-white" title="Close">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                </button>
-            </div>
+
         </div>
 
         <!-- Chat History Canvas -->
@@ -279,15 +272,8 @@ async def embed_widget(
 
         <!-- Input Bar Toolbar -->
         <div class="p-3 bg-white border-t border-slate-100 shrink-0">
-            <form id="chat-form" class="flex items-center space-x-2 bg-slate-100/80 rounded-full px-3.5 py-1.5 border border-slate-200 focus-within:border-indigo-500 focus-within:bg-white transition shadow-xs">
-                <input type="text" id="chat-input" placeholder="Type and press [enter]..." class="flex-1 bg-transparent text-sm text-slate-700 placeholder-slate-400 focus:outline-none py-1">
-                
-                <button type="button" class="text-slate-400 hover:text-slate-600 transition p-1" title="Add Emoji" onclick="insertEmoji('😊')">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                </button>
-                <button type="button" class="text-slate-400 hover:text-slate-600 transition p-1" title="Upload Attachment" onclick="alert('File upload supported in cloud storage mode')">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
-                </button>
+            <form id="chat-form" class="flex items-center space-x-2 bg-slate-100/80 rounded-full px-4 py-1.5 border border-slate-200 focus-within:border-indigo-500 focus-within:bg-white transition shadow-xs">
+                <input type="text" id="chat-input" placeholder="Type and press [enter]..." class="flex-1 bg-transparent text-sm text-slate-700 placeholder-slate-400 focus:outline-none py-1.5">
                 
                 <button type="submit" id="send-btn" class="w-8 h-8 bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-full flex items-center justify-center hover:opacity-90 transition shadow-sm shrink-0" title="Send">
                     <svg class="w-4 h-4 transform rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
@@ -629,12 +615,6 @@ async def embed_widget(
         window.sendQuickReply = sendQuickReply;
         window.executeQuery = executeQuery;
 
-        function insertEmoji(emoji) {
-            input.value += emoji;
-            input.focus();
-        }
-        window.insertEmoji = insertEmoji;
-
         function handleSend() {
             const text = input.value.trim();
             if (!text) return;
@@ -658,21 +638,6 @@ async def embed_widget(
                 handleSend();
             }
         });
-
-        // Parent communication buttons
-        const closeBtn = document.getElementById('close-btn');
-        if (closeBtn) {
-            closeBtn.addEventListener('click', () => {
-                window.parent.postMessage({ type: 'close-chatbot' }, '*');
-            });
-        }
-
-        const minBtn = document.getElementById('minimize-btn');
-        if (minBtn) {
-            minBtn.addEventListener('click', () => {
-                window.parent.postMessage({ type: 'minimize-chatbot' }, '*');
-            });
-        }
 
         // Initialize immediately
         notifyParentHeight();
