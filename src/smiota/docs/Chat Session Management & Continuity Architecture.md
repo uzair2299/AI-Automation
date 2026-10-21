@@ -86,60 +86,100 @@ sequenceDiagram
 
 ## 3. Data Models & Contracts
 
-### 3.1 `ChatMessage` (Individual Message Turn)
+### 3.1 `ChatMessage` (Standard Polymorphic Message Envelope)
 Defined in [`src/smiota/schemas/chat_session.py`](file:///d:/repos/smiota-ai/src/smiota/schemas/chat_session.py):
 
 | Field | Type | Description |
 | :--- | :--- | :--- |
-| `id` | `str` | Unique message identifier (e.g. `msg-84f92a1012`) |
-| `session_id` | `str` | Foreign key linking to parent `ChatSession` |
-| `role` | `"user" \| "assistant" \| "system"` | Standard actor classification |
-| `sender_name` | `str \| None` | Display name (e.g., `"Alex Morgan"` or `"Customer Assistant"`) |
-| `agent_name` | `str \| None` | AI Agent identifier (`"Customer"`, `"Security"`, `"AIOps"`) |
-| `message_type` | `MessageType` | Visual render type: `"text"`, `"card"`, `"approval_gate"`, `"quick_replies"` |
-| `content` | `str` | Clean markdown text representation (consumed by LLM memory & screen readers) |
-| `card_payload` | `dict \| None` | Structured JSON data for interactive cards (tracking, PINs, locker compartments) |
-| `suggested_actions` | `list[str]` | Action pill buttons (e.g. `["Track package", "Resend PIN"]`) |
+| `message_id` | `str` | Unique message identifier (e.g. `msg_01JABC123`) |
+| `conversation_id` | `str` | Parent conversation / session identifier (e.g. `sess-4c9e782a94ef`) |
+| `type` | `str` | Discriminated message type (`"user_message"`, `"agent_message"`, `"agent_card"`, `"stream_token"`, `"approval_gate"`, `"system_event"`) |
+| `sender` | `MessageSender` | Actor attribution object containing `role` (`"user" \| "assistant" \| "system"`), `name`, and `id` |
+| `content` | `dict` | **Dynamic polymorphic payload** determined strictly by `type` (e.g., `text` + `attachments`, or `text` + `card_data` + `suggested_actions`) |
+| `metadata` | `dict` | Turn-level context (`locale`, `timezone`, `client`, `model`) |
 | `created_at` | `datetime` | UTC timestamp of message creation |
-| `metadata` | `dict` | Custom turn attributes |
 
-#### Example: User Message Turn
+#### Dynamic `content` Variations by `type`:
+* **`user_message`**: `{"text": str, "attachments": list}`
+* **`agent_message`**: `{"text": str, "suggested_actions": list[str]}`
+* **`agent_card`**: `{"text": str, "card_type": str, "card_data": dict, "suggested_actions": list[str]}`
+* **`stream_token`**: `{"token": str, "agent": str, "accumulated_text": str}`
+* **`approval_gate`**: `{"text": str, "approval_id": str, "action": str, "compartment": str, "status": "pending", "actions": list[str]}`
+* **`system_event`**: `{"event_type": str, "details": dict, "timestamp": datetime}`
+
+#### Example: User Message Turn (`type: "user_message"`)
 ```json
 {
-  "id": "msg-a1b2c3d4",
-  "session_id": "sess-4c9e782a94ef",
-  "role": "user",
-  "sender_name": "Alex Morgan",
-  "agent_name": null,
-  "message_type": "text",
-  "content": "Where is my package?",
-  "card_payload": null,
-  "suggested_actions": [],
+  "message_id": "msg_01JABC123",
+  "conversation_id": "sess-4c9e782a94ef",
+  "type": "user_message",
+  "sender": {
+    "role": "user",
+    "name": "Alex Morgan",
+    "id": "10790"
+  },
+  "content": {
+    "text": "Where is my parcel?",
+    "attachments": []
+  },
+  "metadata": {
+    "locale": "en-US",
+    "timezone": "Asia/Karachi",
+    "client": "webchat"
+  },
   "created_at": "2026-10-21T13:30:00Z"
 }
 ```
 
-#### Example: Agent Rich Card Turn
+#### Example: Agent Rich Card Turn (`type: "agent_card"`)
 ```json
 {
-  "id": "msg-e5f6g7h8",
-  "session_id": "sess-4c9e782a94ef",
-  "role": "assistant",
-  "sender_name": "Customer Assistant",
-  "agent_name": "Customer",
-  "message_type": "card",
-  "content": "Your package is ready in Locker Compartment 12. Pickup PIN: 842910.",
-  "card_payload": {
-    "card_type": "package_pickup",
-    "tracking_number": "SM-9941",
-    "carrier": "Amazon Logistics",
-    "building": "North Tower",
-    "compartment": "12",
-    "pickup_pin": "842910",
-    "status": "Ready for Pickup"
+  "message_id": "msg_01JDEF456",
+  "conversation_id": "sess-4c9e782a94ef",
+  "type": "agent_card",
+  "sender": {
+    "role": "assistant",
+    "name": "Customer Assistant",
+    "id": "agent-customer"
   },
-  "suggested_actions": ["Resend pickup PIN", "Locker hours"],
+  "content": {
+    "text": "Your package is ready in Locker Compartment 12. Pickup PIN: 842910.",
+    "card_type": "package_pickup",
+    "card_data": {
+      "tracking_number": "SM-9941",
+      "carrier": "Amazon Logistics",
+      "building": "North Tower",
+      "compartment": "12",
+      "pickup_pin": "842910",
+      "status": "Ready for Pickup"
+    },
+    "suggested_actions": ["Unlock door remotely", "Resend pickup PIN", "Locker hours"]
+  },
+  "metadata": {
+    "model": "gemini-2.5-flash",
+    "requires_approval": false
+  },
   "created_at": "2026-10-21T13:30:02Z"
+}
+```
+
+#### Example: Live Streaming Token (`type: "stream_token"`)
+```json
+{
+  "message_id": "msg_01JDEF456",
+  "conversation_id": "sess-4c9e782a94ef",
+  "type": "stream_token",
+  "sender": {
+    "role": "assistant",
+    "name": "Customer Assistant",
+    "id": "agent-customer"
+  },
+  "content": {
+    "token": "package ",
+    "agent": "Customer"
+  },
+  "metadata": {},
+  "created_at": "2026-10-21T13:30:01.200Z"
 }
 ```
 
