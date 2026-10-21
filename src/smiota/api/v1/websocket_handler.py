@@ -86,26 +86,25 @@ class WebSocketChatHandler:
             await self._send_error_fallback()
 
     def _parse_incoming(self, raw_data: str) -> tuple[str, str, dict[str, Any], list[dict[str, Any]]]:
-        """Parse incoming raw frame into user message, resident ID, metadata, and attachments."""
-        user_message = raw_data
+        """Parse incoming raw frame enforcing the Standard Message Envelope."""
+        user_message = ""
         req_resident_id = self.resident_id or "ws-resident"
         client_metadata: dict[str, Any] = {}
         attachments: list[dict[str, Any]] = []
 
         try:
             parsed = json.loads(raw_data)
-            if isinstance(parsed, dict):
-                # Standard Dynamic Envelope
-                if parsed.get("type") == "user_message" and isinstance(parsed.get("content"), dict):
-                    user_message = str(parsed["content"].get("text", ""))
-                    attachments = parsed["content"].get("attachments", [])
-                elif "text" in parsed and parsed["text"] is not None:
-                    user_message = str(parsed["text"])
+            if isinstance(parsed, dict) and parsed.get("type") == "user_message":
+                content = parsed.get("content")
+                if isinstance(content, dict):
+                    user_message = str(content.get("text", "")).strip()
+                    raw_attachments = content.get("attachments")
+                    if isinstance(raw_attachments, list):
+                        attachments = raw_attachments
 
-                if parsed.get("sender") and isinstance(parsed["sender"], dict) and parsed["sender"].get("id"):
-                    req_resident_id = str(parsed["sender"]["id"])
-                elif parsed.get("resident_id"):
-                    req_resident_id = str(parsed["resident_id"])
+                sender = parsed.get("sender")
+                if isinstance(sender, dict) and sender.get("id"):
+                    req_resident_id = str(sender["id"])
 
                 if isinstance(parsed.get("metadata"), dict):
                     client_metadata = parsed["metadata"]
@@ -119,7 +118,7 @@ class WebSocketChatHandler:
         resp_msg_id = f"msg_{uuid.uuid4().hex[:12]}"
         agent_display = result.agent_name
 
-        # Stream response tokens (standard envelope + legacy compatibility fields)
+        # Stream response tokens using Standard Envelope
         for token in result.content.split():
             await self.ws.send_json({
                 "message_id": resp_msg_id,
@@ -132,12 +131,9 @@ class WebSocketChatHandler:
                 },
                 "content": {
                     "token": token + " ",
-                    "agent": agent_display,
                 },
                 "metadata": {},
-                # Backward-compatibility fields:
-                "token": token + " ",
-                "agent": agent_display,
+                "created_at": datetime.now(UTC).isoformat(),
             })
             await asyncio.sleep(0.02)
 
@@ -166,10 +162,6 @@ class WebSocketChatHandler:
             "metadata": {
                 "requires_approval": result.requires_approval,
             },
-            # Backward-compatibility fields:
-            "agent": agent_display,
-            "requires_approval": result.requires_approval,
-            "suggested_actions": result.suggested_actions,
             "created_at": datetime.now(UTC).isoformat(),
         })
 
@@ -182,9 +174,9 @@ class WebSocketChatHandler:
             "conversation_id": self.session_id,
             "type": "stream_token",
             "sender": {"role": "assistant", "name": "Customer", "id": "agent-customer"},
-            "content": {"token": err_text, "agent": "Customer"},
-            "token": err_text,
-            "agent": "Customer",
+            "content": {"token": err_text},
+            "metadata": {},
+            "created_at": datetime.now(UTC).isoformat(),
         })
         await self.ws.send_json({
             "message_id": err_msg_id,
@@ -197,7 +189,5 @@ class WebSocketChatHandler:
                 "suggested_actions": ["Where is my package?", "Resend pickup PIN", "Locker location and hours"],
             },
             "metadata": {"error": True},
-            "agent": "Customer",
-            "suggested_actions": ["Where is my package?", "Resend pickup PIN", "Locker location and hours"],
             "created_at": datetime.now(UTC).isoformat(),
         })

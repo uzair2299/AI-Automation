@@ -651,10 +651,10 @@ async def embed_widget(
         }
 
         function handleIncomingSocketPayload(msg) {
-            if (msg.type === "token" || msg.type === "stream_token") {
+            if (msg.type === "stream_token") {
                 removeTypingIndicator();
-                const agentName = msg.sender?.name || msg.agent || "AI";
-                const tokenText = (typeof msg.content === 'object' && msg.content !== null) ? (msg.content.token || '') : (msg.token || '');
+                const agentName = msg.sender?.name || "AI";
+                const tokenText = (typeof msg.content === 'object' && msg.content !== null) ? (msg.content.token || '') : '';
                 if (!currentStreamDiv) {
                     createStreamingBubble(agentName);
                 }
@@ -666,7 +666,7 @@ async def embed_widget(
             } else if (msg.type === "done" || msg.type === "agent_message" || msg.type === "agent_card") {
                 removeTypingIndicator();
                 markLastUserMessageDelivered();
-                const actions = (typeof msg.content === 'object' && msg.content !== null && msg.content.suggested_actions) ? msg.content.suggested_actions : msg.suggested_actions;
+                const actions = (typeof msg.content === 'object' && msg.content !== null) ? msg.content.suggested_actions : null;
                 if (actions) {
                     renderQuickReplies(actions);
                 }
@@ -685,7 +685,7 @@ async def embed_widget(
             showTypingIndicator();
 
             if (wsConnected && wsSocket && wsSocket.readyState === WebSocket.OPEN) {
-                // Send via Standard Dynamic Message Envelope
+                // Send strictly via Standard Dynamic Message Envelope
                 const standardEnvelope = {
                     message_id: "msg_" + Math.random().toString(36).substring(2, 11),
                     conversation_id: sessionId,
@@ -704,11 +704,7 @@ async def embed_widget(
                         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
                         client: "webchat"
                     },
-                    created_at: new Date().toISOString(),
-                    // Backward-compatibility fields:
-                    text: messageText,
-                    session_id: sessionId,
-                    resident_id: residentId || authenticatedUser?.user_id || "10790"
+                    created_at: new Date().toISOString()
                 };
                 wsSocket.send(JSON.stringify(standardEnvelope));
             } else {
