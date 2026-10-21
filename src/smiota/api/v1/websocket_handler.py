@@ -11,10 +11,11 @@ import json
 from typing import Any, Optional
 import uuid
 
-from fastapi import WebSocket, WebSocketDisconnect
+from fastapi import Depends, Query, WebSocket, WebSocketDisconnect
 
 from smiota.agents.base import AgentContext, AgentResult
 from smiota.agents.orchestrator import AgentOrchestrator
+from smiota.api.deps import get_chat_repo, get_orchestrator
 from smiota.api.v1.websocket_manager import ws_manager
 from smiota.core.logging import logger
 from smiota.repositories.chat_repository import BaseChatRepository
@@ -27,9 +28,9 @@ class WebSocketChatHandler:
         self,
         websocket: WebSocket,
         session_id: str,
-        resident_id: Optional[str],
-        orchestrator: AgentOrchestrator,
-        chat_repo: BaseChatRepository,
+        resident_id: Optional[str] = Query(None),
+        orchestrator: AgentOrchestrator = Depends(get_orchestrator),
+        chat_repo: BaseChatRepository = Depends(get_chat_repo),
     ):
         self.ws = websocket
         self.session_id = session_id

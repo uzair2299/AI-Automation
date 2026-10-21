@@ -2,7 +2,7 @@
 from typing import Optional
 import uuid
 
-from fastapi import APIRouter, Depends, Query, WebSocket
+from fastapi import APIRouter, Depends, Query
 
 from smiota.agents.base import AgentContext
 from smiota.agents.orchestrator import AgentOrchestrator
@@ -105,19 +105,8 @@ async def get_chat_history(
 
 @router.websocket("/ws/{session_id}")
 async def websocket_chat_stream(
-    websocket: WebSocket,
-    session_id: str,
-    resident_id: Optional[str] = Query(None),
-    orchestrator: AgentOrchestrator = Depends(get_orchestrator),
-    chat_repo: BaseChatRepository = Depends(get_chat_repo),
+    handler: WebSocketChatHandler = Depends(),
 ):
     """Real-time WebSocket endpoint for instant token streaming, agent responses, and RabbitMQ push alerts."""
-    handler = WebSocketChatHandler(
-        websocket=websocket,
-        session_id=session_id,
-        resident_id=resident_id,
-        orchestrator=orchestrator,
-        chat_repo=chat_repo,
-    )
     await handler.handle()
 
