@@ -1,8 +1,10 @@
 """Core conversational and task-planning chat endpoint with HTTP and WebSocket streaming."""
+import json
 import uuid
 import asyncio
 from datetime import UTC, datetime
-from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
+from typing import Any, Optional
+from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect
 from smiota.schemas.chat import ChatMessageRequest, ChatMessageResponse
 from smiota.agents.base import AgentContext
 from smiota.agents.orchestrator import AgentOrchestrator
