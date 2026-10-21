@@ -27,6 +27,10 @@ async def send_message(
     sanitized_metadata.pop("roles", None)
     if current_user.email:
         sanitized_metadata.setdefault("user_email", current_user.email)
+    if current_user.name:
+        sanitized_metadata.setdefault("user_name", current_user.name)
+    if current_user.location_id:
+        sanitized_metadata.setdefault("location_id", current_user.location_id)
 
     context = AgentContext(
         session_id=session_id,

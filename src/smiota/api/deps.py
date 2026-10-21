@@ -41,6 +41,8 @@ async def get_current_user(
         tenant_id=payload["tenant_id"],
         roles=payload.get("roles", ["user"]),
         email=payload.get("email", ""),
+        name=payload.get("name", ""),
+        location_id=payload.get("location_id", ""),
         session_id=payload.get("session_id"),
     )
 

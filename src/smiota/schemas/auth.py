@@ -1,5 +1,7 @@
 """Schemas for Spring Boot code exchange and chatbot session establishment."""
 
+from typing import Any
+
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -22,6 +24,19 @@ class UserIdentityInfo(BaseModel):
     tenant_id: str = Field(..., description="Tenant identifier for isolation")
     roles: list[str] = Field(default_factory=list, description="Verified roles assigned to user")
     email: str | None = Field(None, description="User email address if available")
+    name: str | None = Field(None, description="User or resident full name")
+    first_name: str | None = Field(None, description="User first name")
+    last_name: str | None = Field(None, description="User last name")
+    phone: str | None = Field(None, description="User contact phone number")
+    location_id: str | None = Field(None, description="Location identifier")
+    location_name: str | None = Field(None, description="Location name")
+    building_id: str | None = Field(None, description="Building identifier")
+    building_name: str | None = Field(None, description="Building name")
+    tenant_name: str | None = Field(None, description="Tenant company name")
+    unit_no: str | None = Field(None, description="Unit or suite number")
+    passcode: str | None = Field(None, description="Resident pickup or access passcode")
+    raw_profile: dict[str, Any] | None = Field(default=None, description="Raw profile payload from Smiota Main Core")
+
 
 
 class AuthExchangeResponse(BaseModel):

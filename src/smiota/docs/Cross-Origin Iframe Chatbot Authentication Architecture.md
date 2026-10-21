@@ -82,7 +82,74 @@ Sent by Angular when the iframe loads or when the user toggles the chat open:
 }
 ```
 
-### 3.2 Iframe $\rightarrow$ Backend (Token Exchange)
+### 3.2 Internal Smiota Main App $\rightarrow$ FastAPI Backend Payload
+`POST /internal/ai/auth/exchange` (or returned during code validation):
+```json
+{
+  "id": 10790,
+  "uuid": "4c9e782a-94ef-4b21-8854-bc712f5b66d1",
+  "firstName": "Alex",
+  "lastName": "Morgan",
+  "recipientName": "Alex Morgan",
+  "email": "alex.morgan@acme.com",
+  "phone": "+14155551234",
+  "voiceCallPhone": "+14155551234",
+  "photo": null,
+  "badgeId": "BADGE-9941",
+  "authId": "auth0|64f1a23e9821a",
+  "externalId": "EMP-88214",
+  "login": "amorgan",
+
+  "customerId": 42,
+  "locationId": 108,
+  "locationName": "Pleasanton HQ",
+  "buildingId": 15,
+  "buildingName": "North Tower",
+  "tenantId": 89,
+  "tenantName": "Acme Technologies Inc.",
+  "unitNo": "Suite 400",
+  "recipientId": 10790,
+
+  "isInActive": false,
+  "inactive": false,
+  "authorizedForTenant": true,
+  "wheelChairAccess": false,
+  "hasSpecialStatus": false,
+  "optOut": false,
+  "emailUnsubscribe": false,
+  "phoneUnsubscribe": false,
+  "registrationStatus": 1,
+  "keepLocalChanges": false,
+
+  "addressLine1": "100 Innovation Way",
+  "addressLine2": null,
+  "city": "Pleasanton",
+  "state": "CA",
+  "zipCode": "94588",
+
+  "passcode": "842910",
+  "lastPasscodeCreatedTime": "2026-10-15T08:30:00Z",
+  "passcodeGenerationRequired": false,
+  "doNotAssociateToAPackage": false,
+  "delegatesNotificationsToUserId": 0,
+  "delegatesNotificationsToUserNamed": null,
+
+  "roles": [
+    "recipient"
+  ],
+  "roleObjects": [
+    {
+      "roleId": 10,
+      "role": "recipient",
+      "scope": 108,
+      "scopeId": "108",
+      "userId": 10790
+    }
+  ]
+}
+```
+
+### 3.3 Iframe $\rightarrow$ FastAPI Backend (Token Exchange)
 `POST /api/v1/auth/exchange`
 ```json
 // Request Body
@@ -92,15 +159,27 @@ Sent by Angular when the iframe loads or when the user toggles the chat open:
 
 // Successful Response (200 OK)
 {
+  "token_type": "Bearer",
   "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "token_type": "bearer",
+  "expires_in": 3600,
   "session_id": "sess-a1b2c3d4",
   "user": {
-    "user_id": "1054",
-    "email": "user@example.com",
-    "tenant_id": "tenant-001",
-    "location_id": "1",
-    "role": "tenant"
+    "user_id": "10790",
+    "tenant_id": "89",
+    "roles": ["recipient"],
+    "email": "alex.morgan@acme.com",
+    "name": "Alex Morgan",
+    "first_name": "Alex",
+    "last_name": "Morgan",
+    "phone": "+14155551234",
+    "location_id": "108",
+    "location_name": "Pleasanton HQ",
+    "building_id": "15",
+    "building_name": "North Tower",
+    "tenant_name": "Acme Technologies Inc.",
+    "unit_no": "Suite 400",
+    "passcode": "842910",
+    "raw_profile": { ... }
   }
 }
 
@@ -113,7 +192,7 @@ Sent by Angular when the iframe loads or when the user toggles the chat open:
 }
 ```
 
-### 3.3 Iframe $\rightarrow$ Host (Handshake Status)
+### 3.4 Iframe $\rightarrow$ Host (Handshake Status)
 Sent back to the parent window upon exchange resolution:
 
 * **Success Notification**:
@@ -121,11 +200,14 @@ Sent back to the parent window upon exchange resolution:
   {
     "type": "auth-success",
     "user": {
-      "user_id": "1054",
-      "email": "user@example.com",
-      "tenant_id": "tenant-001",
-      "location_id": "1",
-      "role": "tenant"
+      "user_id": "10790",
+      "tenant_id": "89",
+      "roles": ["recipient"],
+      "email": "alex.morgan@acme.com",
+      "name": "Alex Morgan",
+      "location_id": "108",
+      "building_name": "North Tower",
+      "unit_no": "Suite 400"
     },
     "session_id": "sess-a1b2c3d4"
   }

@@ -39,11 +39,13 @@ async def exchange_bootstrap_code(
         tenant_id=identity.tenant_id,
         roles=identity.roles,
         email=identity.email,
+        name=identity.name,
+        location_id=identity.location_id,
     )
 
     logger.info(
         f"Authenticated chatbot session established: session_id={session_id}, "
-        f"user_id={identity.user_id}, tenant_id={identity.tenant_id}"
+        f"user_id={identity.user_id}, tenant_id={identity.tenant_id}, name={identity.name}"
     )
 
     return AuthExchangeResponse(
@@ -56,5 +58,17 @@ async def exchange_bootstrap_code(
             tenant_id=identity.tenant_id,
             roles=identity.roles,
             email=identity.email,
+            name=identity.name,
+            first_name=identity.first_name,
+            last_name=identity.last_name,
+            phone=identity.phone,
+            location_id=identity.location_id,
+            location_name=identity.location_name,
+            building_id=identity.building_id,
+            building_name=identity.building_name,
+            tenant_name=identity.tenant_name,
+            unit_no=identity.unit_no,
+            passcode=identity.passcode,
+            raw_profile=identity.raw_profile,
         ),
     )

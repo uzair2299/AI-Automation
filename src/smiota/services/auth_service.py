@@ -4,12 +4,72 @@ Handles secure service-to-service verification of one-time bootstrap codes
 issued by the Smiota Spring Boot backend and retrieves verified user identities.
 """
 
+from typing import Any
+
 import httpx
 from pydantic import BaseModel, Field
 
 from smiota.core.config import get_settings
 from smiota.core.exceptions import AuthenticationError, BackendServiceUnavailableError
 from smiota.core.logging import logger
+
+DUMMY_SMIOTA_MAIN_PROFILE: dict[str, Any] = {
+    "id": 10790,
+    "uuid": "4c9e782a-94ef-4b21-8854-bc712f5b66d1",
+    "firstName": "Alex",
+    "lastName": "Morgan",
+    "recipientName": "Alex Morgan",
+    "email": "alex.morgan@acme.com",
+    "phone": "+14155551234",
+    "voiceCallPhone": "+14155551234",
+    "photo": None,
+    "badgeId": "BADGE-9941",
+    "authId": "auth0|64f1a23e9821a",
+    "externalId": "EMP-88214",
+    "login": "amorgan",
+    "customerId": 42,
+    "locationId": 108,
+    "locationName": "Pleasanton HQ",
+    "buildingId": 15,
+    "buildingName": "North Tower",
+    "tenantId": 89,
+    "tenantName": "Acme Technologies Inc.",
+    "unitNo": "Suite 400",
+    "recipientId": 10790,
+    "isInActive": False,
+    "inactive": False,
+    "authorizedForTenant": True,
+    "wheelChairAccess": False,
+    "hasSpecialStatus": False,
+    "optOut": False,
+    "emailUnsubscribe": False,
+    "phoneUnsubscribe": False,
+    "registrationStatus": 1,
+    "keepLocalChanges": False,
+    "addressLine1": "100 Innovation Way",
+    "addressLine2": None,
+    "city": "Pleasanton",
+    "state": "CA",
+    "zipCode": "94588",
+    "passcode": "842910",
+    "lastPasscodeCreatedTime": "2026-10-15T08:30:00Z",
+    "passcodeGenerationRequired": False,
+    "doNotAssociateToAPackage": False,
+    "delegatesNotificationsToUserId": 0,
+    "delegatesNotificationsToUserNamed": None,
+    "roles": [
+        "recipient"
+    ],
+    "roleObjects": [
+        {
+            "roleId": 10,
+            "role": "recipient",
+            "scope": 108,
+            "scopeId": "108",
+            "userId": 10790
+        }
+    ]
+}
 
 
 class BackendIdentity(BaseModel):
@@ -19,6 +79,18 @@ class BackendIdentity(BaseModel):
     tenant_id: str = Field(..., description="Verified tenant identifier")
     roles: list[str] = Field(default_factory=list, description="Assigned roles")
     email: str | None = Field(None, description="User email address if available")
+    name: str | None = Field(None, description="User or resident full name")
+    first_name: str | None = Field(None, description="User first name")
+    last_name: str | None = Field(None, description="User last name")
+    phone: str | None = Field(None, description="Contact phone number")
+    location_id: str | None = Field(None, description="Location identifier")
+    location_name: str | None = Field(None, description="Location name")
+    building_id: str | None = Field(None, description="Building identifier")
+    building_name: str | None = Field(None, description="Building name")
+    tenant_name: str | None = Field(None, description="Tenant company name")
+    unit_no: str | None = Field(None, description="Unit or suite number")
+    passcode: str | None = Field(None, description="Pickup or access passcode")
+    raw_profile: dict[str, Any] = Field(default_factory=dict, description="Raw profile dictionary from Smiota Main Core")
 
 
 class SmiotaBackendAuthService:
@@ -137,13 +209,22 @@ class SmiotaBackendAuthService:
                 logger.error("Spring Boot response is not a valid JSON object")
                 raise AuthenticationError("Invalid response structure received from authentication service.")
 
-            # Validate contract: 'valid' flag must be True
-            if data.get("valid") is not True:
+            # Validate contract: fail closed if explicitly marked invalid or inactive
+            if data.get("valid") is False:
                 logger.warning(f"Spring Boot backend explicitly marked code {masked_code} as invalid.")
                 raise AuthenticationError("Bootstrap code is invalid or has already been consumed.")
 
-            user_id = str(data.get("user_id") or "").strip()
-            tenant_id = str(data.get("tenant_id") or "").strip()
+            if data.get("inactive") is True or data.get("isInActive") is True:
+                logger.warning(f"User account is marked inactive in Smiota Main Core: {masked_code}")
+                raise AuthenticationError("User account is inactive. Please contact support.")
+
+            # Extract user identifier (supports Smiota Main Core 'id', 'recipientId', 'uuid' as well as generic 'user_id')
+            raw_user_id = data.get("id") or data.get("user_id") or data.get("recipientId") or data.get("uuid")
+            user_id = str(raw_user_id).strip() if raw_user_id is not None else ""
+
+            # Extract tenant identifier (supports Smiota Main Core 'tenantId', 'customerId' as well as generic 'tenant_id')
+            raw_tenant_id = data.get("tenantId") or data.get("tenant_id") or data.get("customerId")
+            tenant_id = str(raw_tenant_id).strip() if raw_tenant_id is not None else ""
 
             if not user_id or not tenant_id:
                 logger.error("Spring Boot 200 response missing required identity fields (user_id / tenant_id).")
@@ -151,11 +232,37 @@ class SmiotaBackendAuthService:
 
             roles = data.get("roles")
             if not isinstance(roles, list):
-                roles = ["CUSTOMER"]
+                if data.get("recipientId") or data.get("unitNo") or "recipient" in str(data.get("roleObjects", "")):
+                    roles = ["recipient"]
+                else:
+                    roles = ["CUSTOMER"]
 
             email = data.get("email")
             if email is not None:
                 email = str(email).strip() or None
+
+            # Extract rich resident/user details returned by Smiota Main Core
+            recipient_name = data.get("recipientName")
+            if not recipient_name:
+                first = data.get("firstName", "")
+                last = data.get("lastName", "")
+                recipient_name = f"{first} {last}".strip() or None
+
+            first_name = data.get("firstName")
+            last_name = data.get("lastName")
+            phone = data.get("phone") or data.get("voiceCallPhone")
+
+            loc_id = data.get("locationId")
+            location_id = str(loc_id) if loc_id is not None else None
+            location_name = data.get("locationName")
+
+            bld_id = data.get("buildingId")
+            building_id = str(bld_id) if bld_id is not None else None
+            building_name = data.get("buildingName")
+
+            tenant_name = data.get("tenantName")
+            unit_no = data.get("unitNo")
+            passcode = data.get("passcode")
 
             logger.info(f"Bootstrap code {masked_code} successfully verified for user={user_id}, tenant={tenant_id}")
             return BackendIdentity(
@@ -164,23 +271,28 @@ class SmiotaBackendAuthService:
                 tenant_id=tenant_id,
                 roles=roles,
                 email=email,
+                name=recipient_name,
+                first_name=first_name,
+                last_name=last_name,
+                phone=phone,
+                location_id=location_id,
+                location_name=location_name,
+                building_id=building_id,
+                building_name=building_name,
+                tenant_name=tenant_name,
+                unit_no=unit_no,
+                passcode=passcode,
+                raw_profile=data,
             )
 
-        # 2. Rejection statuses (invalid code, expired code, already consumed code)
         # 2. Rejection statuses (invalid code, expired code, already consumed code)
         if status in (400, 401, 403, 404, 410, 422):
             if status == 404:
                 logger.warning(
                     f"Spring Boot endpoint {self.exchange_endpoint} returned HTTP 404 (not yet implemented on server). "
-                    "Returning 200 OK dummy identity for testing."
+                    "Returning 200 OK Smiota Main dummy identity for testing."
                 )
-                return BackendIdentity(
-                    valid=True,
-                    user_id="user-123",
-                    tenant_id="tenant-45",
-                    roles=["CUSTOMER"],
-                    email="user-123@customer.smiota.com",
-                )
+                return self._handle_dummy_exchange(masked_code)
             logger.warning(f"Spring Boot rejected bootstrap code {masked_code} with status HTTP {status}")
             raise AuthenticationError("Bootstrap code is invalid, expired, or was already consumed.")
 
@@ -191,14 +303,28 @@ class SmiotaBackendAuthService:
         )
 
     def _handle_dummy_exchange(self, code: str) -> BackendIdentity:
-        """Deterministic dummy implementation for local dev and testing."""
+        """Deterministic dummy implementation using real Smiota Main user profile for local dev and testing."""
+        profile = DUMMY_SMIOTA_MAIN_PROFILE
         return BackendIdentity(
             valid=True,
-            user_id="user-123",
-            tenant_id="tenant-45",
-            roles=["CUSTOMER"],
-            email="user-123@customer.smiota.com",
+            user_id=str(profile["id"]),
+            tenant_id=str(profile["tenantId"]),
+            roles=list(profile.get("roles", ["recipient"])),
+            email=profile.get("email"),
+            name=profile.get("recipientName"),
+            first_name=profile.get("firstName"),
+            last_name=profile.get("lastName"),
+            phone=profile.get("phone"),
+            location_id=str(profile.get("locationId")),
+            location_name=profile.get("locationName"),
+            building_id=str(profile.get("buildingId")),
+            building_name=profile.get("buildingName"),
+            tenant_name=profile.get("tenantName"),
+            unit_no=profile.get("unitNo"),
+            passcode=profile.get("passcode"),
+            raw_profile=profile,
         )
 
 
 backend_auth_service = SmiotaBackendAuthService()
+

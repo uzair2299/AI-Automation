@@ -133,7 +133,7 @@
     
     <!-- Dummy Mode -->
     <text x="12" y="93" fill="#94a3b8" font-size="11px">[Dummy Mode]</text>
-    <text x="100" y="94" font-size="11.5px" fill="#a7f3d0">Simulates 200 OK verified resident (user-123)</text>
+    <text x="100" y="94" font-size="11.5px" fill="#a7f3d0">Simulates 200 OK resident (Alex Morgan, id: 10790)</text>
   </g>
 
   <!-- Alt Box 2: Success vs Failure Response -->

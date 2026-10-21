@@ -375,3 +375,154 @@ def test_browser_supplied_identity_cannot_override_verified_session():
     assert "user_id" not in context.metadata
     assert "tenant_id" not in context.metadata
     assert "roles" not in context.metadata
+
+
+# ==============================================================================
+# 9. Smiota Main App Real User Profile Payload & Dummy Fallback Tests
+# ==============================================================================
+
+SMIOTA_MAIN_REAL_PAYLOAD = {
+    "id": 10790,
+    "uuid": "4c9e782a-94ef-4b21-8854-bc712f5b66d1",
+    "firstName": "Alex",
+    "lastName": "Morgan",
+    "recipientName": "Alex Morgan",
+    "email": "alex.morgan@acme.com",
+    "phone": "+14155551234",
+    "voiceCallPhone": "+14155551234",
+    "photo": None,
+    "badgeId": "BADGE-9941",
+    "authId": "auth0|64f1a23e9821a",
+    "externalId": "EMP-88214",
+    "login": "amorgan",
+    "customerId": 42,
+    "locationId": 108,
+    "locationName": "Pleasanton HQ",
+    "buildingId": 15,
+    "buildingName": "North Tower",
+    "tenantId": 89,
+    "tenantName": "Acme Technologies Inc.",
+    "unitNo": "Suite 400",
+    "recipientId": 10790,
+    "isInActive": False,
+    "inactive": False,
+    "authorizedForTenant": True,
+    "wheelChairAccess": False,
+    "hasSpecialStatus": False,
+    "optOut": False,
+    "emailUnsubscribe": False,
+    "phoneUnsubscribe": False,
+    "registrationStatus": 1,
+    "keepLocalChanges": False,
+    "addressLine1": "100 Innovation Way",
+    "addressLine2": None,
+    "city": "Pleasanton",
+    "state": "CA",
+    "zipCode": "94588",
+    "passcode": "842910",
+    "lastPasscodeCreatedTime": "2026-10-15T08:30:00Z",
+    "passcodeGenerationRequired": False,
+    "doNotAssociateToAPackage": False,
+    "delegatesNotificationsToUserId": 0,
+    "delegatesNotificationsToUserNamed": None,
+    "roles": [
+        "recipient"
+    ],
+    "roleObjects": [
+        {
+            "roleId": 10,
+            "role": "recipient",
+            "scope": 108,
+            "scopeId": "108",
+            "userId": 10790
+        }
+    ]
+}
+
+
+def test_code_exchange_smiota_main_real_payload_success():
+    """Verify code exchange accurately processes real Smiota Main Core resident profile."""
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
+        mock_post.return_value = httpx.Response(
+            status_code=200,
+            json=SMIOTA_MAIN_REAL_PAYLOAD,
+            request=httpx.Request("POST", "https://dev.smiotaapps.com/smiota/internal/ai/auth/exchange"),
+        )
+        response = client.post("/api/v1/auth/exchange", json={"code": "smiota-resident-code-99"})
+
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["token_type"] == "Bearer"
+    assert "access_token" in data
+    assert data["session_id"].startswith("sess-")
+
+    # Core identity fields
+    user = data["user"]
+    assert user["user_id"] == "10790"
+    assert user["tenant_id"] == "89"
+    assert user["roles"] == ["recipient"]
+    assert user["email"] == "alex.morgan@acme.com"
+
+    # Rich Smiota Main resident metadata
+    assert user["name"] == "Alex Morgan"
+    assert user["first_name"] == "Alex"
+    assert user["last_name"] == "Morgan"
+    assert user["phone"] == "+14155551234"
+    assert user["location_id"] == "108"
+    assert user["location_name"] == "Pleasanton HQ"
+    assert user["building_id"] == "15"
+    assert user["building_name"] == "North Tower"
+    assert user["tenant_name"] == "Acme Technologies Inc."
+    assert user["unit_no"] == "Suite 400"
+    assert user["passcode"] == "842910"
+    assert user["raw_profile"] is not None
+
+    # Verify session JWT token has sub=10790, tenant_id=89, name and location_id
+    payload = verify_session_token(data["access_token"])
+    assert payload["sub"] == "10790"
+    assert payload["tenant_id"] == "89"
+    assert payload["roles"] == ["recipient"]
+    assert payload["name"] == "Alex Morgan"
+    assert payload["location_id"] == "108"
+
+
+def test_code_exchange_backend_404_fallback_returns_smiota_main_dummy():
+    """Backend returning 404 (endpoint unintegrated) falls back to Smiota Main dummy profile."""
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
+        mock_post.return_value = httpx.Response(
+            status_code=404,
+            content=b"Endpoint Not Found",
+            request=httpx.Request("POST", "https://dev.smiotaapps.com/smiota/internal/ai/auth/exchange"),
+        )
+        response = client.post("/api/v1/auth/exchange", json={"code": "fallback-test-code"})
+
+    assert response.status_code == 200
+    data = response.json()
+    user = data["user"]
+    assert user["user_id"] == "10790"
+    assert user["name"] == "Alex Morgan"
+    assert user["tenant_id"] == "89"
+    assert user["roles"] == ["recipient"]
+    assert user["email"] == "alex.morgan@acme.com"
+    assert user["building_name"] == "North Tower"
+    assert user["unit_no"] == "Suite 400"
+
+
+def test_code_exchange_inactive_user_rejected():
+    """Users marked inactive in Smiota Main Core are rejected with 401."""
+    inactive_payload = dict(SMIOTA_MAIN_REAL_PAYLOAD)
+    inactive_payload["inactive"] = True
+
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
+        mock_post.return_value = httpx.Response(
+            status_code=200,
+            json=inactive_payload,
+            request=httpx.Request("POST", "https://dev.smiotaapps.com/smiota/internal/ai/auth/exchange"),
+        )
+        response = client.post("/api/v1/auth/exchange", json={"code": "inactive-user-code"})
+
+    assert response.status_code == 401
+    assert response.json()["success"] is False
+    assert response.json()["error_code"] == "AUTHENTICATION_FAILED"
+

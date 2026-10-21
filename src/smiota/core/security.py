@@ -13,8 +13,10 @@ from smiota.core.exceptions import AuthenticationError
 class AuthenticatedUser(BaseModel):
     user_id: str
     email: str = ""
+    name: str = ""
     roles: list[str] = ["user"]
     tenant_id: str = "default"
+    location_id: str = ""
     session_id: str | None = None
 
 
@@ -24,6 +26,8 @@ def create_session_token(
     roles: list[str],
     email: str | None = None,
     session_id: str | None = None,
+    name: str | None = None,
+    location_id: str | None = None,
 ) -> tuple[str, str, int]:
     """Issue a tamper-proof signed JWT session token for an authenticated chatbot session.
 
@@ -44,6 +48,8 @@ def create_session_token(
         "tenant_id": tenant_id,
         "roles": roles,
         "email": email or "",
+        "name": name or "",
+        "location_id": location_id or "",
         "session_id": active_session_id,
         "iat": int(now.timestamp()),
         "exp": int(exp.timestamp()),
