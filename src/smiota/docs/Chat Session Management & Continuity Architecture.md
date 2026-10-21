@@ -187,7 +187,86 @@ Defined in [`src/smiota/schemas/chat_session.py`](file:///d:/repos/smiota-ai/src
 
 ---
 
-## 5. Storage Provider Abstraction (Future-Proofing)
+## 5. Browser Storage Strategy & Multi-Tier Expiration Model
+
+### 5.1 Are We Storing the Session into `localStorage`?
+**Yes, but strictly as an opaque reference pointer.**
+
+| Item | Stored in `localStorage`? | Where It Actually Lives | Security & Privacy Rationale |
+| :--- | :---: | :--- | :--- |
+| **Session ID Pointer** (`smiota_active_chat_session_id`) | **YES** | Browser `localStorage` | Contains only an opaque string (e.g. `"sess-4c9e782a94ef"`). Retains continuity across drawer close (`*ngIf`) and page refresh (F5). |
+| **Conversation Messages** (Text, Package PINs, Locker Compartments) | **NO** | Backend [`InMemoryChatRepository`](file:///d:/repos/smiota-ai/src/smiota/repositories/chat_repository.py) | **Zero sensitive resident data or locker PINs** stored in the browser. Immune to browser storage inspection and XSS theft. |
+| **JWT Access Token** | **NO** | Iframe JavaScript Closure Variable | Never written to disk; securely discarded when the iframe is destroyed. |
+| **Resident Profile** | **NO** | Backend Spring Boot & Session Tokens | Resident details (Alex Morgan, Unit 400) reside only in verified server memory. |
+
+#### Why `localStorage` instead of `sessionStorage`?
+In Angular host applications, closing the chat drawer unmounts the `<iframe>` DOM element via `*ngIf="isChatOpen"`. When the resident clicks the chat bubble again, a brand new `<iframe>` document context is created. In many browsers, `sessionStorage` is scoped to the document context and can be cleared or isolated when an iframe is recreated. `localStorage` guarantees that the resident's session reference survives drawer toggle and full page reloads.
+
+---
+
+### 5.2 How Does the Session Expire? (The 5-Tier Expiration Lifecycle)
+
+Session expiration is enforced across 5 layers:
+
+```
++-------------------------------------------------------------------------------------------------+
+|                                 5-TIER SESSION EXPIRATION MODEL                                 |
++-------------------------------------------------------------------------------------------------+
+|                                                                                                 |
+|  [Tier 1: Server TTL]        [Tier 2: Stale Detection]        [Tier 3: JWT Token Expiry]        |
+|  24-Hour Sliding Window      Server checks if ID is alive     Auth token expires in 60 min      |
+|  _evict_expired() drops      If expired, discards dead ID     Requires fresh exchange code      |
+|  inactive sessions from RAM  and issues brand new session     from Angular host                 |
+|                                                                                                 |
+|  [Tier 4: User Switch Guard] [Tier 5: Manual Reset Button]                                      |
+|  Alex logs out, John logs in "New Chat" button in header                                        |
+|  Server verifies user_id     clears localStorage immediately                                    |
+|  Rejects cross-user session  and starts fresh conversation                                      |
++-------------------------------------------------------------------------------------------------+
+```
+
+#### Tier 1: Server-Side Inactivity Sliding Window (TTL)
+* **Configuration**: `CHAT_SESSION_TTL_HOURS = 24` (in `.env`).
+* **Mechanism**: Every session maintains `created_at` and `updated_at`. When a resident sends a message, `updated_at` refreshes.
+* **Eviction**: Before every operation, [`_evict_expired()`](file:///d:/repos/smiota-ai/src/smiota/repositories/chat_repository.py#L206) purges all sessions where `datetime.now(UTC) - session.updated_at > ttl`. All stored turns and card payloads are freed from RAM.
+
+#### Tier 2: Stale Session Detection on Re-Exchange
+* If a resident returns after 3 days, their browser sends the stale `cachedSid` (`sess-old`) in [`POST /api/v1/auth/exchange`](file:///d:/repos/smiota-ai/src/smiota/api/v1/auth.py#L38).
+* The server calls `chat_repo.get_session(cachedSid)`.
+* Because 3 days > 24 hours, `_evict_expired()` already deleted it, returning `None`.
+* The server **discards the dead ID**, creates a **brand new `session_id`** (`sess-new-uuid`), and returns it.
+* The client overwrites `localStorage.setItem('smiota_active_chat_session_id', 'sess-new-uuid')` and renders a clean welcome screen.
+
+#### Tier 3: JWT Authentication Token Expiration
+* The chat JWT token has a lifetime of 60 minutes (`SESSION_TOKEN_EXPIRE_MINUTES`).
+* If a session stays idle in an open tab past token expiry, API calls return `401 Unauthorized`.
+* The widget re-initiates the `postMessage('auth-code')` handshake to get a fresh token.
+
+#### Tier 4: Cross-User Account Switch Protection
+* If Resident A logs out and Resident B logs into the Mailroom portal on the same shared computer:
+* Resident B's auth exchange passes Resident A's cached `session_id`.
+* The server checks: `if existing.user_id == identity.user_id and existing.tenant_id == identity.tenant_id:`
+* Since `user_id` does not match, the server **rejects the old session**, issues a new isolated session for Resident B, and overwrites `localStorage`. Resident B can never see Resident A's conversation.
+
+#### Tier 5: Explicit Resident Reset ("New Chat" Button)
+* A **"New Chat"** button is built into the header of [`webchat.py`](file:///d:/repos/smiota-ai/src/smiota/api/v1/channels/webchat.py#L240).
+* Clicking it executes `localStorage.removeItem('smiota_active_chat_session_id')` and refreshes the canvas, allowing residents or QA testers to clear their chat history on demand.
+
+---
+
+### 5.3 Codebase Implementation Map
+
+| Purpose | File & Location |
+| :--- | :--- |
+| **Cache Session ID in `localStorage`** | [`src/smiota/api/v1/channels/webchat.py:L327`](file:///d:/repos/smiota-ai/src/smiota/api/v1/channels/webchat.py#L327) & [`L390`](file:///d:/repos/smiota-ai/src/smiota/api/v1/channels/webchat.py#L390) |
+| **Re-attach & Validate Alive Session** | [`src/smiota/api/v1/auth.py:L38-L47`](file:///d:/repos/smiota-ai/src/smiota/api/v1/auth.py#L38-L47) |
+| **TTL Expiration & Memory Eviction** | [`src/smiota/repositories/chat_repository.py:L206-L215`](file:///d:/repos/smiota-ai/src/smiota/repositories/chat_repository.py#L206-L215) |
+| **Multi-Tenant History Hydration** | [`src/smiota/api/v1/chat.py:L82-L106`](file:///d:/repos/smiota-ai/src/smiota/api/v1/chat.py#L82-L106) |
+| **"New Chat" Reset Button & Handler** | [`src/smiota/api/v1/channels/webchat.py:L240`](file:///d:/repos/smiota-ai/src/smiota/api/v1/channels/webchat.py#L240) & [`L720`](file:///d:/repos/smiota-ai/src/smiota/api/v1/channels/webchat.py#L720) |
+
+---
+
+## 6. Storage Provider Abstraction (Future-Proofing)
 
 ![Pluggable Chat Storage Architecture](./pluggable_storage_architecture.svg)
 
@@ -228,9 +307,9 @@ When you are ready to migrate to a permanent database, **zero changes** are requ
 
 ---
 
-## 6. API Reference
+## 7. API Reference
 
-### 6.1 `POST /api/v1/auth/exchange`
+### 7.1 `POST /api/v1/auth/exchange`
 Exchanges a single-use token or re-attaches to an active session.
 
 **Request Body:**
@@ -260,7 +339,7 @@ Exchanges a single-use token or re-attaches to an active session.
 
 ---
 
-### 6.2 `GET /api/v1/chat/history/{session_id}`
+### 7.2 `GET /api/v1/chat/history/{session_id}`
 Retrieves all historical message turns and cards for the active session.
 
 **Headers:**
@@ -311,6 +390,6 @@ Authorization: Bearer <access_token>
 
 ---
 
-### 6.3 Security Enforcement
+### 7.3 Security Enforcement
 * Calling `GET /api/v1/chat/history/{session_id}` without a valid Bearer token returns **`401 Unauthorized`**.
 * Attempting to query another user's `session_id` across tenants returns **`403 Forbidden` (`error_code: "FORBIDDEN"`)**.
