@@ -41,13 +41,15 @@ class BaseChatRepository(ABC):
         self,
         session_id: str,
         role: Literal["user", "assistant", "system"],
-        content: str,
+        content: str | dict[str, Any],
         sender_name: str | None = None,
         agent_name: str | None = None,
-        message_type: MessageType = "text",
+        message_type: MessageType = "user_message",
         card_payload: dict[str, Any] | None = None,
         suggested_actions: list[str] | None = None,
         metadata: dict[str, Any] | None = None,
+        attachments: list[dict[str, Any]] | None = None,
+        message_id: str | None = None,
     ) -> ChatMessage:
         """Append a message turn to the session history."""
         pass
@@ -127,13 +129,15 @@ class InMemoryChatRepository(BaseChatRepository):
         self,
         session_id: str,
         role: Literal["user", "assistant", "system"],
-        content: str,
+        content: str | dict[str, Any],
         sender_name: str | None = None,
         agent_name: str | None = None,
-        message_type: MessageType = "text",
+        message_type: MessageType = "user_message",
         card_payload: dict[str, Any] | None = None,
         suggested_actions: list[str] | None = None,
         metadata: dict[str, Any] | None = None,
+        attachments: list[dict[str, Any]] | None = None,
+        message_id: str | None = None,
     ) -> ChatMessage:
         async with self._lock:
             self._evict_expired()
@@ -152,18 +156,57 @@ class InMemoryChatRepository(BaseChatRepository):
                 )
 
             session = self._sessions[session_id]
+
+            # Normalize dynamic content dict
+            if isinstance(content, str):
+                content_dict: dict[str, Any] = {"text": content}
+                if role == "user":
+                    content_dict["attachments"] = attachments or []
+                if card_payload:
+                    content_dict["card_data"] = card_payload
+                    content_dict["card_type"] = card_payload.get("card_type", "custom_card")
+                if suggested_actions:
+                    content_dict["suggested_actions"] = suggested_actions
+            else:
+                content_dict = dict(content)
+                content_dict.setdefault("text", "")
+                if role == "user":
+                    content_dict.setdefault("attachments", attachments or [])
+                if card_payload and "card_data" not in content_dict:
+                    content_dict["card_data"] = card_payload
+                    content_dict["card_type"] = card_payload.get("card_type", "custom_card")
+                if suggested_actions and "suggested_actions" not in content_dict:
+                    content_dict["suggested_actions"] = suggested_actions
+
+            # Map legacy display types to standard types
+            effective_type = message_type
+            if effective_type in ("text", "user_message", "agent_message"):
+                effective_type = "user_message" if role == "user" else "agent_message"
+            elif effective_type in ("card", "agent_card"):
+                effective_type = "agent_card"
+
+            sender_display = sender_name or agent_name or ("Assistant" if role == "assistant" else "User")
             msg = ChatMessage(
-                id=f"msg-{uuid.uuid4().hex[:10]}",
+                message_id=message_id or f"msg_{uuid.uuid4().hex[:12]}",
+                conversation_id=session_id,
+                type=effective_type,
+                sender={
+                    "role": role,
+                    "name": sender_display,
+                    "id": agent_name if role == "assistant" else None,
+                },
+                content=content_dict,
+                metadata=metadata or {},
+                created_at=datetime.now(UTC),
+                # Legacy fields for backward compatibility
+                id=message_id or f"msg_{uuid.uuid4().hex[:12]}",
                 session_id=session_id,
                 role=role,
-                sender_name=sender_name,
+                sender_name=sender_display,
                 agent_name=agent_name,
                 message_type=message_type,
-                content=content,
                 card_payload=card_payload,
                 suggested_actions=suggested_actions or [],
-                created_at=datetime.now(UTC),
-                metadata=metadata or {},
             )
 
             session.messages.append(msg)

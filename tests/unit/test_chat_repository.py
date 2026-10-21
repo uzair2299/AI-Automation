@@ -128,8 +128,8 @@ async def test_in_memory_repository_sliding_window():
     messages = await repo.get_messages("sess-window")
     assert len(messages) == 4  # 2 turns * 2 = 4
     # Earliest messages (1, 2) should have been pruned
-    assert messages[0].content == "Message 3"
-    assert messages[3].content == "Message 6"
+    assert messages[0].content["text"] == "Message 3"
+    assert messages[3].content["text"] == "Message 6"
 
 
 @pytest.mark.asyncio
@@ -187,21 +187,25 @@ def test_chat_history_endpoint_returns_stored_turns():
     data = history_resp.json()
 
     assert data["session_id"] == session_id
+    assert data["conversation_id"] == session_id
     assert data["user_id"] == "10790"
     assert data["tenant_id"] == "89"
     assert data["total_messages"] >= 2
 
-    # Check that user turn and assistant turn are properly recorded
+    # Check that user turn and assistant turn are properly recorded in standard envelope format
     user_turn = data["messages"][0]
     assert user_turn["role"] == "user"
-    assert user_turn["content"] == "Where is my parcel?"
-    assert user_turn["message_type"] == "text"
-    assert user_turn["sender_name"] == "Alex Morgan"
+    assert user_turn["type"] == "user_message"
+    assert user_turn["sender"]["name"] == "Alex Morgan"
+    assert user_turn["content"]["text"] == "Where is my parcel?"
+    assert user_turn["content"]["attachments"] == []
+    assert user_turn["message_id"].startswith("msg_")
+    assert user_turn["conversation_id"] == session_id
 
     assistant_turn = data["messages"][1]
     assert assistant_turn["role"] == "assistant"
     assert assistant_turn["agent_name"] == "Customer"
-    assert "Compartment 12" in assistant_turn["content"]
+    assert "Compartment 12" in assistant_turn["content"]["text"]
     assert assistant_turn["suggested_actions"] == ["Resend pickup PIN"]
 
 
@@ -246,3 +250,63 @@ def test_chat_history_non_existent_session_graceful_empty():
     data = response.json()
     assert data["total_messages"] == 0
     assert data["messages"] == []
+
+
+def test_standard_message_envelope_websocket_and_polymorphic_payloads():
+    """Verify WebSocket accepts standard user_message envelope and responds with standard stream/done envelopes."""
+    import json
+    session_id = "sess-standard-envelope-01"
+
+    # Use TestClient websocket context
+    with client.websocket_connect(f"/api/v1/chat/ws/{session_id}") as ws:
+        # 1. Send keep-alive ping
+        ws.send_text("ping")
+        assert ws.receive_text() == "pong"
+
+        # 2. Send standard user_message envelope with dynamic content
+        incoming_envelope = {
+            "message_id": "msg_01JABC123",
+            "conversation_id": session_id,
+            "type": "user_message",
+            "sender": {
+                "role": "user",
+                "name": "Alex Morgan",
+                "id": "10790"
+            },
+            "content": {
+                "text": "Where is my parcel?",
+                "attachments": []
+            },
+            "metadata": {
+                "locale": "en-US",
+                "timezone": "Asia/Karachi",
+                "client": "web"
+            },
+            "created_at": "2026-10-21T08:00:00Z"
+        }
+        ws.send_text(json.dumps(incoming_envelope))
+
+        # 3. Read streamed tokens until 'done'
+        received_tokens = []
+        done_envelope = None
+
+        while True:
+            resp = ws.receive_json()
+            if resp.get("type") == "stream_token":
+                assert resp["conversation_id"] == session_id
+                assert "sender" in resp
+                assert "content" in resp
+                assert "token" in resp["content"]
+                received_tokens.append(resp["content"]["token"])
+            elif resp.get("type") == "done":
+                done_envelope = resp
+                break
+
+        assert len(received_tokens) > 0
+        assert done_envelope is not None
+        assert done_envelope["conversation_id"] == session_id
+        assert "sender" in done_envelope
+        assert "content" in done_envelope
+        assert "text" in done_envelope["content"]
+        assert "suggested_actions" in done_envelope["content"]
+

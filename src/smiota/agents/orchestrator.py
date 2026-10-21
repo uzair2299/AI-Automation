@@ -51,7 +51,10 @@ class AgentOrchestrator:
         # 3. Populate context.conversation_history with recent turns
         recent_turns = await repo.get_messages(context.session_id, limit=10)
         context.conversation_history = [
-            {"role": m.role, "content": m.content}
+            {
+                "role": m.role or (m.sender.role if hasattr(m, "sender") else "user"),
+                "content": m.text if hasattr(m, "text") else (m.content.get("text", "") if isinstance(m.content, dict) else str(m.content)),
+            }
             for m in recent_turns
         ]
 

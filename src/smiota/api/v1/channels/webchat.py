@@ -358,12 +358,17 @@ async def embed_widget(
                         if (initBubble) initBubble.style.display = 'none';
 
                         for (const msg of data.messages) {
+                            const textContent = (typeof msg.content === 'object' && msg.content !== null) ? (msg.content.text || '') : (msg.content || '');
+                            const senderRole = msg.sender?.role || msg.role || 'user';
+                            const senderName = msg.sender?.name || msg.sender_name || msg.agent_name || 'AI';
+                            const isApproval = msg.type === 'approval_gate' || msg.message_type === 'approval_gate';
+                            const actions = (typeof msg.content === 'object' && msg.content !== null && msg.content.suggested_actions) ? msg.content.suggested_actions : (msg.suggested_actions || []);
                             appendMessage(
-                                msg.role === 'user' ? 'user' : 'bot',
-                                msg.content,
-                                msg.agent_name || 'AI',
-                                msg.message_type === 'approval_gate',
-                                msg.suggested_actions || []
+                                senderRole === 'user' ? 'user' : 'bot',
+                                textContent,
+                                senderName,
+                                isApproval,
+                                actions
                             );
                         }
                     }
@@ -646,21 +651,24 @@ async def embed_widget(
         }
 
         function handleIncomingSocketPayload(msg) {
-            if (msg.type === "token") {
+            if (msg.type === "token" || msg.type === "stream_token") {
                 removeTypingIndicator();
+                const agentName = msg.sender?.name || msg.agent || "AI";
+                const tokenText = (typeof msg.content === 'object' && msg.content !== null) ? (msg.content.token || '') : (msg.token || '');
                 if (!currentStreamDiv) {
-                    createStreamingBubble(msg.agent || "AI");
+                    createStreamingBubble(agentName);
                 }
-                currentStreamText += msg.token;
+                currentStreamText += tokenText;
                 if (currentStreamBody) {
                     currentStreamBody.innerHTML = formatMarkdown(currentStreamText);
                 }
                 messagesContainer.scrollTop = messagesContainer.scrollHeight;
-            } else if (msg.type === "done") {
+            } else if (msg.type === "done" || msg.type === "agent_message" || msg.type === "agent_card") {
                 removeTypingIndicator();
                 markLastUserMessageDelivered();
-                if (msg.suggested_actions) {
-                    renderQuickReplies(msg.suggested_actions);
+                const actions = (typeof msg.content === 'object' && msg.content !== null && msg.content.suggested_actions) ? msg.content.suggested_actions : msg.suggested_actions;
+                if (actions) {
+                    renderQuickReplies(actions);
                 }
                 currentStreamDiv = null;
                 currentStreamBody = null;
@@ -677,12 +685,32 @@ async def embed_widget(
             showTypingIndicator();
 
             if (wsConnected && wsSocket && wsSocket.readyState === WebSocket.OPEN) {
-                // Send via Real-Time WebSocket
-                wsSocket.send(JSON.stringify({
+                // Send via Standard Dynamic Message Envelope
+                const standardEnvelope = {
+                    message_id: "msg_" + Math.random().toString(36).substring(2, 11),
+                    conversation_id: sessionId,
+                    type: "user_message",
+                    sender: {
+                        role: "user",
+                        name: authenticatedUser?.name || "Alex Morgan",
+                        id: residentId || authenticatedUser?.user_id || "10790"
+                    },
+                    content: {
+                        text: messageText,
+                        attachments: []
+                    },
+                    metadata: {
+                        locale: navigator.language || "en-US",
+                        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+                        client: "webchat"
+                    },
+                    created_at: new Date().toISOString(),
+                    // Backward-compatibility fields:
                     text: messageText,
                     session_id: sessionId,
-                    resident_id: residentId || "resident-guest"
-                }));
+                    resident_id: residentId || authenticatedUser?.user_id || "10790"
+                };
+                wsSocket.send(JSON.stringify(standardEnvelope));
             } else {
                 // HTTP REST Fallback
                 try {
