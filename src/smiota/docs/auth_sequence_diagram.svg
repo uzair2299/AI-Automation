@@ -80,7 +80,7 @@
   </g>
   <g transform="translate(835, 82)">
     <rect width="150" height="42" fill="url(#actor-grad-smiota)" class="actor-box"/>
-    <text x="75" y="21" class="actor-text">Spring Boot Core</text>
+    <text x="75" y="21" class="actor-text">Smiota Main Core</text>
   </g>
 
   <!-- Step 1: User Opens Chat -->
@@ -122,7 +122,7 @@
     <text x="12" y="18" class="alt-label">ALT: Validation Mode</text>
     
     <!-- Real Mode -->
-    <text x="12" y="38" fill="#94a3b8" font-size="11px">[Real Spring Boot]</text>
+    <text x="12" y="38" fill="#94a3b8" font-size="11px">[Real Smiota Core]</text>
     <line x1="90" y1="46" x2="265" y2="46" class="arrow arrow-req"/>
     <text x="100" y="40" font-size="10.5px" fill="#cbd5e1">POST /internal/ai/auth/exchange</text>
     <line x1="265" y1="62" x2="95" y2="62" class="arrow arrow-resp"/>
@@ -201,6 +201,6 @@
   </g>
   <g transform="translate(835, 800)">
     <rect width="150" height="34" fill="url(#actor-grad-smiota)" class="actor-box"/>
-    <text x="75" y="17" class="actor-text">Spring Boot Core</text>
+    <text x="75" y="17" class="actor-text">Smiota Main Core</text>
   </g>
 </svg>

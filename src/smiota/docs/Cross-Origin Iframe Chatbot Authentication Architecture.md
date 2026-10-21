@@ -33,7 +33,7 @@ sequenceDiagram
     participant Host as "Mailroom WebApp (Angular)"
     participant Iframe as "Chatbot (Inside Iframe)"
     participant API as "FastAPI Backend (/api/v1/auth/exchange)"
-    participant Smiota as "Smiota Core API (dev.smiotaapps.com)"
+    participant Smiota as "Smiota Main Core (dev.smiotaapps.com)"
 
     User->>Host: Clicks Chat Mascot Launcher / Opens Page
     Note over Host: Reads user token from localStorage.getItem('token')
