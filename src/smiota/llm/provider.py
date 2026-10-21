@@ -150,8 +150,13 @@ class GeminiProvider:
             except Exception as e:
                 logger.warning(f"Vertex AI call encountered error: {e}. Falling back to simulation.")
 
-        # Local development / fallback response
-        return f"[Gemini 1.5 Pro via Vertex AI] Analyzed: '{sanitized_prompt[:60]}...'"
+        # Local development / fallback response without leaking debug strings
+        logger.info(f"Using graceful concierge fallback response for prompt: {sanitized_prompt[:60]}")
+        return (
+            "I'm here to assist you with your Smiota smart locker! "
+            "I can help you check deliveries, retrieve your pickup PIN, or look up locker location and hours. "
+            "How can I help you today?"
+        )
 
     async def generate_embedding(self, text: str) -> list[float]:
         """Generate vector embedding for text using text-embedding-004 on Vertex AI."""

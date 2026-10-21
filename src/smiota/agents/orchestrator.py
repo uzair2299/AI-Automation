@@ -50,6 +50,8 @@ class AgentOrchestrator:
         if channel == "webchat":
             if any(w in q for w in ["security", "cve", "vulnerability", "iam"]):
                 return "security"
+            if any(w in q for w in ["cpu", "memory", "oom", "restart", "metric", "prometheus", "opensearch", "grafana", "gke", "pod", "incident", "rca", "crash"]):
+                return "aiops"
             return "customer"
 
         # 1. Security & Compliance

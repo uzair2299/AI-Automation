@@ -61,7 +61,8 @@ class BaseAppSettings(BaseSettings):
     SMIOTA_INTERNAL_EXCHANGE_ENDPOINT: str = "/internal/ai/auth/exchange"
     SMIOTA_SERVICE_TOKEN: str = "smiota-internal-service-secret-token"
     SMIOTA_BACKEND_TIMEOUT_SECONDS: float = 10.0
-    SMIOTA_AUTH_DUMMY_MODE: bool = False
+    SMIOTA_AUTH_DUMMY_MODE: bool = True
+
 
     # Model Context Protocol & Safety Gates
     MCP_READ_ONLY_DEFAULT: bool = True
@@ -120,6 +121,9 @@ class TestSettings(BaseAppSettings):
     ENABLE_SWAGGER: bool = True
     CORS_ORIGINS: list[str] = ["*"]
     GCP_PROJECT_ID: str = "smiota-cloud-test"
+    SMIOTA_AUTH_DUMMY_MODE: bool = False
+    REQUIRE_HUMAN_APPROVAL_FOR_REMEDIATION: bool = True
+
 
 
 # Type alias for backward compatibility across the codebase

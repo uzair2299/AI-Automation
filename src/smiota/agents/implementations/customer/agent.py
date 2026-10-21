@@ -213,6 +213,34 @@ class CustomerAgent(BaseAgent):
                 ],
             )
 
+        # 1.1 Conversational Clarifications & Feedback (e.g. "this is not good response", "i am asking something else")
+        if any(w in q for w in ["not good", "wrong response", "not what i asked", "something else", "different question", "not helpful", "bad response"]):
+            return AgentResult(
+                agent_name=self.name,
+                content=(
+                    "I apologize for the misunderstanding! Let's get you the right information. 😊\n\n"
+                    "What would you like assistance with today?\n"
+                    "• 📦 **Check package delivery status**\n"
+                    "• 🔑 **Retrieve or resend your 6-digit pickup PIN**\n"
+                    "• 📍 **Locker location and 24/7 operating hours**\n"
+                    "• 🚪 **Resolve a locker door or pickup issue**"
+                ),
+                requires_approval=False,
+                suggested_actions=["Where is my package?", "Resend pickup PIN", "Locker location and hours"],
+            )
+
+        # 1.2 Small Talk & Greetings ("how are you", "who are you")
+        if any(w in q for w in ["how are you", "how are you doing", "how r u", "who are you", "what can you do"]):
+            return AgentResult(
+                agent_name=self.name,
+                content=(
+                    "I'm doing great, thank you for asking! 😊 I'm your Smiota Smart Locker Concierge.\n\n"
+                    "I can help you check parcel delivery status, retrieve your pickup PIN, find locker hours, or assist with your locker compartment. How can I help you today?"
+                ),
+                requires_approval=False,
+                suggested_actions=["Where is my package?", "Resend pickup PIN", "Locker location and hours"],
+            )
+
         # 6. Package UUID or Parcel Tracking ID Provided
         uuid_match = re.search(r'\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b', query)
         explicit_match = re.search(
@@ -220,8 +248,9 @@ class CustomerAgent(BaseAgent):
             query,
             re.IGNORECASE,
         )
+        # Tracking match: carrier prefixes, numeric (8-35 digits), or alphanumeric with AT LEAST ONE DIGIT (prevents matching English words like 'response' or 'something')
         tracking_match = re.search(
-            r'\b(sm-[0-9a-zA-Z_-]+|pkg-[0-9a-zA-Z_-]+|1z[0-9a-zA-Z]+|[0-9]{8,35}|[0-9a-fA-F]{12,32}|[a-zA-Z0-9]{8,35})\b',
+            r'\b(sm-[0-9a-zA-Z_-]+|pkg-[0-9a-zA-Z_-]+|1z[0-9a-zA-Z]+|[0-9]{8,35}|(?=[a-zA-Z0-9_-]{8,35})(?=.*\d)[a-zA-Z0-9_-]+)\b',
             q,
         )
 
