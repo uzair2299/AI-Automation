@@ -60,3 +60,12 @@ def get_mcp_client() -> MCPClient:
 def get_knowledge_retriever() -> KnowledgeRetriever:
     """Dependency returning the RAG KnowledgeRetriever instance."""
     return KnowledgeRetriever()
+
+
+from smiota.repositories.chat_repository import BaseChatRepository, get_chat_repository
+
+
+def get_chat_repo() -> BaseChatRepository:
+    """Dependency returning the active chat session repository."""
+    return get_chat_repository()
+

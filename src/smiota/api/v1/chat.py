@@ -58,8 +58,53 @@ async def send_message(
 
 from typing import Optional
 from fastapi import Query
+from smiota.api.deps import get_chat_repo
 from smiota.api.v1.websocket_manager import ws_manager
+from smiota.core.exceptions import AuthorizationError
+from smiota.repositories.chat_repository import BaseChatRepository
+from smiota.schemas.chat_session import ChatHistoryResponse
 import json
+
+
+@router.get(
+    "/history/{session_id}",
+    response_model=ChatHistoryResponse,
+    summary="Get Chat Session Conversation History",
+    description="Retrieve all stored message turns and rich card payloads for an active conversation session.",
+)
+async def get_chat_history(
+    session_id: str,
+    limit: int = Query(50, ge=1, le=200, description="Maximum number of recent message turns to retrieve"),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    chat_repo: BaseChatRepository = Depends(get_chat_repo),
+) -> ChatHistoryResponse:
+    """Retrieve full conversation history for a given session with multi-tenant verification."""
+    session = await chat_repo.get_session(session_id)
+    if not session:
+        return ChatHistoryResponse(
+            session_id=session_id,
+            user_id=current_user.user_id,
+            tenant_id=current_user.tenant_id,
+            channel="webchat",
+            total_messages=0,
+            messages=[],
+        )
+
+    # Multi-tenant isolation enforcement
+    is_admin = any(r.lower() in ("admin", "superadmin", "sre") for r in current_user.roles)
+    if not is_admin and (session.user_id != current_user.user_id or session.tenant_id != current_user.tenant_id):
+        raise AuthorizationError("Access denied: You do not have permission to access this chat session.")
+
+    recent_messages = session.messages[-limit:]
+    return ChatHistoryResponse(
+        session_id=session.session_id,
+        user_id=session.user_id,
+        tenant_id=session.tenant_id,
+        channel=session.channel,
+        total_messages=len(session.messages),
+        messages=recent_messages,
+    )
+
 
 
 @router.websocket("/ws/{session_id}")

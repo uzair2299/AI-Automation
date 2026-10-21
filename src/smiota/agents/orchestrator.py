@@ -1,9 +1,11 @@
 """Agent Orchestration & Reasoning Layer: Task planning, intent classification, and multi-agent coordination."""
 from typing import Optional
 from smiota.agents.base import AgentContext, AgentResult
-from smiota.agents.registry import AgentRegistry
 from smiota.agents.memory import ConversationMemory
+from smiota.agents.registry import AgentRegistry
 from smiota.core.logging import logger
+from smiota.repositories.chat_repository import get_chat_repository
+from smiota.schemas.chat_session import MessageType
 
 
 class AgentOrchestrator:
@@ -22,10 +24,45 @@ class AgentOrchestrator:
         selected_agent_name = preferred_agent or self._classify_intent(query, context.channel)
         logger.info(f"Routing query to agent: [{selected_agent_name}] (Session: {context.session_id})")
 
-        # Record incoming user turn in conversation memory
-        memory = ConversationMemory(session_id=context.session_id)
-        await memory.add_message(role="user", content=query)
+        # 1. Ensure session is tracked in the repository
+        repo = get_chat_repository()
+        await repo.get_or_create_session(
+            session_id=context.session_id,
+            user_id=context.user_id,
+            tenant_id=context.tenant_id,
+            channel=context.channel,
+            metadata=context.metadata,
+        )
 
+        # 2. Record incoming user turn in chat repository
+        user_display_name = (
+            context.metadata.get("user_name")
+            or context.metadata.get("recipient_name")
+            or None
+        )
+        await repo.append_message(
+            session_id=context.session_id,
+            role="user",
+            content=query,
+            sender_name=user_display_name,
+            message_type="text",
+        )
+
+        # 3. Populate context.conversation_history with recent turns
+        recent_turns = await repo.get_messages(context.session_id, limit=10)
+        context.conversation_history = [
+            {"role": m.role, "content": m.content}
+            for m in recent_turns
+        ]
+
+        # Maintain legacy ConversationMemory for backward compatibility
+        try:
+            memory = ConversationMemory(session_id=context.session_id)
+            await memory.add_message(role="user", content=query)
+        except Exception:
+            pass
+
+        # 4. Route to specialized agent
         default_fallback = "customer" if context.channel == "webchat" else "aiops"
         try:
             agent = AgentRegistry.get(selected_agent_name)
@@ -35,8 +72,39 @@ class AgentOrchestrator:
 
         result = await agent.process(query, context)
 
-        # Record assistant response in conversation memory
-        await memory.add_message(role="assistant", content=result.content)
+        # 5. Classify message type (text vs. card vs. approval gate)
+        msg_type: MessageType = "text"
+        card_data: Optional[dict] = None
+
+        if result.requires_approval:
+            msg_type = "approval_gate"
+            card_data = {
+                "action": "security_approval_required",
+                "approval_details": result.approval_details,
+                "approval_id": result.approval_id,
+            }
+        elif result.metadata.get("card_payload"):
+            msg_type = "card"
+            card_data = result.metadata["card_payload"]
+
+        # 6. Record assistant response in chat repository
+        await repo.append_message(
+            session_id=context.session_id,
+            role="assistant",
+            content=result.content,
+            agent_name=result.agent_name,
+            sender_name=f"{result.agent_name} Assistant",
+            message_type=msg_type,
+            card_payload=card_data,
+            suggested_actions=result.suggested_actions,
+            metadata=result.metadata,
+        )
+
+        # Record assistant response in legacy conversation memory
+        try:
+            await memory.add_message(role="assistant", content=result.content)
+        except Exception:
+            pass
 
         return result
 

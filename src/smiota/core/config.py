@@ -63,6 +63,11 @@ class BaseAppSettings(BaseSettings):
     SMIOTA_BACKEND_TIMEOUT_SECONDS: float = 10.0
     SMIOTA_AUTH_DUMMY_MODE: bool = True
 
+    # Chat Session Persistence & Storage Provider
+    CHAT_STORAGE_BACKEND: str = "memory"  # Options: 'memory', 'redis', 'postgres'
+    CHAT_SESSION_TTL_HOURS: int = 24
+    CHAT_SESSION_MAX_TURNS: int = 20
+
 
     # Model Context Protocol & Safety Gates
     MCP_READ_ONLY_DEFAULT: bool = True
