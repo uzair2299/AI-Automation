@@ -43,7 +43,7 @@ sequenceDiagram
     end
     API->>API: Signs JWT access_token embedding session_id, user_id, tenant_id
     API-->>Iframe: 200 OK: { access_token, session_id, user }
-    Iframe->>Iframe: Saves session_id & token in localStorage
+    Iframe->>Iframe: Saves session_id in localStorage (token in memory)
 
     Note over Iframe,Repo: Step 2: History Hydration (Restoring Previous Turns)
     Iframe->>API: GET /api/v1/chat/history/{session_id} (Authorization: Bearer token)

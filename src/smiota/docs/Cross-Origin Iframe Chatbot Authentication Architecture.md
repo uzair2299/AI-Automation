@@ -154,7 +154,8 @@ Sent by Angular when the iframe loads or when the user toggles the chat open:
 ```json
 // Request Body
 {
-  "code": "<SMIOTA_SESSION_OR_BOOTSTRAP_TOKEN>"
+  "code": "<SMIOTA_SESSION_OR_BOOTSTRAP_TOKEN>",
+  "session_id": "sess-4c9e782a94ef" // Optional: cached active session for continuity
 }
 
 // Successful Response (200 OK)
@@ -347,7 +348,59 @@ if (initialCode) {
 
 ---
 
-## 5. Fallback & Guest Mode Strategies (Non-postMessage Hosts)
+## 5. Session Continuity & Expiration Architecture Across Drawer Closes
+
+### 5.1 The Drawer Toggle Problem
+In Angular host applications, closing the floating widget or drawer typically unmounts the `<iframe>` DOM element using `*ngIf="isChatOpen"`. When the resident clicks the chat bubble again:
+1. A fresh `<iframe>` document context mounts.
+2. The Angular host immediately sends a new `auth-code` via `window.postMessage`.
+3. Without a session persistence mechanism, the backend would generate a brand new `session_id`, wiping all past conversation turns and forcing the resident to restart.
+
+### 5.2 Browser Storage Strategy: Why `localStorage`?
+To solve this, the iframe caches strictly the **session identifier pointer**:
+
+```javascript
+const STORAGE_KEY = 'smiota_active_chat_session_id';
+const cachedSid = localStorage.getItem(STORAGE_KEY);
+```
+
+| Item | Stored in Browser `localStorage`? | Where It Actually Lives | Security & Privacy Rationale |
+| :--- | :---: | :--- | :--- |
+| **Session ID Pointer** (`smiota_active_chat_session_id`) | **YES** | Browser `localStorage` | Contains only an opaque string (e.g. `"sess-4c9e782a94ef"`). Retains continuity across drawer close (`*ngIf`) and page refresh (F5). |
+| **Conversation Messages** (Text, Package PINs, Locker Compartments) | **NO** | Backend [`InMemoryChatRepository`](file:///d:/repos/smiota-ai/src/smiota/repositories/chat_repository.py) | **Zero sensitive resident data or locker PINs** stored in browser storage. Immune to browser storage inspection and XSS theft. |
+| **JWT Access Token** | **NO** | Iframe JavaScript Closure Variable | Never written to disk; securely discarded when the iframe is destroyed. |
+| **Resident Profile** | **NO** | Backend Spring Boot & Verified Session Tokens | Resident details (Alex Morgan, Unit 400) reside only in verified server memory. |
+
+> **Why not `sessionStorage`?** In Angular, destroying and recreating the `<iframe>` element creates a new browsing context where `sessionStorage` can be reset or isolated depending on browser sandbox policies. `localStorage` guarantees reliable retention across drawer toggles and tab reloads.
+
+### 5.3 The 5-Tier Expiration Lifecycle
+
+```
++-------------------------------------------------------------------------------------------------+
+|                                 5-TIER SESSION EXPIRATION MODEL                                 |
++-------------------------------------------------------------------------------------------------+
+|                                                                                                 |
+|  [Tier 1: Server TTL]        [Tier 2: Stale Detection]        [Tier 3: JWT Token Expiry]        |
+|  24-Hour Sliding Window      Server checks if ID is alive     Auth token expires in 60 min      |
+|  _evict_expired() drops      If expired, discards dead ID     Requires fresh exchange code      |
+|  inactive sessions from RAM  and issues brand new session     from Angular host                 |
+|                                                                                                 |
+|  [Tier 4: User Switch Guard] [Tier 5: Manual Reset Button]                                      |
+|  Alex logs out, John logs in "New Chat" button in header                                        |
+|  Server verifies user_id     clears localStorage immediately                                    |
+|  Rejects cross-user session  and starts fresh conversation                                      |
++-------------------------------------------------------------------------------------------------+
+```
+
+1. **Tier 1: Server Inactivity TTL (24 Hours)**: In `InMemoryChatRepository`, inactive sessions are automatically purged from memory via `_evict_expired()` when idle beyond `CHAT_SESSION_TTL_HOURS` (24h).
+2. **Tier 2: Stale Session Detection on Re-Exchange**: When a returning resident opens the chat days later, the server detects that the cached `session_id` was evicted, discards the dead ID, generates a fresh session UUID, and updates `localStorage`.
+3. **Tier 3: JWT Authentication Token Lifetime**: The signed chat JWT token expires in 60 minutes (`SESSION_TOKEN_EXPIRE_MINUTES`).
+4. **Tier 4: Cross-User Account Switch Protection**: When Resident A logs out and Resident B logs in on the same browser, the server verifies `existing.user_id == identity.user_id`. Cross-user re-attachments are strictly rejected and replaced with an isolated session.
+5. **Tier 5: Manual Resident Reset ("New Chat" Button)**: Residents can click the **"New Chat"** button in the chat header ([`webchat.py:L240`](file:///d:/repos/smiota-ai/src/smiota/api/v1/channels/webchat.py#L240)) to immediately clear `localStorage` and start fresh.
+
+---
+
+## 6. Fallback & Guest Mode Strategies (Non-postMessage Hosts)
 
 If a parent application embeds the chatbot `<iframe>` but does **not** implement `window.postMessage`, the architecture provides two resilient operating strategies:
 
@@ -435,12 +488,15 @@ sequenceDiagram
 
 ---
 
-## 6. Security & Production Checklist
+## 7. Security & Production Checklist
 
 | Category | Recommendation | Status |
 | :--- | :--- | :--- |
 | **Origin Verification** | Replace target `'*'` with the explicit target domain (e.g. `event.origin === 'https://dev.smiotaapps.com'`) in message listeners. | Recommended for Prod |
 | **URL Parameter Safety** | Keep `postMessage` as the primary transport; avoid putting long-lived JWTs in `?code=` query parameters. | Implemented |
 | **Identity Protection** | Backend sanitizes all client metadata so users cannot spoof `tenant_id` or `user_id`. | Implemented in `chat.py` |
+| **Session Continuity** | `localStorage` caches only the opaque `session_id`; no sensitive PII or messages stored client-side. | Implemented in `webchat.py` |
+| **TTL Eviction** | Inactive sessions older than 24 hours are automatically evicted from server RAM (`_evict_expired`). | Implemented in `chat_repository.py` |
+| **Cross-User Protection** | Stale or cross-resident session IDs are rejected during auth exchange (`user_id` validation). | Implemented in `auth.py` |
 | **Dummy Auth Mode** | Ensure `SMIOTA_AUTH_DUMMY_MODE=False` in production deployment environments. | Configurable via `.env` |
 | **Session Lifetime** | Tokens expire after `ACCESS_TOKEN_EXPIRE_MINUTES` (default 60 mins). | Configured |
