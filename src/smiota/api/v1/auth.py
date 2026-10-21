@@ -1,9 +1,10 @@
 """FastAPI Authentication and One-Time Bootstrap Code Exchange Router."""
 from fastapi import APIRouter, Depends, status
 
-from smiota.api.deps import get_backend_auth_service
+from smiota.api.deps import get_backend_auth_service, get_chat_repo
 from smiota.core.logging import logger
 from smiota.core.security import create_session_token
+from smiota.repositories.chat_repository import BaseChatRepository
 from smiota.schemas.auth import (
     AuthExchangeRequest,
     AuthExchangeResponse,
@@ -28,12 +29,23 @@ router = APIRouter(prefix="/auth", tags=["Authentication & Session Exchange"])
 async def exchange_bootstrap_code(
     payload: AuthExchangeRequest,
     auth_service: SmiotaBackendAuthService = Depends(get_backend_auth_service),  # noqa: B008
+    chat_repo: BaseChatRepository = Depends(get_chat_repo),  # noqa: B008
 ) -> AuthExchangeResponse:
     """Exchange single-use bootstrap code with trusted Spring Boot backend."""
     # 1. Atomically consume code and retrieve verified identity from Spring Boot
     identity = await auth_service.exchange_bootstrap_code(payload.code)
 
-    # 2. Establish signed JWT session for the chatbot
+    # 2. Re-attach to ongoing conversation session if one exists for this resident
+    active_session_id = payload.session_id
+    if not active_session_id:
+        existing_sessions = await chat_repo.list_user_sessions(
+            user_id=identity.user_id,
+            tenant_id=identity.tenant_id,
+        )
+        if existing_sessions:
+            active_session_id = existing_sessions[0].session_id
+
+    # 3. Establish signed JWT session for the chatbot (retaining existing session_id if active)
     token, session_id, expires_in = create_session_token(
         user_id=identity.user_id,
         tenant_id=identity.tenant_id,
@@ -41,6 +53,7 @@ async def exchange_bootstrap_code(
         email=identity.email,
         name=identity.name,
         location_id=identity.location_id,
+        session_id=active_session_id,
     )
 
     logger.info(

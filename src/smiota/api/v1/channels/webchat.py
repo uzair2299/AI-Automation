@@ -247,7 +247,7 @@ async def embed_widget(
             </div>
 
             <!-- Bot Welcome Message -->
-            <div class="flex items-end space-x-2">
+            <div id="initial-welcome-bubble" class="flex items-end space-x-2">
                 <div class="w-9 h-9 rounded-full bg-indigo-50 border border-indigo-200/90 shadow-xs flex items-center justify-center p-1 shrink-0 relative">__BOT_SVG__</div>
                 <div class="bg-slate-100 text-slate-800 px-4 py-3 rounded-2xl rounded-bl-sm max-w-[85%] text-sm shadow-xs leading-relaxed">
                     <div class="flex items-center justify-between space-x-3 mb-1">
@@ -324,28 +324,76 @@ async def embed_widget(
             const el = document.getElementById('header-subtitle');
             if (el) el.innerText = urlParams.get('subtitle');
         }
-        const sessionId = urlParams.get('session_id') || ("webchat-" + Math.random().toString(36).substring(2, 9));
+        const STORAGE_KEY = 'smiota_active_chat_session_id';
+        const cachedSid = localStorage.getItem(STORAGE_KEY);
+        let sessionId = urlParams.get('session_id') || cachedSid || ("webchat-" + Math.random().toString(36).substring(2, 9));
         const residentId = urlParams.get('resident_id') || urlParams.get('user_id') || null;
 
         // Chatbot Authentication State & One-Time Code Exchange
         let chatSessionToken = null;
         let authenticatedUser = null;
+        let historyRestored = false;
+
+        async function restoreChatHistory(activeSessionId, token) {
+            if (!activeSessionId || !token || historyRestored) return;
+            try {
+                const res = await fetch('/api/v1/chat/history/' + encodeURIComponent(activeSessionId), {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.messages && data.messages.length > 0) {
+                        historyRestored = true;
+                        console.log(`Restoring ${data.messages.length} previous conversation messages...`);
+                        
+                        // Hide initial welcome message if user already has an active history
+                        const initBubble = document.getElementById('initial-welcome-bubble');
+                        if (initBubble) initBubble.style.display = 'none';
+
+                        for (const msg of data.messages) {
+                            appendMessage(
+                                msg.role === 'user' ? 'user' : 'bot',
+                                msg.content,
+                                msg.agent_name || 'AI',
+                                msg.message_type === 'approval_gate',
+                                msg.suggested_actions || []
+                            );
+                        }
+                    }
+                }
+            } catch (err) {
+                console.warn("Could not restore chat history:", err);
+            }
+        }
 
         async function exchangeBootstrapCode(bootstrapCode) {
             if (!bootstrapCode) return;
             try {
                 console.log("Exchanging bootstrap code for chatbot session...");
+                const exchangePayload = { code: bootstrapCode };
+                const savedId = localStorage.getItem(STORAGE_KEY);
+                if (savedId && savedId.startsWith('sess-')) {
+                    exchangePayload.session_id = savedId;
+                }
+
                 const res = await fetch('/api/v1/auth/exchange', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ code: bootstrapCode })
+                    body: JSON.stringify(exchangePayload)
                 });
                 if (res.ok) {
                     const data = await res.json();
                     chatSessionToken = data.access_token;
                     authenticatedUser = data.user;
-                    console.log("Chatbot session established for user:", data.user?.user_id);
+                    if (data.session_id) {
+                        sessionId = data.session_id;
+                        localStorage.setItem(STORAGE_KEY, data.session_id);
+                    }
+                    console.log("Chatbot session established for user:", data.user?.user_id, "session:", sessionId);
                     window.parent.postMessage({ type: 'auth-success', user: data.user, session_id: data.session_id }, '*');
+
+                    // Automatically restore previous conversation history so closing/reopening drawer retains chat!
+                    await restoreChatHistory(data.session_id, data.access_token);
                 } else {
                     console.warn("Bootstrap code exchange rejected with status:", res.status);
                     window.parent.postMessage({ type: 'auth-failed', status: res.status }, '*');

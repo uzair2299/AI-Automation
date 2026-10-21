@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field, field_validator
 class AuthExchangeRequest(BaseModel):
     """Payload to exchange a single-use bootstrap code for an authenticated chatbot session."""
     code: str = Field(..., min_length=1, description="One-time bootstrap code issued by Spring Boot backend")
+    session_id: str | None = Field(None, description="Optional active session ID to resume conversation continuity")
 
     @field_validator("code")
     @classmethod
