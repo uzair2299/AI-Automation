@@ -265,7 +265,95 @@ if (initialCode) {
 
 ---
 
-## 5. Security & Production Checklist
+## 5. Fallback & Guest Mode Strategies (Non-postMessage Hosts)
+
+If a parent application embeds the chatbot `<iframe>` but does **not** implement `window.postMessage`, the architecture provides two resilient operating strategies:
+
+![Fallback and Guest Mode Flow](./fallback_and_guest_flow.svg)
+
+### 5.1 Strategy A: The URL Parameter Fallback (Built into `webchat.py`)
+
+The embedded widget script automatically checks for a `?code=` query parameter on initialization:
+
+```javascript
+// Auto-exchange if code query parameter is provided in iframe URL (?code=...)
+const initialCode = urlParams.get('code');
+if (initialCode) {
+    exchangeBootstrapCode(initialCode);
+}
+```
+
+#### How it works for the parent:
+The parent application does not need to write any JavaScript or `postMessage` listeners. It only needs to render the iframe HTML with the bootstrap token appended:
+
+```html
+<iframe src="https://ai-automation-production-ef2d.up.railway.app/api/v1/channels/webchat/embed?code=USER_TOKEN"></iframe>
+```
+
+The iframe automatically reads `?code=USER_TOKEN` and runs the exact same `/api/v1/auth/exchange` handshake without needing postMessage.
+
+---
+
+### 5.2 Strategy B: Graceful "Guest Mode" (Public vs. Private Queries)
+
+If the parent application provides **no token at all** (e.g. on a public marketing site or unauthenticated portal):
+
+#### 1. Public Queries (Allowed)
+The chatbot answers general questions and informational queries from the public knowledge base:
+* *"What are the locker room hours?"*
+* *"How do I pick up a package using Smiota?"*
+* *"Where are the lockers located in Building B?"*
+
+#### 2. Personal / Protected Queries (Gated)
+When the user asks for personal, resident-specific data:
+* *"What is my locker PIN?"*
+* *"Do I have any packages waiting?"*
+* *"Unlock my compartment door"*
+
+The AI detects that `current_user` is an unauthenticated guest and politely responds:
+> *"To check your packages or retrieve your pickup PIN, please log in to your resident portal."*
+
+#### 3. Guest Mode End-to-End Sequence Diagram
+
+![Guest Mode Sequence Diagram](./guest_mode_sequence_diagram.svg)
+
+<details open>
+<summary><b>Mermaid Diagram Source (Guest Mode)</b></summary>
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as "Visitor / Resident"
+    participant Host as "Public Website / Host"
+    participant Iframe as "Chatbot (Inside Iframe)"
+    participant API as "FastAPI Backend (/api/v1/chat)"
+    participant AI as "AI Agent & Knowledge Base"
+
+    User->>Host: Visits public page & opens chatbot
+    Host->>Iframe: Embeds iframe (no token provided)
+    Note over Iframe: Operates in Guest Mode (unauthenticated)
+
+    alt Scenario A: Public Inquiry (Allowed)
+        User->>Iframe: "What are the locker room hours in Building A?"
+        Iframe->>API: POST /api/v1/chat (no auth token)
+        API->>AI: Knowledge Retrieval: Public locker hours
+        AI-->>API: "Lockers in Building A are accessible 24/7"
+        API-->>Iframe: 200 OK: Public Informational Answer
+        Iframe-->>User: Displays locker hours & locations
+    else Scenario B: Protected Personal Query (Gated)
+        User->>Iframe: "What is my pickup PIN?"
+        Iframe->>API: POST /api/v1/chat (Intent: locker_pin)
+        API->>API: Gating Check: current_user is unauthenticated
+        API-->>Iframe: Gating Prompt (login required)
+        Iframe-->>User: "To check your packages or retrieve your PIN, please log in."
+    end
+```
+
+</details>
+
+---
+
+## 6. Security & Production Checklist
 
 | Category | Recommendation | Status |
 | :--- | :--- | :--- |
