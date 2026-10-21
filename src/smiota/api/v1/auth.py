@@ -36,7 +36,12 @@ async def exchange_bootstrap_code(
     identity = await auth_service.exchange_bootstrap_code(payload.code)
 
     # 2. Re-attach to ongoing conversation session if one exists for this resident
-    active_session_id = payload.session_id
+    active_session_id = None
+    if payload.session_id:
+        existing = await chat_repo.get_session(payload.session_id)
+        if existing and existing.user_id == identity.user_id and existing.tenant_id == identity.tenant_id:
+            active_session_id = existing.session_id
+
     if not active_session_id:
         existing_sessions = await chat_repo.list_user_sessions(
             user_id=identity.user_id,

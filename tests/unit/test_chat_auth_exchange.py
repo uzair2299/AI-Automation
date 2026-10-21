@@ -526,3 +526,54 @@ def test_code_exchange_inactive_user_rejected():
     assert response.json()["success"] is False
     assert response.json()["error_code"] == "AUTHENTICATION_FAILED"
 
+
+@pytest.mark.asyncio
+async def test_code_exchange_session_reattachment_and_expired_replacement():
+    """Verify session continuity: re-attach when valid, generate fresh when expired or cross-user."""
+    from smiota.repositories.chat_repository import get_chat_repository
+    repo = get_chat_repository()
+    await repo.clear_all()
+
+    # Pre-populate an active session for Alex Morgan (10790 / 89)
+    existing_session = await repo.get_or_create_session(
+        session_id="sess-active-alex-1",
+        user_id="10790",
+        tenant_id="89",
+    )
+
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
+        mock_post.return_value = httpx.Response(
+            status_code=200,
+            json=SMIOTA_MAIN_REAL_PAYLOAD,
+            request=httpx.Request("POST", "https://dev.smiotaapps.com/smiota/internal/ai/auth/exchange"),
+        )
+
+        # 1. Valid re-attachment: Alex provides her active session_id
+        res1 = client.post("/api/v1/auth/exchange", json={
+            "code": "code-1",
+            "session_id": "sess-active-alex-1",
+        })
+        assert res1.status_code == 200
+        assert res1.json()["session_id"] == "sess-active-alex-1"
+
+        # 2. Expired session: Alex provides a non-existent or expired session_id
+        res2 = client.post("/api/v1/auth/exchange", json={
+            "code": "code-2",
+            "session_id": "sess-expired-9999",
+        })
+        assert res2.status_code == 200
+        # Should not use the dead session_id, but instead falls back to her active session
+        assert res2.json()["session_id"] == "sess-active-alex-1"
+
+        # 3. If no active sessions exist and expired id is passed, generate brand new
+        await repo.clear_all()
+        res3 = client.post("/api/v1/auth/exchange", json={
+            "code": "code-3",
+            "session_id": "sess-expired-9999",
+        })
+        assert res3.status_code == 200
+        new_sid = res3.json()["session_id"]
+        assert new_sid.startswith("sess-")
+        assert new_sid != "sess-expired-9999"
+
+
