@@ -1,0 +1,206 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 860" width="100%" height="100%" style="background:#0f172a; font-family:'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+  <defs>
+    <style>
+      .title { fill: #f8fafc; font-size: 20px; font-weight: 700; }
+      .subtitle { fill: #94a3b8; font-size: 13px; }
+      .actor-box { rx: 10px; ry: 10px; }
+      .actor-text { fill: #ffffff; font-size: 13px; font-weight: 600; text-anchor: middle; dominant-baseline: central; }
+      .lifeline { stroke: #334155; stroke-width: 1.5; stroke-dasharray: 6 6; }
+      .arrow { stroke-width: 1.8; fill: none; }
+      .arrow-req { stroke: #818cf8; marker-end: url(#arrow-head-req); }
+      .arrow-resp { stroke: #38bdf8; stroke-dasharray: 5 4; marker-end: url(#arrow-head-resp); }
+      .arrow-err { stroke: #f87171; stroke-dasharray: 5 4; marker-end: url(#arrow-head-err); }
+      .msg-num { fill: #c7d2fe; font-size: 11px; font-weight: 700; }
+      .msg-text { fill: #e2e8f0; font-size: 12.5px; font-weight: 500; }
+      .note-box { fill: #1e293b; stroke: #475569; stroke-width: 1; rx: 6; }
+      .note-text { fill: #cbd5e1; font-size: 11.5px; font-style: italic; }
+      .alt-box { fill: #1e293b; fill-opacity: 0.5; stroke: #4f46e5; stroke-width: 1.2; rx: 8; }
+      .alt-label { fill: #a5b4fc; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+      .alt-divider { stroke: #475569; stroke-width: 1; stroke-dasharray: 4 4; }
+    </style>
+    <marker id="arrow-head-req" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#818cf8"/>
+    </marker>
+    <marker id="arrow-head-resp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#38bdf8"/>
+    </marker>
+    <marker id="arrow-head-err" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#f87171"/>
+    </marker>
+    <linearGradient id="actor-grad-host" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4f46e5"/>
+      <stop offset="100%" stop-color="#3730a3"/>
+    </linearGradient>
+    <linearGradient id="actor-grad-iframe" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0284c7"/>
+      <stop offset="100%" stop-color="#0369a1"/>
+    </linearGradient>
+    <linearGradient id="actor-grad-api" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0d9488"/>
+      <stop offset="100%" stop-color="#115e59"/>
+    </linearGradient>
+    <linearGradient id="actor-grad-smiota" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#d97706"/>
+      <stop offset="100%" stop-color="#b45309"/>
+    </linearGradient>
+    <linearGradient id="actor-grad-user" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#64748b"/>
+      <stop offset="100%" stop-color="#475569"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Title Header -->
+  <text x="50" y="42" class="title">Cross-Origin Iframe Chatbot Authentication Flow</text>
+  <text x="50" y="64" class="subtitle">HTML5 postMessage Handshake &amp; Single-Use Bootstrap Code Exchange</text>
+
+  <!-- Lifeline Columns (X Coordinates) -->
+  <!-- User: 90, Host: 290, Iframe: 510, API: 730, Smiota: 910 -->
+  <line x1="90" y1="120" x2="90" y2="800" class="lifeline"/>
+  <line x1="290" y1="120" x2="290" y2="800" class="lifeline"/>
+  <line x1="510" y1="120" x2="510" y2="800" class="lifeline"/>
+  <line x1="730" y1="120" x2="730" y2="800" class="lifeline"/>
+  <line x1="910" y1="120" x2="910" y2="800" class="lifeline"/>
+
+  <!-- Top Actor Boxes -->
+  <g transform="translate(15, 82)">
+    <rect width="150" height="42" fill="url(#actor-grad-user)" class="actor-box"/>
+    <text x="75" y="21" class="actor-text">👤 User / Resident</text>
+  </g>
+  <g transform="translate(205, 82)">
+    <rect width="170" height="42" fill="url(#actor-grad-host)" class="actor-box"/>
+    <text x="85" y="21" class="actor-text">Angular Host App</text>
+  </g>
+  <g transform="translate(425, 82)">
+    <rect width="170" height="42" fill="url(#actor-grad-iframe)" class="actor-box"/>
+    <text x="85" y="21" class="actor-text">Chatbot Iframe</text>
+  </g>
+  <g transform="translate(645, 82)">
+    <rect width="170" height="42" fill="url(#actor-grad-api)" class="actor-box"/>
+    <text x="85" y="21" class="actor-text">FastAPI Backend</text>
+  </g>
+  <g transform="translate(835, 82)">
+    <rect width="150" height="42" fill="url(#actor-grad-smiota)" class="actor-box"/>
+    <text x="75" y="21" class="actor-text">Spring Boot Core</text>
+  </g>
+
+  <!-- Step 1: User Opens Chat -->
+  <g transform="translate(0, 160)">
+    <line x1="90" y1="0" x2="285" y2="0" class="arrow arrow-req"/>
+    <text x="96" y="-10" class="msg-num">1</text>
+    <text x="114" y="-10" class="msg-text">Clicks Chat Mascot Launcher (Opens Iframe)</text>
+  </g>
+
+  <!-- Note: Host reads token -->
+  <g transform="translate(190, 185)">
+    <rect width="200" height="28" class="note-box"/>
+    <text x="100" y="18" text-anchor="middle" class="note-text">Reads token from localStorage</text>
+  </g>
+
+  <!-- Step 2: postMessage from Host to Iframe -->
+  <g transform="translate(0, 240)">
+    <line x1="290" y1="0" x2="505" y2="0" class="arrow arrow-req"/>
+    <text x="296" y="-10" class="msg-num">2</text>
+    <text x="314" y="-10" class="msg-text">postMessage({ type: 'auth-code', code: token })</text>
+  </g>
+
+  <!-- Note: Iframe receives event -->
+  <g transform="translate(420, 265)">
+    <rect width="180" height="28" class="note-box"/>
+    <text x="90" y="18" text-anchor="middle" class="note-text">Catches 'auth-code' event</text>
+  </g>
+
+  <!-- Step 3: Exchange token with FastAPI -->
+  <g transform="translate(0, 320)">
+    <line x1="510" y1="0" x2="725" y2="0" class="arrow arrow-req"/>
+    <text x="516" y="-10" class="msg-num">3</text>
+    <text x="534" y="-10" class="msg-text">POST /api/v1/auth/exchange { code: token }</text>
+  </g>
+
+  <!-- Alt Box 1: Backend Verification vs Dummy -->
+  <g transform="translate(640, 345)">
+    <rect width="330" height="110" class="alt-box"/>
+    <text x="12" y="18" class="alt-label">ALT: Validation Mode</text>
+    
+    <!-- Real Mode -->
+    <text x="12" y="38" fill="#94a3b8" font-size="11px">[Real Spring Boot]</text>
+    <line x1="90" y1="46" x2="265" y2="46" class="arrow arrow-req"/>
+    <text x="100" y="40" font-size="10.5px" fill="#cbd5e1">POST /internal/ai/auth/exchange</text>
+    <line x1="265" y1="62" x2="95" y2="62" class="arrow arrow-resp"/>
+    <text x="100" y="58" font-size="10.5px" fill="#7dd3fc">Returns verified identity</text>
+
+    <!-- Divider -->
+    <line x1="0" y1="75" x2="330" y2="75" class="alt-divider"/>
+    
+    <!-- Dummy Mode -->
+    <text x="12" y="93" fill="#94a3b8" font-size="11px">[Dummy Mode]</text>
+    <text x="100" y="94" font-size="11.5px" fill="#a7f3d0">Simulates 200 OK verified resident (user-123)</text>
+  </g>
+
+  <!-- Alt Box 2: Success vs Failure Response -->
+  <g transform="translate(200, 480)">
+    <rect width="610" height="280" class="alt-box" style="stroke:#10b981; fill:#0f172a; fill-opacity:0.7;"/>
+    <text x="15" y="20" fill="#34d399" font-size="11px" font-weight="700">ALT: 200 OK (SUCCESSFUL EXCHANGE)</text>
+
+    <!-- 4a: Signs JWT & returns session -->
+    <g transform="translate(0, 45)">
+      <line x1="530" y1="0" x2="315" y2="0" class="arrow arrow-resp"/>
+      <text x="325" y="-9" class="msg-num">4a</text>
+      <text x="345" y="-9" class="msg-text">200 OK { access_token: JWT, user: {...}, session_id }</text>
+    </g>
+
+    <!-- 5a: Iframe informs Parent Angular App -->
+    <g transform="translate(0, 95)">
+      <line x1="310" y1="0" x2="95" y2="0" class="arrow arrow-resp"/>
+      <text x="105" y="-9" class="msg-num">5a</text>
+      <text x="125" y="-9" class="msg-text">window.parent.postMessage({ type: 'auth-success', user })</text>
+    </g>
+
+    <!-- 6a: Subsequent Chat interactions -->
+    <g transform="translate(0, 145)">
+      <line x1="310" y1="0" x2="525" y2="0" class="arrow arrow-req"/>
+      <text x="325" y="-9" class="msg-num">6a</text>
+      <text x="345" y="-9" class="msg-text">POST /api/v1/chat (Header: Authorization: Bearer JWT)</text>
+      <line x1="525" y1="20" x2="315" y2="20" class="arrow arrow-resp"/>
+      <text x="345" y="34" font-size="11.5px" fill="#7dd3fc">Streams locker PIN, package status &amp; telemetry</text>
+    </g>
+
+    <!-- Divider for Failure -->
+    <line x1="0" y1="195" x2="610" y2="195" class="alt-divider" style="stroke:#f87171;"/>
+    <text x="15" y="215" fill="#f87171" font-size="11px" font-weight="700">ELSE: 401 UNAUTHORIZED (FAILED / EXPIRED CODE)</text>
+
+    <!-- 4b: 401 response -->
+    <g transform="translate(0, 240)">
+      <line x1="530" y1="0" x2="315" y2="0" class="arrow arrow-err"/>
+      <text x="325" y="-9" class="msg-num" fill="#fca5a5">4b</text>
+      <text x="345" y="-9" class="msg-text" fill="#fca5a5">401 { error_code: 'AUTHENTICATION_FAILED' }</text>
+    </g>
+    <!-- 5b: Failure postMessage -->
+    <g transform="translate(0, 270)">
+      <line x1="310" y1="0" x2="95" y2="0" class="arrow arrow-err"/>
+      <text x="105" y="-9" class="msg-num" fill="#fca5a5">5b</text>
+      <text x="125" y="-9" class="msg-text" fill="#fca5a5">postMessage({ type: 'auth-failed', status: 401 })</text>
+    </g>
+  </g>
+
+  <!-- Bottom Actor Boxes -->
+  <g transform="translate(15, 800)">
+    <rect width="150" height="34" fill="url(#actor-grad-user)" class="actor-box"/>
+    <text x="75" y="17" class="actor-text">👤 User</text>
+  </g>
+  <g transform="translate(205, 800)">
+    <rect width="170" height="34" fill="url(#actor-grad-host)" class="actor-box"/>
+    <text x="85" y="17" class="actor-text">Angular Host</text>
+  </g>
+  <g transform="translate(425, 800)">
+    <rect width="170" height="34" fill="url(#actor-grad-iframe)" class="actor-box"/>
+    <text x="85" y="17" class="actor-text">Chatbot Iframe</text>
+  </g>
+  <g transform="translate(645, 800)">
+    <rect width="170" height="34" fill="url(#actor-grad-api)" class="actor-box"/>
+    <text x="85" y="17" class="actor-text">FastAPI Backend</text>
+  </g>
+  <g transform="translate(835, 800)">
+    <rect width="150" height="34" fill="url(#actor-grad-smiota)" class="actor-box"/>
+    <text x="75" y="17" class="actor-text">Spring Boot Core</text>
+  </g>
+</svg>

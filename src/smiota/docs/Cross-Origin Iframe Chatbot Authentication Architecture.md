@@ -21,6 +21,11 @@ To establish an authenticated session for the current logged-in user:
 
 ## 2. End-to-End Sequence Diagram
 
+![Cross-Origin Iframe Authentication Sequence](./auth_sequence_diagram.svg)
+
+<details open>
+<summary><b>Mermaid Diagram Source</b></summary>
+
 ```mermaid
 sequenceDiagram
     autonumber
@@ -36,12 +41,12 @@ sequenceDiagram
     Host->>Iframe: postMessage: auth-code (token)
     
     Note over Iframe: Listener catches 'auth-code' event
-    Iframe->>API: POST /api/v1/auth/exchange { code: token }
+    Iframe->>API: POST /api/v1/auth/exchange (token)
     
     alt Real Backend Validation Mode
-        API->>Smiota: POST /internal/ai/auth/exchange (with service secret + token)
+        API->>Smiota: POST /internal/ai/auth/exchange (service secret + token)
         Smiota-->>API: Returns User Profile (userId, tenantId, email, role)
-    else Dummy Auth Mode (SMIOTA_AUTH_DUMMY_MODE = True)
+    else Dummy Auth Mode
         API->>API: Mocks verified resident / admin identity
     end
 
@@ -53,7 +58,7 @@ sequenceDiagram
         Note over Host: Angular logs 'Chatbot session authenticated successfully'
         
         Note over Iframe,API: Subsequent Chat Interactions
-        Iframe->>API: POST /api/v1/chat (Header: Authorization: Bearer [chatSessionToken])
+        Iframe->>API: POST /api/v1/chat (Authorization: Bearer session token)
         API-->>Iframe: Streams response / Locker PIN / Package status
     else Exchange Failed (401 Unauthorized)
         API-->>Iframe: 401 Unauthorized: AUTHENTICATION_FAILED
@@ -61,6 +66,8 @@ sequenceDiagram
         Note over Host: Angular logs 'Chatbot authentication failed with status: 401'
     end
 ```
+
+</details>
 
 ---
 
