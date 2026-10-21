@@ -16,7 +16,10 @@ This document provides a comprehensive technical specification of how conversati
 
 ## 2. End-to-End Lifecycle & Sequence Flow
 
-### 2.1 Complete Step-by-Step Sequence
+![Chat Session Lifecycle and Continuity Flow](./session_lifecycle_and_continuity.svg)
+
+<details open>
+<summary><b>Mermaid Diagram Source</b></summary>
 
 ```mermaid
 sequenceDiagram
@@ -76,6 +79,8 @@ sequenceDiagram
     API-->>Iframe: Full history returned
     Iframe->>Iframe: All previous messages restored seamlessly!
 ```
+
+</details>
 
 ---
 
@@ -183,6 +188,8 @@ Defined in [`src/smiota/schemas/chat_session.py`](file:///d:/repos/smiota-ai/src
 ---
 
 ## 5. Storage Provider Abstraction (Future-Proofing)
+
+![Pluggable Chat Storage Architecture](./pluggable_storage_architecture.svg)
 
 All session operations go through the abstract interface [`BaseChatRepository`](file:///d:/repos/smiota-ai/src/smiota/repositories/chat_repository.py):
 

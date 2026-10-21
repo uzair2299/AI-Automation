@@ -1,0 +1,169 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 620" width="100%" height="100%" style="background:#0b0f19; font-family:'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+  <defs>
+    <style>
+      .main-title { fill: #f8fafc; font-size: 20px; font-weight: 700; }
+      .sub-title { fill: #94a3b8; font-size: 13px; }
+      .layer-bg { fill: #111827; stroke: #1e293b; stroke-width: 1.5; rx: 12; }
+      .layer-title { fill: #94a3b8; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; }
+      .box { rx: 8; ry: 8; stroke-width: 1.2; }
+      .box-title { font-size: 13px; font-weight: 600; }
+      .box-desc { font-size: 11px; fill: #cbd5e1; }
+      .tag-active { fill: #065f46; stroke: #10b981; stroke-width: 1; rx: 4; }
+      .tag-future { fill: #1e293b; stroke: #475569; stroke-width: 1; rx: 4; }
+      .flow-line { stroke: #6366f1; stroke-width: 1.8; fill: none; stroke-dasharray: 5 4; marker-end: url(#marker-flow); }
+      .flow-line-solid { stroke: #10b981; stroke-width: 2; fill: none; marker-end: url(#marker-flow-solid); }
+    </style>
+
+    <marker id="marker-flow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#6366f1"/>
+    </marker>
+    <marker id="marker-flow-solid" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#10b981"/>
+    </marker>
+
+    <!-- Gradients -->
+    <linearGradient id="grad-api-layer" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e1b4b"/><stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="grad-contract" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#312e81"/><stop offset="100%" stop-color="#1e1b4b"/>
+    </linearGradient>
+    <linearGradient id="grad-active-box" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#064e3b"/><stop offset="100%" stop-color="#022c22"/>
+    </linearGradient>
+    <linearGradient id="grad-future-box" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b"/><stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Title -->
+  <text x="40" y="40" class="main-title">Pluggable Chat Storage Architecture</text>
+  <text x="40" y="62" class="sub-title">Repository Pattern &amp; Dependency Inversion: Seamless In-Memory to Persistent Database Evolution</text>
+
+  <!-- ====================================================================== -->
+  <!-- LAYER 1: Consumers (API Endpoints & Multi-Agent Orchestrator)           -->
+  <!-- ====================================================================== -->
+  <rect x="40" y="90" width="920" height="110" class="layer-bg"/>
+  <text x="60" y="112" class="layer-title">CONSUMER LAYER (Zero Database Couplings)</text>
+
+  <!-- Component 1: FastAPI Chat Routes -->
+  <g transform="translate(60, 125)">
+    <rect width="260" height="60" class="box" fill="url(#grad-api-layer)" stroke="#6366f1"/>
+    <text x="15" y="24" class="box-title" fill="#a5b4fc">FastAPI Chat Routes</text>
+    <text x="15" y="44" class="box-desc">POST /chat &amp; GET /chat/history/{id}</text>
+  </g>
+
+  <!-- Component 2: WebSocket Manager -->
+  <g transform="translate(360, 125)">
+    <rect width="260" height="60" class="box" fill="url(#grad-api-layer)" stroke="#6366f1"/>
+    <text x="15" y="24" class="box-title" fill="#a5b4fc">WebSocket Chat Stream</text>
+    <text x="15" y="44" class="box-desc">Real-time bi-directional streaming</text>
+  </g>
+
+  <!-- Component 3: Agent Orchestrator -->
+  <g transform="translate(660, 125)">
+    <rect width="280" height="60" class="box" fill="url(#grad-api-layer)" stroke="#6366f1"/>
+    <text x="15" y="24" class="box-title" fill="#a5b4fc">AgentOrchestrator</text>
+    <text x="15" y="44" class="box-desc">Context memory &amp; intent routing</text>
+  </g>
+
+  <!-- Downward arrows to contract -->
+  <path d="M 190 185 L 190 235" class="flow-line"/>
+  <path d="M 490 185 L 490 235" class="flow-line"/>
+  <path d="M 800 185 L 800 235" class="flow-line"/>
+
+  <!-- ====================================================================== -->
+  <!-- LAYER 2: Abstract Contract & Dependency Injection Provider              -->
+  <!-- ====================================================================== -->
+  <g transform="translate(40, 240)">
+    <rect width="920" height="120" class="layer-bg" stroke="#818cf8"/>
+    <text x="20" y="22" class="layer-title" fill="#818cf8">STORAGE CONTRACT &amp; PROVIDER FACTORY (api/deps.py)</text>
+
+    <!-- BaseChatRepository Box -->
+    <g transform="translate(20, 32)">
+      <rect width="520" height="70" class="box" fill="url(#grad-contract)" stroke="#818cf8"/>
+      <text x="15" y="22" class="box-title" fill="#ffffff">BaseChatRepository (Abstract Interface / Protocol)</text>
+      <text x="15" y="42" font-family="monospace" font-size="10.5px" fill="#cbd5e1">• get_or_create_session()   • append_message()   • get_messages()</text>
+      <text x="15" y="58" font-family="monospace" font-size="10.5px" fill="#cbd5e1">• list_user_sessions()      • delete_session()   • clear_all()</text>
+    </g>
+
+    <!-- Factory function Box -->
+    <g transform="translate(560, 32)">
+      <rect width="340" height="70" class="box" fill="#1e293b" stroke="#475569"/>
+      <text x="15" y="22" class="box-title" fill="#38bdf8">get_chat_repository()</text>
+      <text x="15" y="40" class="box-desc">Reads <tspan fill="#f59e0b">CHAT_STORAGE_BACKEND</tspan> config</text>
+      <text x="15" y="58" class="box-desc">Swaps backend transparently via .env</text>
+    </g>
+  </g>
+
+  <!-- Solid Arrow down to In-Memory, dotted to future -->
+  <path d="M 180 360 L 180 410" class="flow-line-solid"/>
+  <path d="M 440 360 L 440 410" class="flow-line"/>
+  <path d="M 680 360 L 680 410" class="flow-line"/>
+  <path d="M 880 360 L 880 410" class="flow-line"/>
+
+  <!-- ====================================================================== -->
+  <!-- LAYER 3: Storage Implementations                                       -->
+  <!-- ====================================================================== -->
+  <rect x="40" y="415" width="920" height="185" class="layer-bg"/>
+  <text x="60" y="435" class="layer-title">PLUGGABLE STORAGE ADAPTERS</text>
+
+  <!-- 1. InMemoryChatRepository (ACTIVE NOW) -->
+  <g transform="translate(60, 445)">
+    <rect width="250" height="135" class="box" fill="url(#grad-active-box)" stroke="#10b981"/>
+    
+    <!-- Active Pill Badge -->
+    <g transform="translate(15, 12)">
+      <rect width="80" height="18" class="tag-active"/>
+      <text x="40" y="13" fill="#a7f3d0" font-size="10px" font-weight="700" text-anchor="middle">ACTIVE NOW</text>
+    </g>
+
+    <text x="15" y="48" class="box-title" fill="#34d399">InMemoryChatRepository</text>
+    <text x="15" y="68" class="box-desc">• Thread-safe with asyncio.Lock</text>
+    <text x="15" y="86" class="box-desc">• Sliding Window (last 20 turns)</text>
+    <text x="15" y="104" class="box-desc">• 24h Inactivity TTL Eviction</text>
+    <text x="15" y="122" class="box-desc">• Zero external DB dependencies</text>
+  </g>
+
+  <!-- 2. PostgresChatRepository (FUTURE) -->
+  <g transform="translate(330, 445)">
+    <rect width="210" height="135" class="box" fill="url(#grad-future-box)" stroke="#334155"/>
+    <g transform="translate(15, 12)">
+      <rect width="90" height="18" class="tag-future"/>
+      <text x="45" y="13" fill="#94a3b8" font-size="10px" font-weight="700" text-anchor="middle">FUTURE ADAPTER</text>
+    </g>
+    <text x="15" y="48" class="box-title" fill="#e2e8f0">PostgresChatRepository</text>
+    <text x="15" y="68" class="box-desc">• SQLAlchemy Async Session</text>
+    <text x="15" y="86" class="box-desc">• chat_sessions table</text>
+    <text x="15" y="104" class="box-desc">• chat_messages table (FK)</text>
+    <text x="15" y="122" class="box-desc">• Permanent audit &amp; compliance</text>
+  </g>
+
+  <!-- 3. RedisChatRepository (FUTURE) -->
+  <g transform="translate(560, 445)">
+    <rect width="200" height="135" class="box" fill="url(#grad-future-box)" stroke="#334155"/>
+    <g transform="translate(15, 12)">
+      <rect width="90" height="18" class="tag-future"/>
+      <text x="45" y="13" fill="#94a3b8" font-size="10px" font-weight="700" text-anchor="middle">FUTURE ADAPTER</text>
+    </g>
+    <text x="15" y="48" class="box-title" fill="#e2e8f0">RedisChatRepository</text>
+    <text x="15" y="68" class="box-desc">• Distributed cache across pods</text>
+    <text x="15" y="86" class="box-desc">• Native Redis Key TTLs</text>
+    <text x="15" y="104" class="box-desc">• RedisJSON / Streams (XADD)</text>
+    <text x="15" y="122" class="box-desc">• Sub-millisecond turn reads</text>
+  </g>
+
+  <!-- 4. DynamoChatRepository (FUTURE) -->
+  <g transform="translate(780, 445)">
+    <rect width="160" height="135" class="box" fill="url(#grad-future-box)" stroke="#334155"/>
+    <g transform="translate(15, 12)">
+      <rect width="90" height="18" class="tag-future"/>
+      <text x="45" y="13" fill="#94a3b8" font-size="10px" font-weight="700" text-anchor="middle">FUTURE ADAPTER</text>
+    </g>
+    <text x="15" y="48" class="box-title" fill="#e2e8f0">Dynamo / NoSQL</text>
+    <text x="15" y="68" class="box-desc">• Serverless NoSQL</text>
+    <text x="15" y="86" class="box-desc">• PK: session_id</text>
+    <text x="15" y="104" class="box-desc">• SK: created_at</text>
+    <text x="15" y="122" class="box-desc">• Global multi-region</text>
+  </g>
+</svg>

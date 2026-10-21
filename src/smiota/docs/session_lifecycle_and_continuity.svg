@@ -1,0 +1,208 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 980" width="100%" height="100%" style="background:#0b0f19; font-family:'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+  <defs>
+    <style>
+      .title { fill: #f8fafc; font-size: 21px; font-weight: 700; letter-spacing: -0.3px; }
+      .subtitle { fill: #94a3b8; font-size: 13px; }
+      .actor-box { rx: 10px; ry: 10px; }
+      .actor-text { fill: #ffffff; font-size: 12.5px; font-weight: 600; text-anchor: middle; dominant-baseline: central; }
+      .lifeline { stroke: #1e293b; stroke-width: 1.5; stroke-dasharray: 6 6; }
+      .arrow { stroke-width: 1.8; fill: none; }
+      .arrow-req { stroke: #818cf8; marker-end: url(#arrow-head-req); }
+      .arrow-resp { stroke: #38bdf8; stroke-dasharray: 5 4; marker-end: url(#arrow-head-resp); }
+      .arrow-store { stroke: #10b981; marker-end: url(#arrow-head-store); }
+      .msg-text { fill: #e2e8f0; font-size: 12px; font-weight: 500; }
+      .phase-box { fill: #111827; fill-opacity: 0.6; stroke-width: 1.2; rx: 8; }
+      .phase-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; }
+      .note-pill { rx: 5px; ry: 5px; fill: #1e293b; stroke: #334155; stroke-width: 1; }
+      .note-text { font-size: 10.5px; fill: #94a3b8; }
+    </style>
+
+    <marker id="arrow-head-req" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#818cf8"/>
+    </marker>
+    <marker id="arrow-head-resp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#38bdf8"/>
+    </marker>
+    <marker id="arrow-head-store" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#10b981"/>
+    </marker>
+
+    <!-- Actor Gradients -->
+    <linearGradient id="grad-resident" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#475569"/><stop offset="100%" stop-color="#334155"/>
+    </linearGradient>
+    <linearGradient id="grad-angular" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ef4444"/><stop offset="100%" stop-color="#b91c1c"/>
+    </linearGradient>
+    <linearGradient id="grad-iframe" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6"/><stop offset="100%" stop-color="#1d4ed8"/>
+    </linearGradient>
+    <linearGradient id="grad-api" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0d9488"/><stop offset="100%" stop-color="#0f766e"/>
+    </linearGradient>
+    <linearGradient id="grad-repo" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10b981"/><stop offset="100%" stop-color="#047857"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Title & Subtitle -->
+  <text x="40" y="40" class="title">Chat Session Lifecycle &amp; Continuity Flow</text>
+  <text x="40" y="62" class="subtitle">Multi-Tenant Session Re-attachment, History Hydration &amp; State Persistence across Window Toggles / Page Reloads</text>
+
+  <!-- Lifeline Columns (X: Resident=90, Angular=270, Iframe=470, FastAPI=710, ChatRepo=960) -->
+  <line x1="90" y1="120" x2="90" y2="930" class="lifeline"/>
+  <line x1="270" y1="120" x2="270" y2="930" class="lifeline"/>
+  <line x1="470" y1="120" x2="470" y2="930" class="lifeline"/>
+  <line x1="710" y1="120" x2="710" y2="930" class="lifeline"/>
+  <line x1="960" y1="120" x2="960" y2="930" class="lifeline"/>
+
+  <!-- Actor Header Boxes -->
+  <g transform="translate(25, 80)">
+    <rect width="130" height="38" class="actor-box" fill="url(#grad-resident)"/>
+    <text x="65" y="19" class="actor-text">Resident (Alex)</text>
+  </g>
+  <g transform="translate(205, 80)">
+    <rect width="130" height="38" class="actor-box" fill="url(#grad-angular)"/>
+    <text x="65" y="19" class="actor-text">Angular Host App</text>
+  </g>
+  <g transform="translate(405, 80)">
+    <rect width="130" height="38" class="actor-box" fill="url(#grad-iframe)"/>
+    <text x="65" y="19" class="actor-text">Webchat Iframe</text>
+  </g>
+  <g transform="translate(645, 80)">
+    <rect width="130" height="38" class="actor-box" fill="url(#grad-api)"/>
+    <text x="65" y="19" class="actor-text">FastAPI Backend</text>
+  </g>
+  <g transform="translate(895, 80)">
+    <rect width="130" height="38" class="actor-box" fill="url(#grad-repo)"/>
+    <text x="65" y="19" class="actor-text">Chat Repository</text>
+  </g>
+
+  <!-- ====================================================================== -->
+  <!-- PHASE 1: Initial Mount & Auth Exchange (with Session Re-attachment)   -->
+  <!-- ====================================================================== -->
+  <g transform="translate(195, 135)">
+    <rect width="875" height="185" class="phase-box" stroke="#4f46e5"/>
+    <text x="14" y="20" fill="#a5b4fc" class="phase-label">PHASE 1: MOUNT &amp; SESSION RE-ATTACHMENT HANDSHAKE</text>
+  </g>
+
+  <!-- 1. PostMessage auth-code -->
+  <line x1="270" y1="170" x2="470" y2="170" class="arrow arrow-req"/>
+  <text x="282" y="163" class="msg-text">1. postMessage({ type: 'auth-code', code })</text>
+
+  <!-- 2. Iframe checks localStorage & calls /auth/exchange -->
+  <line x1="470" y1="205" x2="710" y2="205" class="arrow arrow-req"/>
+  <text x="482" y="198" class="msg-text">2. POST /api/v1/auth/exchange { code, session_id: cachedId }</text>
+
+  <!-- 3. Backend queries Repo for active user sessions -->
+  <line x1="710" y1="235" x2="960" y2="235" class="arrow arrow-req"/>
+  <text x="722" y="228" class="msg-text">3. list_user_sessions(user_id=10790, tenant_id=89)</text>
+
+  <!-- 4. Repo returns active session -->
+  <line x1="960" y1="260" x2="710" y2="260" class="arrow arrow-resp"/>
+  <text x="735" y="254" class="msg-text" fill="#38bdf8">4. Re-attaches to active session_id ("sess-4c9e782a")</text>
+
+  <!-- 5. Returns JWT & session_id -->
+  <line x1="710" y1="295" x2="470" y2="295" class="arrow arrow-resp"/>
+  <text x="485" y="288" class="msg-text" fill="#38bdf8">5. 200 OK { access_token, session_id: "sess-4c9e782a" }</text>
+
+  <!-- Pill note: localStorage cache -->
+  <g transform="translate(365, 305)">
+    <rect width="210" height="20" class="note-pill"/>
+    <text x="105" y="14" text-anchor="middle" class="note-text">localStorage.setItem(session_id)</text>
+  </g>
+
+  <!-- ====================================================================== -->
+  <!-- PHASE 2: History Hydration (Restoring Previous Messages & Cards)      -->
+  <!-- ====================================================================== -->
+  <g transform="translate(395, 335)">
+    <rect width="675" height="135" class="phase-box" stroke="#0284c7"/>
+    <text x="14" y="20" fill="#38bdf8" class="phase-label">PHASE 2: HISTORY HYDRATION (RESTORES PAST MESSAGES &amp; CARDS)</text>
+  </g>
+
+  <!-- 6. GET /api/v1/chat/history/{session_id} -->
+  <line x1="470" y1="375" x2="710" y2="375" class="arrow arrow-req"/>
+  <text x="482" y="368" class="msg-text">6. GET /api/v1/chat/history/sess-4c9e782a (Bearer token)</text>
+
+  <!-- 7. Backend gets messages from repository -->
+  <line x1="710" y1="405" x2="960" y2="405" class="arrow arrow-req"/>
+  <text x="722" y="398" class="msg-text">7. get_messages("sess-4c9e782a", limit=50)</text>
+
+  <!-- 8. Returns messages & cards array -->
+  <line x1="960" y1="430" x2="710" y2="430" class="arrow arrow-resp"/>
+  <line x1="710" y1="445" x2="470" y2="445" class="arrow arrow-resp"/>
+  <text x="495" y="440" class="msg-text" fill="#38bdf8">8. 200 OK: { total_messages: 4, messages: [text, card, ...] }</text>
+
+  <!-- Iframe hydrates DOM -->
+  <g transform="translate(345, 455)">
+    <rect width="250" height="20" class="note-pill"/>
+    <text x="125" y="14" text-anchor="middle" class="note-text">Hides welcome bubble &amp; renders history</text>
+  </g>
+
+  <!-- ====================================================================== -->
+  <!-- PHASE 3: Real-Time Chat Turn & Card Presentation                      -->
+  <!-- ====================================================================== -->
+  <g transform="translate(15, 485)">
+    <rect width="1055" height="235" class="phase-box" stroke="#10b981"/>
+    <text x="14" y="20" fill="#34d399" class="phase-label">PHASE 3: CONVERSATIONAL TURN WITH RICH CARD PRESENTATION</text>
+  </g>
+
+  <!-- 9. User enters question -->
+  <line x1="90" y1="525" x2="470" y2="525" class="arrow arrow-req"/>
+  <text x="105" y="518" class="msg-text">9. Types message: "Where is my Amazon delivery?"</text>
+
+  <!-- 10. POST /api/v1/chat -->
+  <line x1="470" y1="555" x2="710" y2="555" class="arrow arrow-req"/>
+  <text x="482" y="548" class="msg-text">10. POST /api/v1/chat { message, session_id }</text>
+
+  <!-- 11. Stores User Turn -->
+  <line x1="710" y1="580" x2="960" y2="580" class="arrow arrow-store"/>
+  <text x="722" y="573" class="msg-text" fill="#10b981">11. append_message(role="user", sender="Alex Morgan", text)</text>
+
+  <!-- 12. Agent Execution -->
+  <g transform="translate(680, 595)">
+    <rect width="260" height="24" rx="6" fill="#1e293b" stroke="#0d9488" stroke-width="1"/>
+    <text x="130" y="16" fill="#5eead4" font-size="11px" font-weight="600" text-anchor="middle">Customer Agent queries Locker Inventory</text>
+  </g>
+
+  <!-- 13. Stores Assistant Card Turn -->
+  <line x1="710" y1="645" x2="960" y2="645" class="arrow arrow-store"/>
+  <text x="722" y="638" class="msg-text" fill="#10b981">13. append_message(role="assistant", type="card", card_payload={PIN:842910})</text>
+
+  <!-- 14. Response to Iframe -->
+  <line x1="710" y1="680" x2="470" y2="680" class="arrow arrow-resp"/>
+  <text x="485" y="673" class="msg-text" fill="#38bdf8">14. 200 OK: { response, agent: "Customer", card_payload, PIN }</text>
+
+  <!-- 15. Render in UI -->
+  <line x1="470" y1="705" x2="90" y2="705" class="arrow arrow-resp"/>
+  <text x="105" y="700" class="msg-text" fill="#38bdf8">15. Displays Package Card (Compartment 12, PIN: 842910)</text>
+
+  <!-- ====================================================================== -->
+  <!-- PHASE 4: Window Close / Reopen & Browser Reload Continuity             -->
+  <!-- ====================================================================== -->
+  <g transform="translate(15, 735)">
+    <rect width="1055" height="195" class="phase-box" stroke="#f59e0b"/>
+    <text x="14" y="20" fill="#fcd34d" class="phase-label">PHASE 4: DRAWER CLOSE &amp; REOPEN / PAGE RELOAD (F5) CONTINUITY</text>
+  </g>
+
+  <!-- 16. Resident closes chat -->
+  <line x1="90" y1="775" x2="270" y2="775" class="arrow arrow-req" stroke="#f59e0b"/>
+  <text x="105" y="768" class="msg-text" fill="#fcd34d">16. Closes Chat Window (*ngIf removes iframe from DOM)</text>
+
+  <!-- 17. Reopens -> Iframe mounts & re-exchanges using cached session_id -->
+  <line x1="90" y1="815" x2="270" y2="815" class="arrow arrow-req"/>
+  <line x1="270" y1="825" x2="470" y2="825" class="arrow arrow-req"/>
+  <text x="105" y="808" class="msg-text">17. Reopens Chat Window -&gt; Iframe reads localStorage session_id</text>
+
+  <!-- 18. POST /auth/exchange with session_id -->
+  <line x1="470" y1="850" x2="710" y2="850" class="arrow arrow-req"/>
+  <text x="482" y="843" class="msg-text">18. POST /auth/exchange { code, session_id: "sess-4c9e782a" }</text>
+
+  <!-- 19. Matches existing session & restores history -->
+  <line x1="710" y1="875" x2="470" y2="875" class="arrow arrow-resp"/>
+  <text x="495" y="868" class="msg-text" fill="#38bdf8">19. Backend returns same session_id -&gt; calls /history/sess-4c9e782a</text>
+
+  <!-- 20. Restored Seamlessly -->
+  <line x1="470" y1="905" x2="90" y2="905" class="arrow arrow-resp"/>
+  <text x="105" y="898" class="msg-text" fill="#34d399" font-weight="700">20. History and Package Card restored immediately! (Zero turns lost)</text>
+</svg>
