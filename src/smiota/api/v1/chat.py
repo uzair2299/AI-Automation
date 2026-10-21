@@ -1,16 +1,22 @@
 """Core conversational and task-planning chat endpoint with HTTP and WebSocket streaming."""
-import json
-import uuid
 import asyncio
 from datetime import UTC, datetime
+import json
 from typing import Any, Optional
+import uuid
+
 from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect
-from smiota.schemas.chat import ChatMessageRequest, ChatMessageResponse
+
 from smiota.agents.base import AgentContext
 from smiota.agents.orchestrator import AgentOrchestrator
-from smiota.core.security import AuthenticatedUser
-from smiota.api.deps import get_current_user, get_orchestrator
+from smiota.api.deps import get_chat_repo, get_current_user, get_orchestrator
+from smiota.api.v1.websocket_manager import ws_manager
+from smiota.core.exceptions import AuthorizationError
 from smiota.core.logging import logger
+from smiota.core.security import AuthenticatedUser
+from smiota.repositories.chat_repository import BaseChatRepository
+from smiota.schemas.chat import ChatMessageRequest, ChatMessageResponse
+from smiota.schemas.chat_session import ChatHistoryResponse
 
 router = APIRouter(prefix="/chat", tags=["Agent Chat & Task Planning"])
 
@@ -59,16 +65,6 @@ async def send_message(
     )
 
 
-from typing import Optional
-from fastapi import Query
-from smiota.api.deps import get_chat_repo
-from smiota.api.v1.websocket_manager import ws_manager
-from smiota.core.exceptions import AuthorizationError
-from smiota.repositories.chat_repository import BaseChatRepository
-from smiota.schemas.chat_session import ChatHistoryResponse
-import json
-
-
 @router.get(
     "/history/{session_id}",
     response_model=ChatHistoryResponse,
@@ -110,17 +106,16 @@ async def get_chat_history(
     )
 
 
-
 @router.websocket("/ws/{session_id}")
 async def websocket_chat_stream(
     websocket: WebSocket,
     session_id: str,
     resident_id: Optional[str] = Query(None),
+    orchestrator: AgentOrchestrator = Depends(get_orchestrator),
+    chat_repo: BaseChatRepository = Depends(get_chat_repo),
 ):
     """Real-time WebSocket endpoint for instant token streaming, agent responses, and RabbitMQ push alerts."""
     await ws_manager.connect(session_id, websocket, resident_id)
-    orchestrator = AgentOrchestrator()
-    chat_repo = get_chat_repo()
 
     try:
         while True:
