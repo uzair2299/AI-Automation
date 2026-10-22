@@ -292,12 +292,40 @@ class CustomerAgent(BaseAgent):
                     or (context.metadata.get("token") if isinstance(context.metadata, dict) else None)
                     or None
                 )
+                if not parent_token:
+                    return AgentResult(
+                        agent_name=self.name,
+                        content=(
+                            "🔒 **Login Required to View Package Details**\n\n"
+                            "You are currently chatting as a guest. For resident privacy and security, "
+                            "package delivery records and locker details can only be viewed by logged-in users.\n\n"
+                            "Please log in to your Smiota resident portal or open this chat inside your property app to track your packages."
+                        ),
+                        requires_approval=False,
+                        suggested_actions=[
+                            "Locker location and hours",
+                            "What does Smiota offer?",
+                            "Locker door did not open",
+                        ],
+                    )
+
                 if is_uuid:
                     api_result = await package_service.get_packages(uuid=pkg_id, token=parent_token)
                 else:
                     api_result = await package_service.get_packages(by_name_or_number=pkg_id, token=parent_token)
 
                 if not api_result.get("success"):
+                    if api_result.get("error_type") in ["UNAUTHENTICATED", "AUTH_ERROR"]:
+                        return AgentResult(
+                            agent_name=self.name,
+                            content=(
+                                "🔒 **Authentication Required**\n\n"
+                                "Your session token is missing or has expired. "
+                                "Please log in to your Smiota resident account to access package information."
+                            ),
+                            requires_approval=False,
+                            suggested_actions=["Locker location and hours", "What does Smiota offer?"],
+                        )
                     return AgentResult(
                         agent_name=self.name,
                         content=(
@@ -305,7 +333,7 @@ class CustomerAgent(BaseAgent):
                             "Please try again in a few moments or contact your property management office for assistance."
                         ),
                         requires_approval=False,
-                        suggested_actions=["Where is my package•", "Resend pickup PIN", "Locker location and hours"],
+                        suggested_actions=["Where is my package?", "Resend pickup PIN", "Locker location and hours"],
                     )
 
                 packages = api_result.get("packages", [])
@@ -380,8 +408,35 @@ class CustomerAgent(BaseAgent):
                     or (context.metadata.get("token") if isinstance(context.metadata, dict) else None)
                     or None
                 )
+                if not parent_token:
+                    return AgentResult(
+                        agent_name=self.name,
+                        content=(
+                            "🔒 **Login Required to View Package Details**\n\n"
+                            "You are currently chatting as a guest. For resident privacy and security, "
+                            "package delivery records can only be viewed by logged-in users.\n\n"
+                            "Please log in to your Smiota resident portal or open this chat inside your property app to check deliveries."
+                        ),
+                        requires_approval=False,
+                        suggested_actions=[
+                            "Locker location and hours",
+                            "What does Smiota offer?",
+                        ],
+                    )
+
                 api_result = await package_service.get_packages(by_name_or_number=identifier, token=parent_token)
                 if not api_result.get("success"):
+                    if api_result.get("error_type") in ["UNAUTHENTICATED", "AUTH_ERROR"]:
+                        return AgentResult(
+                            agent_name=self.name,
+                            content=(
+                                "🔒 **Authentication Required**\n\n"
+                                "Your session token is missing or has expired. "
+                                "Please log in to your Smiota resident account to access package information."
+                            ),
+                            requires_approval=False,
+                            suggested_actions=["Locker location and hours", "What does Smiota offer?"],
+                        )
                     return AgentResult(
                         agent_name=self.name,
                         content=(
@@ -389,7 +444,7 @@ class CustomerAgent(BaseAgent):
                             "Please try again shortly or contact your property concierge."
                         ),
                         requires_approval=False,
-                        suggested_actions=["Where is my package•", "Resend pickup PIN", "Locker location and hours"],
+                        suggested_actions=["Where is my package?", "Resend pickup PIN", "Locker location and hours"],
                     )
 
                 packages = api_result.get("packages", [])

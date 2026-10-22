@@ -53,8 +53,6 @@ class BaseAppSettings(BaseSettings):
     JWT_ISSUER: str = "smiota-ai"
     JWT_AUDIENCE: str = "smiota-chat"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
-    # Legacy default session token (fallback for offline tests only; live requests use dynamic token from parent app)
-    SAVED_SESSION_TOKEN: str = "350ab6f7-7dfb-468c-a68a-f7b150b489f3"
     SMIOTA_SERVER_BASE_URL: str = "https://dev.smiotaapps.com/smiota"
     SMIOTA_BACKEND_URL: str = "https://dev.smiotaapps.com/smiota"
     SMIOTA_INTERNAL_EXCHANGE_ENDPOINT: str = "/internal/ai/auth/exchange"

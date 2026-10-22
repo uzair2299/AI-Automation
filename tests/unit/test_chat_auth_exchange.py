@@ -683,7 +683,44 @@ async def test_customer_agent_uses_parent_app_token_for_api_calls():
         mock_get_packages.assert_awaited_once()
         _, kwargs = mock_get_packages.call_args
         assert kwargs.get("token") == parent_app_token
-        assert kwargs.get("token") != "350ab6f7-7dfb-468c-a68a-f7b150b489f3"
+
+
+@pytest.mark.asyncio
+async def test_customer_agent_blocks_package_lookup_for_unauthenticated_public_user():
+    """Verify CustomerAgent requires login when a public user without a parent token checks packages."""
+    from smiota.agents.base import AgentContext
+    from smiota.agents.implementations.customer.agent import CustomerAgent
+    from smiota.services.package_service import package_service
+
+    # Guest user with no parent token
+    context = AgentContext(
+        session_id="sess-guest-123",
+        user_id="guest",
+        tenant_id="default",
+        channel="webchat",
+        parent_token=None,
+        user={},
+        metadata={},
+    )
+
+    agent = CustomerAgent()
+    with patch.object(package_service, "get_packages", new_callable=AsyncMock) as mock_get_packages:
+        result = await agent.process("Where is my package with tracking number d012a7eb840e?", context)
+        assert result.agent_name == "Customer"
+        assert "Login Required" in result.content
+        # Ensure external service was never invoked for unauthenticated user
+        mock_get_packages.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_package_service_rejects_missing_token():
+    """Verify PackageService returns UNAUTHENTICATED error when called without a session token."""
+    from smiota.services.package_service import package_service
+
+    res = await package_service.get_packages(by_name_or_number="d012a7eb840e", token=None)
+    assert res["success"] is False
+    assert res["error_type"] == "UNAUTHENTICATED"
+
 
 
 

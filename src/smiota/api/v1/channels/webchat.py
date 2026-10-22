@@ -692,8 +692,8 @@ async def embed_widget(
                     type: "user_message",
                     sender: {
                         role: "user",
-                        name: authenticatedUser?.name || "Alex Morgan",
-                        id: residentId || authenticatedUser?.user_id || "10790"
+                        name: authenticatedUser?.name || (residentId ? ("Resident " + residentId) : "Guest"),
+                        id: residentId || authenticatedUser?.user_id || "guest"
                     },
                     content: {
                         text: messageText,

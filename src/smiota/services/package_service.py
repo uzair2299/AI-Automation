@@ -24,16 +24,10 @@ class SmiotaPackageService:
             self.settings, "SMIOTA_SERVER_BASE_URL", "http://localhost:8080"
         )
 
-    @property
-    def default_token(self) -> str:
-        return os.environ.get("SAVED_SESSION_TOKEN") or getattr(
-            self.settings, "SAVED_SESSION_TOKEN", "350ab6f7-7dfb-468c-a68a-f7b150b489f3"
-        )
-
     def _log_api_call(self, url: str, params: dict, status: str, details: str, auth_token: Optional[str] = None) -> None:
         """Log API request details to logs/text_to_sql.log and logs/smiota.log."""
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        tok = auth_token or self.default_token or ""
+        tok = auth_token or ""
         masked = f"{tok[:8]}...{tok[-6:]}" if len(tok) >= 14 else (f"{tok[:4]}***" if tok else "none")
         log_entry = (
             f"\n[{timestamp}] --- [SMIOTA SERVER API CALL] ---\n"
@@ -71,7 +65,15 @@ class SmiotaPackageService:
         token: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Fetch package details from Smiota Server GET /api/v1/packages using URL query parameters."""
-        auth_token = token or self.default_token
+        if not token or not token.strip():
+            logger.warning("Package query rejected: No authentication token provided. Parent app login required.")
+            return {
+                "success": False,
+                "error_type": "UNAUTHENTICATED",
+                "message": "User is not logged in. An active session token from the parent app is required to access package details.",
+            }
+
+        auth_token = token.strip()
         url = f"{self.base_url.rstrip('/')}/api/v1/packages"
 
         params: Dict[str, Any] = {
