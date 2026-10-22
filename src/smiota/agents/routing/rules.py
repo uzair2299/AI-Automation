@@ -9,6 +9,111 @@ from smiota.core.logging import logger
 
 GREETINGS = {"hi", "hello", "hey", "good morning", "good evening", "greetings"}
 
+INFORMATIONAL_CATEGORIES = {
+    "how_to": [
+        "how to",
+        "how do i",
+        "how can i",
+        "how does",
+        "how do you",
+        "how should i",
+    ],
+    "definitions": [
+        "what is",
+        "what are",
+        "what does",
+        "what do you mean by",
+        "define",
+    ],
+    "explanations": [
+        "why does",
+        "why is",
+        "why do",
+        "why can't",
+        "why cant",
+        "explain",
+        "tell me about",
+    ],
+    "instructions": [
+        "what steps",
+        "what should i do",
+        "guide me",
+        "show me how",
+    ],
+    "general_knowledge": [
+        "can you explain",
+        "could you explain",
+        "help me understand",
+        "i want to know",
+    ],
+    "process_policy": [
+        "what is the process",
+        "what is the policy",
+        "what are the requirements",
+        "how does the process work",
+    ],
+    "capabilities": [
+        "does smiota",
+        "can smiota",
+        "is it possible to",
+        "do you support",
+    ],
+    "troubleshooting": [
+        "why am i unable to",
+        "why is my locker",
+        "what causes",
+        "what should i do if",
+    ],
+}
+
+INFORMATIONAL_PREFIXES = [
+    # How-to
+    "how to",
+    "how do i",
+    "how can i",
+    "how does",
+    "how do you",
+    "how should i",
+    # Definitions
+    "what is",
+    "what are",
+    "what does",
+    "what do you mean by",
+    "define",
+    # Explanations
+    "why does",
+    "why is",
+    "why do",
+    "why can't",
+    "explain",
+    "tell me about",
+    # Instructions
+    "what steps",
+    "what should i do",
+    "guide me",
+    "show me how",
+    # General knowledge
+    "can you explain",
+    "could you explain",
+    "help me understand",
+    "i want to know",
+    # Process and policy
+    "what is the process",
+    "what is the policy",
+    "what are the requirements",
+    "how does the process work",
+    # Capabilities
+    "does smiota",
+    "can smiota",
+    "is it possible to",
+    "do you support",
+    # Troubleshooting
+    "what causes",
+    "what should i do if",
+    "why am i unable to",
+    "why is my locker",
+]
+
 
 class RuleBasedRouter(BaseIntentRouter):
     """Classifies user queries using compiled regex patterns, weighted keyword dictionaries,
@@ -17,6 +122,8 @@ class RuleBasedRouter(BaseIntentRouter):
     """
 
     GREETINGS = GREETINGS
+    INFORMATIONAL_PREFIXES = INFORMATIONAL_PREFIXES
+    INFORMATIONAL_CATEGORIES = INFORMATIONAL_CATEGORIES
 
     # High-certainty domain identifiers
     CUSTOMER_REGEX = re.compile(r"\b(sm|pkg)-[a-z0-9]+\b|\bpickup code\b|\bcompartment \d+\b", re.IGNORECASE)
@@ -70,6 +177,34 @@ class RuleBasedRouter(BaseIntentRouter):
         if len(tokens) <= 3 and any(clean == g or clean.startswith(g + " ") for g in cls.GREETINGS):
             return True
         return False
+
+    @classmethod
+    def _match_informational(cls, q: str) -> Optional[tuple[str, str]]:
+        """Check if query matches any informational prefix pattern.
+
+        Returns tuple of (matched_prefix, category) or None.
+        """
+        q_norm = q.lower().strip()
+        q_clean = re.sub(r"[’']", "'", q_norm)
+        q_no_punct = re.sub(r"[^\w\s]", " ", q_norm).strip()
+        q_no_punct = " ".join(q_no_punct.split())
+
+        sorted_prefixes = sorted(cls.INFORMATIONAL_PREFIXES, key=len, reverse=True)
+
+        for prefix in sorted_prefixes:
+            p_norm = prefix.lower().strip()
+            p_no_punct = re.sub(r"[^\w\s]", " ", p_norm).strip()
+            p_no_punct = " ".join(p_no_punct.split())
+
+            if q_norm.startswith(p_norm) or q_clean.startswith(p_norm) or q_no_punct.startswith(p_no_punct):
+                category = "general"
+                for cat, prefixes in cls.INFORMATIONAL_CATEGORIES.items():
+                    if prefix in prefixes:
+                        category = cat
+                        break
+                return (prefix, category)
+
+        return None
 
     async def classify(self, query: str, context: AgentContext) -> RouteDecision:
         """Classify user query based on channel, rules, and conversation continuity."""
@@ -135,7 +270,7 @@ class RuleBasedRouter(BaseIntentRouter):
         """Webchat channel classification (prioritizes customer locker support,
         with support for operational security & incident queries).
         """
-        # Check standard greeting intent
+        # 1. Check standard greeting intent
         if self._is_greeting(q):
             return RouteDecision(
                 agent_name="customer",
@@ -145,7 +280,42 @@ class RuleBasedRouter(BaseIntentRouter):
                 reasoning="Matched standard greeting in webchat channel",
             )
 
-        # Strong regex matches
+        # 2. Check Informational questions in webchat (How-to, Definitions, Policies, Instructions, Capabilities, etc.)
+        info_match = self._match_informational(q)
+        if info_match:
+            # Check if specifically asks about security
+            sec_matches = self._match_keywords(q, self.SECURITY_KEYWORDS)
+            if sec_matches or self.SECURITY_REGEX.search(q):
+                return RouteDecision(
+                    agent_name="security",
+                    confidence=0.95,
+                    matched_intent="informational",
+                    routing_method="rule_informational",
+                    reasoning=f"Matched informational prefix '{info_match[0]}' ({info_match[1]}) with security keywords: {sec_matches}",
+                    metadata={"is_informational": True, "category": info_match[1], "matched_prefix": info_match[0], "domain": "security"},
+                )
+            # Check if specifically asks about AIOps
+            aiops_matches = self._match_keywords(q, self.AIOPS_KEYWORDS)
+            if aiops_matches or self.AIOPS_REGEX.search(q):
+                return RouteDecision(
+                    agent_name="aiops",
+                    confidence=0.95,
+                    matched_intent="informational",
+                    routing_method="rule_informational",
+                    reasoning=f"Matched informational prefix '{info_match[0]}' ({info_match[1]}) with AIOps keywords: {aiops_matches}",
+                    metadata={"is_informational": True, "category": info_match[1], "matched_prefix": info_match[0], "domain": "aiops"},
+                )
+            # Default for webchat informational queries is customer concierge
+            return RouteDecision(
+                agent_name="customer",
+                confidence=0.95,
+                matched_intent="informational",
+                routing_method="rule_informational",
+                reasoning=f"Matched informational query prefix: '{info_match[0]}' (Category: {info_match[1]})",
+                metadata={"is_informational": True, "category": info_match[1], "matched_prefix": info_match[0], "domain": "customer"},
+            )
+
+        # 3. Strong regex matches (e.g. direct parcel lookup or compartment code without informational phrasing)
         if self.CUSTOMER_REGEX.search(q):
             return RouteDecision(
                 agent_name="customer",
@@ -155,7 +325,7 @@ class RuleBasedRouter(BaseIntentRouter):
                 reasoning="Matched exact locker or package identifier regex",
             )
 
-        # Check security keywords (e.g. admin or staff testing in webchat)
+        # 4. Check security keywords (e.g. admin or staff testing in webchat)
         sec_matches = self._match_keywords(q, self.SECURITY_KEYWORDS)
         if sec_matches or self.SECURITY_REGEX.search(q):
             confidence = 0.95 if len(sec_matches) >= 2 or self.SECURITY_REGEX.search(q) else 0.88
@@ -167,7 +337,7 @@ class RuleBasedRouter(BaseIntentRouter):
                 reasoning=f"Matched security keywords: {sec_matches}",
             )
 
-        # Check AIOps keywords (e.g. pod restarts, high CPU)
+        # 5. Check AIOps keywords (e.g. pod restarts, high CPU)
         aiops_matches = self._match_keywords(q, self.AIOPS_KEYWORDS)
         if aiops_matches or self.AIOPS_REGEX.search(q):
             confidence = 0.95 if len(aiops_matches) >= 2 or self.AIOPS_REGEX.search(q) else 0.88
@@ -179,7 +349,7 @@ class RuleBasedRouter(BaseIntentRouter):
                 reasoning=f"Matched AIOps keywords: {aiops_matches}",
             )
 
-        # Check Customer keywords
+        # 6. Check Customer keywords
         cust_matches = self._match_keywords(q, self.CUSTOMER_KEYWORDS)
         if cust_matches:
             confidence = 0.95 if len(cust_matches) >= 2 else 0.88
@@ -212,64 +382,98 @@ class RuleBasedRouter(BaseIntentRouter):
                 reasoning="Matched standard greeting in internal channel",
             )
 
+        # Check informational query prefix early
+        info_match = self._match_informational(q)
+
         # 1. Security & Compliance
         sec_matches = self._match_keywords(q, self.SECURITY_KEYWORDS)
         if sec_matches or self.SECURITY_REGEX.search(q):
             confidence = 0.95 if (len(sec_matches) >= 2 or self.SECURITY_REGEX.search(q)) else 0.88
+            intent = "informational" if info_match else "security_compliance"
+            method = "rule_informational" if info_match else "rule_pattern"
+            meta = {"is_informational": True, "category": info_match[1], "matched_prefix": info_match[0], "domain": "security"} if info_match else {}
             return RouteDecision(
                 agent_name="security",
                 confidence=confidence,
-                matched_intent="security_compliance",
-                routing_method="rule_pattern",
+                matched_intent=intent,
+                routing_method=method,
                 reasoning=f"Matched security keywords: {sec_matches}",
+                metadata=meta,
             )
 
         # 2. QA & Automated Testing
         qa_matches = self._match_keywords(q, self.QA_KEYWORDS)
         if qa_matches:
             confidence = 0.95 if len(qa_matches) >= 2 else 0.88
+            intent = "informational" if info_match else "qa_testing"
+            method = "rule_informational" if info_match else "rule_pattern"
+            meta = {"is_informational": True, "category": info_match[1], "matched_prefix": info_match[0], "domain": "qa"} if info_match else {}
             return RouteDecision(
                 agent_name="qa",
                 confidence=confidence,
-                matched_intent="qa_testing",
-                routing_method="rule_pattern",
+                matched_intent=intent,
+                routing_method=method,
                 reasoning=f"Matched QA keywords: {qa_matches}",
+                metadata=meta,
             )
 
         # 3. Customer & Smart Locker
         cust_matches = self._match_keywords(q, self.CUSTOMER_KEYWORDS)
         if cust_matches or self.CUSTOMER_REGEX.search(q):
             confidence = 0.95 if (len(cust_matches) >= 2 or self.CUSTOMER_REGEX.search(q)) else 0.88
+            intent = "informational" if info_match else "customer_locker"
+            method = "rule_informational" if info_match else "rule_pattern"
+            meta = {"is_informational": True, "category": info_match[1], "matched_prefix": info_match[0], "domain": "customer"} if info_match else {}
             return RouteDecision(
                 agent_name="customer",
                 confidence=confidence,
-                matched_intent="customer_locker",
-                routing_method="rule_pattern",
+                matched_intent=intent,
+                routing_method=method,
                 reasoning=f"Matched customer keywords: {cust_matches}",
+                metadata=meta,
             )
 
         # 4. SRE & AIOps
         aiops_matches = self._match_keywords(q, self.AIOPS_KEYWORDS)
         if aiops_matches or self.AIOPS_REGEX.search(q):
             confidence = 0.95 if (len(aiops_matches) >= 2 or self.AIOPS_REGEX.search(q)) else 0.88
+            intent = "informational" if info_match else "aiops_sre"
+            method = "rule_informational" if info_match else "rule_pattern"
+            meta = {"is_informational": True, "category": info_match[1], "matched_prefix": info_match[0], "domain": "aiops"} if info_match else {}
             return RouteDecision(
                 agent_name="aiops",
                 confidence=confidence,
-                matched_intent="aiops_sre",
-                routing_method="rule_pattern",
+                matched_intent=intent,
+                routing_method=method,
                 reasoning=f"Matched AIOps keywords: {aiops_matches}",
+                metadata=meta,
             )
 
         # 5. Developer & DevOps
         dev_matches = self._match_keywords(q, self.DEVELOPER_KEYWORDS)
         if dev_matches:
             confidence = 0.95 if len(dev_matches) >= 2 else 0.88
+            intent = "informational" if info_match else "developer_devops"
+            method = "rule_informational" if info_match else "rule_pattern"
+            meta = {"is_informational": True, "category": info_match[1], "matched_prefix": info_match[0], "domain": "developer"} if info_match else {}
             return RouteDecision(
                 agent_name="developer",
                 confidence=confidence,
-                matched_intent="developer_devops",
-                routing_method="rule_pattern",
+                matched_intent=intent,
+                routing_method=method,
                 reasoning=f"Matched developer keywords: {dev_matches}",
+                metadata=meta,
+            )
+
+        # 6. Check General Informational query without domain keywords
+        if info_match:
+            return RouteDecision(
+                agent_name="aiops",
+                confidence=0.88,
+                matched_intent="informational",
+                routing_method="rule_informational",
+                reasoning=f"Matched internal informational query prefix: '{info_match[0]}' (Category: {info_match[1]})",
+                metadata={"is_informational": True, "category": info_match[1], "matched_prefix": info_match[0]},
             )
 
         # Default fallback for internal channels

@@ -40,10 +40,15 @@ async def test_rule_router_exact_locker_identifiers(base_context):
 async def test_rule_router_channel_routing(base_context):
     router = RuleBasedRouter()
 
-    # Webchat channel defaults to customer for general questions
+    # Webchat channel recognizes informational query prefix or falls back to customer
     decision_web = await router.classify("What are the building hours?", base_context)
     assert decision_web.agent_name == "customer"
-    assert decision_web.routing_method == "channel_default"
+    assert decision_web.routing_method in {"channel_default", "rule_informational"}
+
+    # General question without keyword or prefix triggers channel default
+    decision_default = await router.classify("General unclassified query", base_context)
+    assert decision_default.agent_name == "customer"
+    assert decision_default.routing_method == "channel_default"
 
     # Internal channels
     internal_ctx = AgentContext(
@@ -220,3 +225,88 @@ async def test_composite_router_greetings_fast_path(base_context):
     assert decision.confidence >= 0.95
     # Must NOT call semantic router (zero LLM cost, zero latency)
     mock_semantic.classify.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_rule_router_informational_prefixes_webchat(base_context):
+    from smiota.agents.routing.rules import INFORMATIONAL_CATEGORIES
+
+    router = RuleBasedRouter()
+
+    # Representative test queries across all 8 informational categories
+    category_samples = {
+        "how_to": "how to retrieve my delivery pickup code",
+        "definitions": "what is a compartment PIN",
+        "explanations": "why can't I access my locker",
+        "instructions": "guide me through the pickup process",
+        "general_knowledge": "can you explain how smart lockers work",
+        "process_policy": "what is the policy for locker storage",
+        "capabilities": "does smiota support refrigerated lockers",
+        "troubleshooting": "why is my locker door not opening",
+    }
+
+    for expected_cat, sample_query in category_samples.items():
+        decision = await router.classify(sample_query, base_context)
+        assert decision.agent_name == "customer", f"Failed for query: {sample_query}"
+        assert decision.matched_intent == "informational"
+        assert decision.routing_method == "rule_informational"
+        assert decision.confidence >= 0.90
+        assert decision.metadata.get("is_informational") is True
+        assert decision.metadata.get("category") == expected_cat
+
+
+@pytest.mark.asyncio
+async def test_rule_router_informational_internal_channel():
+    router = RuleBasedRouter()
+    internal_ctx = AgentContext(
+        session_id="internal-session",
+        user_id="eng-1",
+        tenant_id="smiota",
+        channel="slack",
+    )
+
+    decision = await router.classify("what is the process for incident escalation", internal_ctx)
+    assert decision.agent_name == "aiops"
+    assert decision.matched_intent == "informational"
+    assert decision.routing_method == "rule_informational"
+    assert decision.metadata.get("is_informational") is True
+
+
+@pytest.mark.asyncio
+async def test_composite_router_informational_fast_path(base_context):
+    mock_semantic = MagicMock(spec=SemanticRouter)
+    mock_semantic.classify = AsyncMock()
+
+    rule_router = RuleBasedRouter()
+    composite = CompositeIntentRouter(
+        rule_router=rule_router,
+        semantic_router=mock_semantic,
+        confidence_threshold=0.75,
+    )
+
+    decision = await composite.classify("how can I pick up my parcel", base_context)
+    assert decision.agent_name == "customer"
+    assert decision.matched_intent == "informational"
+    assert decision.confidence >= 0.75
+    # Must NOT call semantic router (fast path < 1ms)
+    mock_semantic.classify.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_customer_agent_handles_informational_query(base_context):
+    from unittest.mock import patch
+    from smiota.agents.implementations.customer.agent import CustomerAgent
+
+    agent = CustomerAgent()
+    with patch("smiota.llm.provider.GeminiProvider.generate_completion", new_callable=AsyncMock) as mock_llm:
+        mock_llm.return_value = "To pick up your package, scan the QR code at the locker kiosk."
+        result = await agent.process("how do I pick up my package", base_context)
+        assert result.metadata.get("is_informational") is True
+        assert result.metadata.get("category") == "how_to"
+        assert result.metadata.get("matched_prefix") == "how do i"
+        assert "QR code" in result.content
+        mock_llm.assert_called_once()
+        prompt_arg = mock_llm.call_args[1]["prompt"]
+        assert "[Informational Query - Category: how_to, Pattern: 'how do i']" in prompt_arg
+
+

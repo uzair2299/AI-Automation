@@ -480,8 +480,15 @@ class CustomerAgent(BaseAgent):
                     suggested_actions=["Where is my package?", "Contact support concierge"],
                 )
 
+        # Identify informational intent before calling LLM or evaluating generic tracking prompts
+        from smiota.agents.routing.rules import RuleBasedRouter
+        info_match = RuleBasedRouter._match_informational(query)
+        is_informational = info_match is not None
+        info_prefix = info_match[0] if info_match else None
+        info_category = info_match[1] if info_match else None
+
         # 8. Check Parcel / Tracking Inquiry (Prompt for Package ID or Tracking Number if none given)
-        if any(w in q for w in ["parcel", "package", "tracking", "track", "delivery", "pickup", "where is my"]):
+        if not is_informational and any(w in q for w in ["parcel", "package", "tracking", "track", "delivery", "pickup", "where is my"]):
             return AgentResult(
                 agent_name=self.name,
                 content=(
@@ -499,7 +506,7 @@ class CustomerAgent(BaseAgent):
             )
 
         # 9. Fallback Account Lookup Prompt (Phone / Email)
-        if any(w in q for w in ["phone", "email", "don't have", "dont have", "no tracking"]):
+        if not is_informational and any(w in q for w in ["phone", "email", "don't have", "dont have", "no tracking"]):
             return AgentResult(
                 agent_name=self.name,
                 content=(
@@ -515,7 +522,7 @@ class CustomerAgent(BaseAgent):
             )
 
         # 9. Smart Locker Sensor & Hardware Diagnostics
-        if any(w in q for w in ["sensor", "jammed"]):
+        if not is_informational and any(w in q for w in ["sensor", "jammed"]):
             return AgentResult(
                 agent_name=self.name,
                 content=(
@@ -533,14 +540,28 @@ class CustomerAgent(BaseAgent):
                 ],
             )
 
-        # 10. Open-Ended Inquiry -> Invoke Gemini / Vertex AI
+        # 10. Informational & Open-Ended Inquiry -> Invoke Gemini / Vertex AI
         try:
             from smiota.llm.provider import GeminiProvider
             llm = GeminiProvider()
+            prompt = (
+                f"[Informational Query - Category: {info_category}, Pattern: '{info_prefix}']\n"
+                f"Resident query: {query}\n"
+                f"Provide a helpful, polite, and concise instructional answer for the resident."
+                if is_informational
+                else f"Resident query: {query}\nProvide a helpful, polite, and concise answer for the resident."
+            )
             llm_reply = await llm.generate_completion(
-                prompt=f"Resident query: {query}\nProvide a helpful, polite, and concise answer for the resident.",
+                prompt=prompt,
                 system_instruction=self.system_prompt,
             )
+            result_metadata = {}
+            if is_informational:
+                result_metadata = {
+                    "is_informational": True,
+                    "category": info_category,
+                    "matched_prefix": info_prefix,
+                }
             return AgentResult(
                 agent_name=self.name,
                 content=llm_reply,
@@ -551,6 +572,7 @@ class CustomerAgent(BaseAgent):
                     "Locker location and hours",
                     "Locker door did not open",
                 ],
+                metadata=result_metadata,
             )
         except Exception:
             return AgentResult(
