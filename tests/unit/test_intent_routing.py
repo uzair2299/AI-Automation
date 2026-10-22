@@ -159,3 +159,64 @@ async def test_orchestrator_routing_metadata_attachment(base_context):
     routing_info = result.metadata["routing"]
     assert routing_info["confidence"] >= 0.80
     assert routing_info["routing_method"] in {"rule_pattern", "channel_default", "gemini_semantic"}
+
+
+@pytest.mark.asyncio
+async def test_rule_router_greetings_classification(base_context):
+    from smiota.agents.routing.rules import GREETINGS
+
+    router = RuleBasedRouter()
+
+    # Test all greetings in webchat channel
+    for greeting in GREETINGS:
+        decision = await router.classify(greeting, base_context)
+        assert decision.agent_name == "customer", f"Failed for greeting: {greeting}"
+        assert decision.matched_intent == "greeting"
+        assert decision.confidence >= 0.95
+        assert decision.routing_method == "rule_greeting"
+
+    # Test greetings with punctuation and common follow-ups
+    for phrase in ["Hello!", "hey there", "good morning, ", "Greetings."]:
+        decision = await router.classify(phrase, base_context)
+        assert decision.agent_name == "customer"
+        assert decision.matched_intent == "greeting"
+        assert decision.confidence >= 0.95
+
+
+@pytest.mark.asyncio
+async def test_rule_router_greetings_internal_channel():
+    from smiota.agents.routing.rules import GREETINGS
+
+    router = RuleBasedRouter()
+    internal_ctx = AgentContext(
+        session_id="internal-session",
+        user_id="eng-1",
+        tenant_id="smiota",
+        channel="slack",
+    )
+
+    for greeting in ["hi", "hello", "good morning"]:
+        decision = await router.classify(greeting, internal_ctx)
+        assert decision.agent_name == "aiops"
+        assert decision.matched_intent == "greeting"
+        assert decision.confidence >= 0.95
+
+
+@pytest.mark.asyncio
+async def test_composite_router_greetings_fast_path(base_context):
+    mock_semantic = MagicMock(spec=SemanticRouter)
+    mock_semantic.classify = AsyncMock()
+
+    rule_router = RuleBasedRouter()
+    composite = CompositeIntentRouter(
+        rule_router=rule_router,
+        semantic_router=mock_semantic,
+        confidence_threshold=0.75,
+    )
+
+    decision = await composite.classify("hello", base_context)
+    assert decision.agent_name == "customer"
+    assert decision.matched_intent == "greeting"
+    assert decision.confidence >= 0.95
+    # Must NOT call semantic router (zero LLM cost, zero latency)
+    mock_semantic.classify.assert_not_called()

@@ -7,11 +7,16 @@ from smiota.agents.routing.schema import RouteDecision
 from smiota.core.logging import logger
 
 
+GREETINGS = {"hi", "hello", "hey", "good morning", "good evening", "greetings"}
+
+
 class RuleBasedRouter(BaseIntentRouter):
     """Classifies user queries using compiled regex patterns, weighted keyword dictionaries,
 
     and channel guardrails. Runs in < 1 millisecond.
     """
+
+    GREETINGS = GREETINGS
 
     # High-certainty domain identifiers
     CUSTOMER_REGEX = re.compile(r"\b(sm|pkg)-[a-z0-9]+\b|\bpickup code\b|\bcompartment \d+\b", re.IGNORECASE)
@@ -53,21 +58,45 @@ class RuleBasedRouter(BaseIntentRouter):
         "again", "code", "pin", "where", "how", "what", "please", "help",
     }
 
+    @classmethod
+    def _is_greeting(cls, q: str) -> bool:
+        """Check if query is a greeting.
+        Matches exact greetings or short greetings with punctuation/fillers (e.g., 'hello!', 'hey there').
+        """
+        clean = re.sub(r"[^\w\s]", "", q).strip().lower()
+        if clean in cls.GREETINGS:
+            return True
+        tokens = clean.split()
+        if len(tokens) <= 3 and any(clean == g or clean.startswith(g + " ") for g in cls.GREETINGS):
+            return True
+        return False
+
     async def classify(self, query: str, context: AgentContext) -> RouteDecision:
         """Classify user query based on channel, rules, and conversation continuity."""
         q = query.lower().strip()
         channel = (context.channel or "webchat").lower()
 
-        # 1. Multi-turn continuity check: Short queries in active conversations
+        # 1. Greetings classification check (Immediate high confidence < 1ms)
+        if self._is_greeting(q):
+            target_agent = "customer" if channel == "webchat" else "aiops"
+            return RouteDecision(
+                agent_name=target_agent,
+                confidence=0.98,
+                matched_intent="greeting",
+                routing_method="rule_greeting",
+                reasoning=f"Matched standard greeting intent in {channel} channel",
+            )
+
+        # 2. Multi-turn continuity check: Short queries in active conversations
         continuity_decision = self._check_continuity(q, context)
         if continuity_decision:
             return continuity_decision
 
-        # 2. Channel-specific routing logic
+        # 3. Channel-specific routing logic
         if channel == "webchat":
             return self._classify_webchat(q)
 
-        # 3. General internal routing (Slack, Teams, Eval, API)
+        # 4. General internal routing (Slack, Teams, Eval, API)
         return self._classify_internal(q)
 
     def _check_continuity(self, q: str, context: AgentContext) -> Optional[RouteDecision]:
@@ -106,6 +135,16 @@ class RuleBasedRouter(BaseIntentRouter):
         """Webchat channel classification (prioritizes customer locker support,
         with support for operational security & incident queries).
         """
+        # Check standard greeting intent
+        if self._is_greeting(q):
+            return RouteDecision(
+                agent_name="customer",
+                confidence=0.98,
+                matched_intent="greeting",
+                routing_method="rule_greeting",
+                reasoning="Matched standard greeting in webchat channel",
+            )
+
         # Strong regex matches
         if self.CUSTOMER_REGEX.search(q):
             return RouteDecision(
@@ -163,6 +202,16 @@ class RuleBasedRouter(BaseIntentRouter):
 
     def _classify_internal(self, q: str) -> RouteDecision:
         """Internal enterprise channels (Slack, Teams, Eval, API)."""
+        # 0. Check standard greeting intent
+        if self._is_greeting(q):
+            return RouteDecision(
+                agent_name="aiops",
+                confidence=0.98,
+                matched_intent="greeting",
+                routing_method="rule_greeting",
+                reasoning="Matched standard greeting in internal channel",
+            )
+
         # 1. Security & Compliance
         sec_matches = self._match_keywords(q, self.SECURITY_KEYWORDS)
         if sec_matches or self.SECURITY_REGEX.search(q):

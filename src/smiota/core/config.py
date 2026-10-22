@@ -31,8 +31,8 @@ class BaseAppSettings(BaseSettings):
 
     # GCP & Vertex AI Configuration
     GCP_PROJECT_ID: str = "vertex-ai-510710"
-    GCP_REGION: str = "us-central1"
-    GEMINI_MODEL: str = "gemini-2.5-flash"
+    GCP_REGION: str = "global"
+    GEMINI_MODEL: str = "gemini-3.7-flash"
     GEMINI_EMBEDDING_MODEL: str = "text-embedding-004"
 
     # Database, Cache & Message Broker

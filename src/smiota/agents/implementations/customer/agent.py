@@ -1,8 +1,10 @@
 """Customer Agent: Troubleshooting, Device/Locker Status, Support Ticket Creation, Escalation."""
 from smiota.agents.base import BaseAgent, AgentContext, AgentResult
+from smiota.agents.routing.rules import GREETINGS
 from smiota.schemas.agents import AgentCapability
 from smiota.agents.implementations.customer.prompts import CUSTOMER_SYSTEM_PROMPT
 from smiota.agents.implementations.customer.tools import CUSTOMER_BOUND_TOOLS
+from smiota.core.logging import logger
 
 
 class CustomerAgent(BaseAgent):
@@ -99,7 +101,7 @@ class CustomerAgent(BaseAgent):
 
     def _get_suggested_actions(self, packages: list) -> list[str]:
         if not packages:
-            return ["Where is my package•", "Look up by phone number", "Contact support concierge"]
+            return ["Where is my package?", "Look up by phone number", "Contact support concierge"]
         
         status = (packages[0].get("statusName") or "").lower()
         if any(w in status for w in ["released", "picked up", "delivered", "collected"]):
@@ -120,21 +122,14 @@ class CustomerAgent(BaseAgent):
         q = query.lower()
 
         # 1. Greetings & Welcome
-        if any(q.strip() == w or q.strip().startswith(w + " ") or q.strip().startswith(w + ",") for w in ["hi", "hello", "hey", "hola", "good morning", "good afternoon", "good evening", "howdy"]):
+        clean_q = re.sub(r"[^\w\s]", "", q).strip()
+        if clean_q in GREETINGS or any(clean_q == w or clean_q.startswith(w + " ") for w in GREETINGS):
             return AgentResult(
                 agent_name=self.name,
-                content=(
-                    "Hello! 👋 I'm your Smiota Smart Locker Concierge.\n\n"
-                    "I can help you:\n"
-                    "• 📦 **Check package delivery status** and locker compartment numbers\n"
-                    "• 🔑 **Retrieve or resend your 6-digit pickup PIN**\n"
-                    "• 📍 **Find locker location and operating hours**\n"
-                    "• 🚪 **Resolve locker door or pickup issues**\n\n"
-                    "What would you like to check today•"
-                ),
+                content="Hello! 👋 How can I help you today?",
                 requires_approval=False,
                 suggested_actions=[
-                    "Where is my package•",
+                    "Where is my package?",
                     "Resend pickup PIN",
                     "Locker location and hours",
                     "Locker door did not open",
@@ -171,7 +166,7 @@ class CustomerAgent(BaseAgent):
                 ),
                 requires_approval=False,
                 suggested_actions=[
-                    "Where is my package•",
+                    "Where is my package?",
                     "Resend pickup PIN",
                     "Locker door did not open",
                 ],
@@ -233,10 +228,7 @@ class CustomerAgent(BaseAgent):
         if any(w in q for w in ["how are you", "how are you doing", "how r u", "who are you", "what can you do"]):
             return AgentResult(
                 agent_name=self.name,
-                content=(
-                    "I'm doing great, thank you for asking! 😊 I'm your Smiota Smart Locker Concierge.\n\n"
-                    "I can help you check parcel delivery status, retrieve your pickup PIN, find locker hours, or assist with your locker compartment. How can I help you today?"
-                ),
+                content="I'm doing well, thank you! 😊 How can I help you today?",
                 requires_approval=False,
                 suggested_actions=["Where is my package?", "Resend pickup PIN", "Locker location and hours"],
             )
@@ -335,10 +327,7 @@ class CustomerAgent(BaseAgent):
                         )
                     return AgentResult(
                         agent_name=self.name,
-                        content=(
-                            f"I'm temporarily unable to retrieve package details for **{pkg_id}**. "
-                            "Please try again in a few moments or contact your property management office for assistance."
-                        ),
+                        content="I apologize, I'm taking a bit longer than expected to look that up. Please try again.",
                         requires_approval=False,
                         suggested_actions=["Where is my package?", "Resend pickup PIN", "Locker location and hours"],
                     )
@@ -356,7 +345,7 @@ class CustomerAgent(BaseAgent):
                             f"Please double-check the {id_label}, or contact your property management office if you need further help."
                         ),
                         requires_approval=False,
-                        suggested_actions=["Where is my package•", "Look up by phone number", "Contact support concierge"],
+                        suggested_actions=["Where is my package?", "Look up by phone number", "Contact support concierge"],
                     )
 
                 if len(packages) == 1:
@@ -385,11 +374,11 @@ class CustomerAgent(BaseAgent):
                         "Please try again shortly or contact your property concierge."
                     ),
                     requires_approval=False,
-                    suggested_actions=["Where is my package•", "Contact support concierge"],
+                    suggested_actions=["Where is my package?", "Contact support concierge"],
                 )
 
         # 7. Resident Phone or Email Lookup Provided (e.g. user provides email or phone to trace parcels)
-        phone_match = re.search(r'(\+•\d{1,3}[-.\s]•)•\(•\d{3}\)•[-.\s]•\d{3}[-.\s]•\d{4}', q)
+        phone_match = re.search(r'(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}', q)
         email_match = re.search(r'[\w\.-]+@[\w\.-]+\.\w+', q)
         if phone_match or email_match:
             identifier = phone_match.group(0) if phone_match else email_match.group(0)
@@ -442,10 +431,7 @@ class CustomerAgent(BaseAgent):
                         )
                     return AgentResult(
                         agent_name=self.name,
-                        content=(
-                            f"I'm temporarily unable to check deliveries for **{identifier}**. "
-                            "Please try again shortly or contact your property concierge."
-                        ),
+                        content="I apologize, I'm taking a bit longer than expected to look that up. Please try again.",
                         requires_approval=False,
                         suggested_actions=["Where is my package?", "Resend pickup PIN", "Locker location and hours"],
                     )
@@ -462,7 +448,7 @@ class CustomerAgent(BaseAgent):
                             "Please confirm the contact details or check with your property management office."
                         ),
                         requires_approval=False,
-                        suggested_actions=["Where is my package•", "Look up by phone number", "Contact support concierge"],
+                        suggested_actions=["Where is my package?", "Look up by phone number", "Contact support concierge"],
                     )
 
                 if len(packages) == 1:
@@ -491,7 +477,7 @@ class CustomerAgent(BaseAgent):
                         "Please try again shortly or contact your property concierge."
                     ),
                     requires_approval=False,
-                    suggested_actions=["Where is my package•", "Contact support concierge"],
+                    suggested_actions=["Where is my package?", "Contact support concierge"],
                 )
 
         # 8. Check Parcel / Tracking Inquiry (Prompt for Package ID or Tracking Number if none given)
@@ -560,7 +546,7 @@ class CustomerAgent(BaseAgent):
                 content=llm_reply,
                 requires_approval=False,
                 suggested_actions=[
-                    "Where is my package•",
+                    "Where is my package?",
                     "Resend pickup PIN",
                     "Locker location and hours",
                     "Locker door did not open",
@@ -569,10 +555,10 @@ class CustomerAgent(BaseAgent):
         except Exception:
             return AgentResult(
                 agent_name=self.name,
-                content=f"I'm here to help with your Smiota smart locker deliveries! Regarding '{query}', would you like me to check a package, retrieve your pickup PIN, or connect you with property concierge•",
+                content=f"I'm here to help with your Smiota smart locker deliveries! Regarding '{query}', would you like me to check a package, retrieve your pickup PIN, or connect you with property concierge?",
                 requires_approval=False,
                 suggested_actions=[
-                    "Where is my package•",
+                    "Where is my package?",
                     "Resend pickup PIN",
                     "Locker location and hours",
                     "Locker door did not open",

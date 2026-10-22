@@ -2,11 +2,12 @@
 from typing import Optional
 from smiota.agents.routing.base import BaseIntentRouter
 from smiota.agents.routing.composite import CompositeIntentRouter
-from smiota.agents.routing.rules import RuleBasedRouter
+from smiota.agents.routing.rules import GREETINGS, RuleBasedRouter
 from smiota.agents.routing.schema import RouteDecision
 from smiota.agents.routing.semantic import SemanticRouter
 
 __all__ = [
+    "GREETINGS",
     "BaseIntentRouter",
     "RouteDecision",
     "RuleBasedRouter",

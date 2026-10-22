@@ -1,5 +1,7 @@
 """AIOps Agent: Incident Investigation, RCA, Runbook recommendations, Capacity & Performance."""
+import re
 from smiota.agents.base import BaseAgent, AgentContext, AgentResult
+from smiota.agents.routing.rules import GREETINGS
 from smiota.schemas.agents import AgentCapability
 from smiota.agents.implementations.aiops.prompts import AIOPS_SYSTEM_PROMPT
 from smiota.agents.implementations.aiops.tools import AIOPS_BOUND_TOOLS
@@ -23,8 +25,23 @@ class AIOpsAgent(BaseAgent):
         )
 
     async def process(self, query: str, context: AgentContext) -> AgentResult:
+        q = query.lower().strip()
+        clean_q = re.sub(r"[^\w\s]", "", q).strip()
+
+        # 1. Greetings & Welcome
+        if clean_q in GREETINGS or any(clean_q == w or clean_q.startswith(w + " ") for w in GREETINGS):
+            return AgentResult(
+                agent_name=self.name,
+                content="Hello! 👋 I'm your Smiota AIOps & SRE Assistant. How can I assist you with infrastructure, telemetry, or incidents today?",
+                requires_approval=False,
+                suggested_actions=[
+                    "Check cluster health",
+                    "Inspect active alerts",
+                    "Recent pod restarts",
+                ],
+            )
+
         # Check if query requests a mutating action
-        q = query.lower()
         if "restart" in q and ("deployment" in q or "pod" in q or "service" in q):
             return AgentResult(
                 agent_name=self.name,

@@ -593,7 +593,7 @@ async def embed_widget(
             typingTimeout = setTimeout(() => {
                 if (document.getElementById('typing-indicator')) {
                     removeTypingIndicator();
-                    appendMessage('bot', "I'm taking a bit longer than expected to look that up. Please try again or provide your tracking number (e.g. SM-9821).", 'Concierge');
+                    appendMessage('bot', "I apologize, I'm taking a bit longer than expected to look that up. Please try again.", 'Concierge', false, ['Try again', 'Contact support']);
                 }
             }, 30000);
         }
@@ -737,7 +737,7 @@ async def embed_widget(
                     appendMessage('bot', data.response, data.agent_used, data.requires_approval, data.suggested_actions);
                 } catch (err) {
                     removeTypingIndicator();
-                    appendMessage('bot', 'Network error communicating with Smiota AI Core.', 'Error');
+                    appendMessage('bot', "I apologize, I'm taking a bit longer than expected to look that up. Please try again.", 'Concierge', false, ['Try again', 'Contact support']);
                 }
             }
         }

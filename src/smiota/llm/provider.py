@@ -83,7 +83,7 @@ class GeminiProvider:
 
     @property
     def model_name(self) -> str:
-        return os.environ.get("GEMINI_MODEL") or getattr(self.settings, "GEMINI_MODEL", "gemini-2.5-flash") or "gemini-2.5-flash"
+        return os.environ.get("GEMINI_MODEL") or getattr(self.settings, "GEMINI_MODEL", "gemini-3.7-flash") or "gemini-3.7-flash"
 
     @property
     def project_id(self) -> str:
@@ -91,7 +91,7 @@ class GeminiProvider:
 
     @property
     def location(self) -> str:
-        return os.environ.get("GCP_REGION") or getattr(self.settings, "GCP_REGION", "us-central1") or "us-central1"
+        return os.environ.get("GCP_REGION") or getattr(self.settings, "GCP_REGION", "global") or "global"
 
     def _get_vertex_client(self):
         """Lazy-initialize official Google GenAI Vertex AI client or Gemini API Key client."""
