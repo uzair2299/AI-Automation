@@ -4,7 +4,7 @@ Handles secure service-to-service verification of one-time bootstrap codes
 issued by the Smiota Spring Boot backend and retrieves verified user identities.
 """
 
-from typing import Any
+from typing import Any, Optional
 
 import httpx
 from pydantic import BaseModel, Field
@@ -90,6 +90,7 @@ class BackendIdentity(BaseModel):
     tenant_name: str | None = Field(None, description="Tenant company name")
     unit_no: str | None = Field(None, description="Unit or suite number")
     passcode: str | None = Field(None, description="Pickup or access passcode")
+    parent_token: str | None = Field(None, description="Session token received from parent app")
     raw_profile: dict[str, Any] = Field(default_factory=dict, description="Raw profile dictionary from Smiota Main Core")
 
 
@@ -191,9 +192,11 @@ class SmiotaBackendAuthService:
                 "Internal authentication service encountered an error."
             )
 
-        return self._process_backend_response(response, masked_code)
+        return self._process_backend_response(response, masked_code, code=stripped_code)
 
-    def _process_backend_response(self, response: httpx.Response, masked_code: str) -> BackendIdentity:
+    def _process_backend_response(
+        self, response: httpx.Response, masked_code: str, code: str = ""
+    ) -> BackendIdentity:
         """Validate and parse Spring Boot HTTP response."""
         status = response.status_code
 
@@ -282,6 +285,7 @@ class SmiotaBackendAuthService:
                 tenant_name=tenant_name,
                 unit_no=unit_no,
                 passcode=passcode,
+                parent_token=data.get("token") or data.get("sessionToken") or code or None,
                 raw_profile=data,
             )
 
@@ -292,7 +296,7 @@ class SmiotaBackendAuthService:
                     f"Spring Boot endpoint {self.exchange_endpoint} returned HTTP 404 (not yet implemented on server). "
                     "Returning 200 OK Smiota Main dummy identity for testing."
                 )
-                return self._handle_dummy_exchange(masked_code)
+                return self._handle_dummy_exchange(code or masked_code)
             logger.warning(f"Spring Boot rejected bootstrap code {masked_code} with status HTTP {status}")
             raise AuthenticationError("Bootstrap code is invalid, expired, or was already consumed.")
 
@@ -322,9 +326,64 @@ class SmiotaBackendAuthService:
             tenant_name=profile.get("tenantName"),
             unit_no=profile.get("unitNo"),
             passcode=profile.get("passcode"),
+            parent_token=code,
             raw_profile=profile,
         )
 
 
 backend_auth_service = SmiotaBackendAuthService()
+
+
+class SmiotaAuthClient:
+    """Async client for exchanging tokens with the Smiota Java Server."""
+
+    def __init__(self, base_url: Optional[str] = None, service_token: Optional[str] = None):
+        cfg = get_settings()
+        self.base_url = (
+            base_url
+            or getattr(cfg, "SMIOTA_SERVER_BASE_URL", None)
+            or getattr(cfg, "SMIOTA_BACKEND_URL", "https://dev.smiotaapps.com/smiota")
+        ).rstrip("/")
+        self.service_token = service_token or getattr(cfg, "SMIOTA_SERVICE_TOKEN", "")
+
+    def _get_headers(self) -> dict[str, str]:
+        return {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "X-Internal-Service-Key": self.service_token,
+            "Authorization": f"Bearer {self.service_token}",
+        }
+
+    async def exchange_token(self, code: str) -> Optional[dict[str, Any]]:
+        """Exchanges client auth token/code with Smiota Java Server for verified user and tenant profile."""
+        if not code or not code.strip():
+            return None
+        url = f"{self.base_url}/internal/ai/auth/exchange"
+        payload = {"code": code.strip()}
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            try:
+                response = await client.post(
+                    url,
+                    headers=self._get_headers(),
+                    json=payload,
+                )
+                if response.status_code == 200:
+                    return response.json()
+                elif response.status_code == 401:
+                    error_data = response.json() if response.headers.get("content-type") == "application/json" else {}
+                    logger.warning(f"[AI Auth] Unauthorized: {error_data.get('message', response.text)}")
+                    return None
+                elif response.status_code == 400:
+                    logger.warning(f"[AI Auth] Bad Request: {response.text}")
+                    return None
+                else:
+                    logger.warning(f"[AI Auth] Unexpected status {response.status_code}: {response.text}")
+                    return None
+            except httpx.RequestError as exc:
+                logger.error(f"[AI Auth] Network error connecting to Smiota Server ({url}): {exc}")
+                return None
+
+
+smiota_auth_client = SmiotaAuthClient()
+
 

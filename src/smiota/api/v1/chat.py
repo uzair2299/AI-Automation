@@ -25,6 +25,7 @@ async def send_message(
     orchestrator: AgentOrchestrator = Depends(get_orchestrator),
 ):
     session_id = payload.session_id or current_user.session_id or f"sess-{uuid.uuid4().hex[:8]}"
+    user_info = current_user.to_user_info_dict()
 
     # Prevent client-supplied metadata from overriding verified identity & tenant
     sanitized_metadata = dict(payload.metadata or {})
@@ -37,6 +38,16 @@ async def send_message(
         sanitized_metadata.setdefault("user_name", current_user.name)
     if current_user.location_id:
         sanitized_metadata.setdefault("location_id", current_user.location_id)
+    parent_token = (
+        current_user.parent_token
+        or sanitized_metadata.get("parent_token")
+        or sanitized_metadata.get("token")
+        or None
+    )
+    if parent_token:
+        sanitized_metadata.setdefault("parent_token", parent_token)
+        if isinstance(user_info, dict):
+            user_info.setdefault("parent_token", parent_token)
 
     context = AgentContext(
         session_id=session_id,
@@ -44,6 +55,8 @@ async def send_message(
         tenant_id=current_user.tenant_id,
         channel=payload.channel,
         roles=current_user.roles,
+        user=user_info,
+        parent_token=parent_token,
         metadata=sanitized_metadata,
     )
 
@@ -59,6 +72,8 @@ async def send_message(
         agent_used=result.agent_name,
         requires_approval=result.requires_approval,
         suggested_actions=result.suggested_actions,
+        user=user_info,
+        metadata=result.metadata,
     )
 
 
@@ -82,6 +97,7 @@ async def get_chat_history(
             user_id=current_user.user_id,
             tenant_id=current_user.tenant_id,
             channel="webchat",
+            user=current_user.to_user_info_dict(),
             total_messages=0,
             messages=[],
         )
@@ -92,12 +108,18 @@ async def get_chat_history(
         raise AuthorizationError("Access denied: You do not have permission to access this chat session.")
 
     recent_messages = session.messages[-limit:]
+    session_user = (
+        session.user
+        or (session.metadata.get("user") if isinstance(session.metadata, dict) else None)
+        or current_user.to_user_info_dict()
+    )
     return ChatHistoryResponse(
         conversation_id=session.session_id,
         session_id=session.session_id,
         user_id=session.user_id,
         tenant_id=session.tenant_id,
         channel=session.channel,
+        user=session_user,
         total_messages=len(session.messages),
         messages=recent_messages,
     )

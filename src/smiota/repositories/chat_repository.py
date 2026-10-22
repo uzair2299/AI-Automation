@@ -50,6 +50,7 @@ class BaseChatRepository(ABC):
         metadata: dict[str, Any] | None = None,
         attachments: list[dict[str, Any]] | None = None,
         message_id: str | None = None,
+        user: dict[str, Any] | None = None,
     ) -> ChatMessage:
         """Append a message turn to the session history."""
         pass
@@ -104,14 +105,18 @@ class InMemoryChatRepository(BaseChatRepository):
                 session.updated_at = datetime.now(UTC)
                 if metadata:
                     session.metadata.update(metadata)
+                    if "user" in metadata and not session.user:
+                        session.user = metadata["user"]
                 self._sessions.move_to_end(session_id)
                 return session
 
+            user_obj = (metadata or {}).get("user")
             session = ChatSession(
                 session_id=session_id,
                 user_id=user_id,
                 tenant_id=tenant_id,
                 channel=channel,
+                user=user_obj,
                 created_at=datetime.now(UTC),
                 updated_at=datetime.now(UTC),
                 metadata=metadata or {},
@@ -138,6 +143,7 @@ class InMemoryChatRepository(BaseChatRepository):
         metadata: dict[str, Any] | None = None,
         attachments: list[dict[str, Any]] | None = None,
         message_id: str | None = None,
+        user: dict[str, Any] | None = None,
     ) -> ChatMessage:
         async with self._lock:
             self._evict_expired()
@@ -149,6 +155,7 @@ class InMemoryChatRepository(BaseChatRepository):
                     user_id="anonymous",
                     tenant_id="default",
                     channel="webchat",
+                    user=user,
                     created_at=datetime.now(UTC),
                     updated_at=datetime.now(UTC),
                     metadata={},
@@ -156,6 +163,20 @@ class InMemoryChatRepository(BaseChatRepository):
                 )
 
             session = self._sessions[session_id]
+
+            # Resolve user information object across parameters and session state
+            user_info = (
+                user
+                or (metadata.get("user") if isinstance(metadata, dict) else None)
+                or session.user
+                or (session.metadata.get("user") if isinstance(session.metadata, dict) else None)
+            )
+            if user_info and not session.user:
+                session.user = user_info
+
+            msg_metadata = dict(metadata or {})
+            if user_info:
+                msg_metadata.setdefault("user", user_info)
 
             # Normalize dynamic content dict
             if isinstance(content, str):
@@ -186,17 +207,23 @@ class InMemoryChatRepository(BaseChatRepository):
                 effective_type = "agent_card"
 
             sender_display = sender_name or agent_name or ("Assistant" if role == "assistant" else "User")
+            sender_dict: dict[str, Any] = {
+                "role": role,
+                "name": sender_display,
+                "id": agent_name if role == "assistant" else None,
+            }
+            if user_info and role == "user":
+                sender_dict["user"] = user_info
+                sender_dict["user_info"] = user_info
+
             msg = ChatMessage(
                 message_id=message_id or f"msg_{uuid.uuid4().hex[:12]}",
                 conversation_id=session_id,
                 type=effective_type,
-                sender={
-                    "role": role,
-                    "name": sender_display,
-                    "id": agent_name if role == "assistant" else None,
-                },
+                sender=sender_dict,
+                user=user_info,
                 content=content_dict,
-                metadata=metadata or {},
+                metadata=msg_metadata,
                 created_at=datetime.now(UTC),
                 # Legacy fields for backward compatibility
                 id=message_id or f"msg_{uuid.uuid4().hex[:12]}",

@@ -13,6 +13,8 @@ class MessageSender(BaseModel):
     role: Literal["user", "assistant", "system"] = Field("user", description="Actor classification")
     name: str = Field("User", description="Display name of user, agent, or service")
     id: str | None = Field(None, description="Unique identifier (e.g. resident ID or agent key)")
+    user: dict[str, Any] | None = Field(default=None, description="User necessary information object")
+    user_info: dict[str, Any] | None = Field(default=None, description="Detailed user information object")
 
 
 class UserMessageContent(BaseModel):
@@ -61,6 +63,7 @@ class ChatMessage(BaseModel):
     sender: MessageSender = Field(default_factory=lambda: MessageSender(role="user", name="User"))
     content: dict[str, Any] = Field(default_factory=dict, description="Dynamic payload based on type")
     metadata: dict[str, Any] = Field(default_factory=dict, description="Turn-level metadata")
+    user: dict[str, Any] | None = Field(default=None, description="User necessary information object")
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC), description="UTC creation timestamp")
 
     # Backward-compatible fields
@@ -87,7 +90,16 @@ class ChatMessage(BaseModel):
             data["conversation_id"] = conv_id
             data["session_id"] = conv_id
 
-            # 3. sender and role
+            # 3. user info extraction
+            user_info = data.get("user") or data.get("user_info")
+            if not user_info and isinstance(data.get("metadata"), dict):
+                user_info = data["metadata"].get("user") or data["metadata"].get("user_info")
+            if not user_info and isinstance(data.get("sender"), dict):
+                user_info = data["sender"].get("user") or data["sender"].get("user_info")
+            if user_info:
+                data["user"] = user_info
+
+            # 4. sender and role
             sender_data = data.get("sender")
             if isinstance(sender_data, dict):
                 role = sender_data.get("role", "user")
@@ -97,14 +109,20 @@ class ChatMessage(BaseModel):
                 role = data.get("role") or "user"
                 name = data.get("sender_name") or data.get("agent_name") or ("Assistant" if role == "assistant" else "User")
                 sender_id = data.get("agent_name")
-            data["sender"] = {"role": role, "name": name, "id": sender_id}
+            data["sender"] = {
+                "role": role,
+                "name": name,
+                "id": sender_id,
+                "user": user_info,
+                "user_info": user_info,
+            }
 
             data["role"] = role
             data["sender_name"] = name
             if role == "assistant" and not data.get("agent_name"):
                 data["agent_name"] = name
 
-            # 4. type / message_type
+            # 5. type / message_type
             raw_msg_type = data.get("message_type")
             raw_type = data.get("type") or raw_msg_type or ("user_message" if role == "user" else "agent_message")
             if raw_type == "text":
@@ -162,6 +180,7 @@ class ChatSession(BaseModel):
     user_id: str = Field(..., description="Verified primary user identifier")
     tenant_id: str = Field(..., description="Tenant identifier for strict data isolation")
     channel: str = Field("webchat", description="Communication channel (e.g., 'webchat', 'teams', 'slack')")
+    user: dict[str, Any] | None = Field(default=None, description="User necessary information object")
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC), description="Session creation timestamp"
     )
@@ -183,6 +202,8 @@ class ChatSession(BaseModel):
             if sid:
                 data["session_id"] = sid
                 data["conversation_id"] = sid
+            if not data.get("user") and isinstance(data.get("metadata"), dict):
+                data["user"] = data["metadata"].get("user")
         return data
 
 
@@ -193,6 +214,7 @@ class ChatHistoryResponse(BaseModel):
     user_id: str
     tenant_id: str
     channel: str
+    user: dict[str, Any] | None = Field(default=None, description="User necessary information object")
     total_messages: int
     messages: list[ChatMessage]
 
@@ -204,4 +226,7 @@ class ChatHistoryResponse(BaseModel):
             if sid:
                 data["session_id"] = sid
                 data["conversation_id"] = sid
+            if not data.get("user") and isinstance(data.get("metadata"), dict):
+                data["user"] = data["metadata"].get("user")
         return data
+

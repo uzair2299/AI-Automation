@@ -55,13 +55,14 @@ class BaseAppSettings(BaseSettings):
     JWT_ISSUER: str = "smiota-ai"
     JWT_AUDIENCE: str = "smiota-chat"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+    # Legacy default session token (fallback for offline tests only; live requests use dynamic token from parent app)
     SAVED_SESSION_TOKEN: str = "350ab6f7-7dfb-468c-a68a-f7b150b489f3"
     SMIOTA_SERVER_BASE_URL: str = "https://dev.smiotaapps.com/smiota"
     SMIOTA_BACKEND_URL: str = "https://dev.smiotaapps.com/smiota"
     SMIOTA_INTERNAL_EXCHANGE_ENDPOINT: str = "/internal/ai/auth/exchange"
-    SMIOTA_SERVICE_TOKEN: str = "smiota-internal-service-secret-token"
+    SMIOTA_SERVICE_TOKEN: str = "smsec_fc7308bef9f566733226ff8db7601fe7dc138e6f12831b9978bb307973604f3e"
     SMIOTA_BACKEND_TIMEOUT_SECONDS: float = 10.0
-    SMIOTA_AUTH_DUMMY_MODE: bool = True
+    SMIOTA_AUTH_DUMMY_MODE: bool = False
 
     # Chat Session Persistence & Storage Provider
     CHAT_STORAGE_BACKEND: str = "memory"  # Options: 'memory', 'redis', 'postgres'
@@ -148,3 +149,8 @@ def get_settings() -> BaseAppSettings:
         return TestSettings()
     else:
         return DevelopmentSettings()
+
+
+# Export default global settings instance
+settings = get_settings()
+

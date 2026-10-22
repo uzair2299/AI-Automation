@@ -535,7 +535,7 @@ async def test_code_exchange_session_reattachment_and_expired_replacement():
     await repo.clear_all()
 
     # Pre-populate an active session for Alex Morgan (10790 / 89)
-    existing_session = await repo.get_or_create_session(
+    await repo.get_or_create_session(
         session_id="sess-active-alex-1",
         user_id="10790",
         tenant_id="89",
@@ -575,5 +575,116 @@ async def test_code_exchange_session_reattachment_and_expired_replacement():
         new_sid = res3.json()["session_id"]
         assert new_sid.startswith("sess-")
         assert new_sid != "sess-expired-9999"
+
+
+def test_complete_user_information_in_token_and_chat_payloads():
+    """Verify complete user information is stored in token claims and exposed in chat message & conversation history payloads."""
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
+        mock_post.return_value = httpx.Response(
+            status_code=200,
+            json=SMIOTA_MAIN_REAL_PAYLOAD,
+            request=httpx.Request("POST", "https://dev.smiotaapps.com/smiota/internal/ai/auth/exchange"),
+        )
+        auth_res = client.post("/api/v1/auth/exchange", json={"code": "user-info-full-test-code"})
+
+    assert auth_res.status_code == 200
+    auth_data = auth_res.json()
+    token = auth_data["access_token"]
+    session_id = auth_data["session_id"]
+
+    # 1. Verify complete information is stored in JWT token
+    claims = verify_session_token(token)
+    assert "user" in claims
+    token_user = claims["user"]
+    assert token_user["user_id"] == "10790"
+    assert token_user["name"] == "Alex Morgan"
+    assert token_user["first_name"] == "Alex"
+    assert token_user["last_name"] == "Morgan"
+    assert token_user["phone"] == "+14155551234"
+    assert token_user["email"] == "alex.morgan@acme.com"
+    assert token_user["tenant_id"] == "89"
+    assert token_user["tenant_name"] == "Acme Technologies Inc."
+    assert token_user["location_id"] == "108"
+    assert token_user["location_name"] == "Pleasanton HQ"
+    assert token_user["building_id"] == "15"
+    assert token_user["building_name"] == "North Tower"
+    assert token_user["unit_no"] == "Suite 400"
+    assert token_user["passcode"] == "842910"
+    assert token_user["roles"] == ["recipient"]
+
+    # 2. Verify chat message payload includes user necessary information object
+    headers = {"Authorization": f"Bearer {token}"}
+    chat_res = client.post(
+        "/api/v1/chat",
+        headers=headers,
+        json={"message": "Where is my parcel?"},
+    )
+    assert chat_res.status_code == 200
+    chat_data = chat_res.json()
+    assert "user" in chat_data
+    chat_user = chat_data["user"]
+    assert chat_user["user_id"] == "10790"
+    assert chat_user["name"] == "Alex Morgan"
+    assert chat_user["building_name"] == "North Tower"
+    assert chat_user["unit_no"] == "Suite 400"
+
+    # 3. Verify conversation history payload contains user necessary information object
+    history_res = client.get(f"/api/v1/chat/history/{session_id}", headers=headers)
+    assert history_res.status_code == 200
+    hist_data = history_res.json()
+    assert "user" in hist_data
+    assert hist_data["user"]["user_id"] == "10790"
+    assert hist_data["user"]["name"] == "Alex Morgan"
+    assert hist_data["total_messages"] >= 2
+    # Check that message turns have user object attached
+    user_msg = hist_data["messages"][0]
+    assert user_msg["user"] is not None
+    assert user_msg["user"]["user_id"] == "10790"
+    assert user_msg["user"].get("parent_token") == "user-info-full-test-code"
+
+
+@pytest.mark.asyncio
+async def test_customer_agent_uses_parent_app_token_for_api_calls():
+    """Verify CustomerAgent passes the parent app token rather than static SAVED_SESSION_TOKEN."""
+    from smiota.agents.base import AgentContext
+    from smiota.agents.implementations.customer.agent import CustomerAgent
+    from smiota.services.package_service import package_service
+
+    parent_app_token = "parent-app-token-998877"
+    context = AgentContext(
+        session_id="sess-test-token-usage",
+        user_id="10790",
+        tenant_id="89",
+        channel="webchat",
+        parent_token=parent_app_token,
+        user={"parent_token": parent_app_token, "name": "Alex Morgan"},
+        metadata={"parent_token": parent_app_token},
+    )
+
+    agent = CustomerAgent()
+    with patch.object(package_service, "get_packages", new_callable=AsyncMock) as mock_get_packages:
+        mock_get_packages.return_value = {
+            "success": True,
+            "packages": [
+                {
+                    "packageId": "PKG-5544",
+                    "trackingNumber": "SM-982144",
+                    "recipientName": "Alex Morgan",
+                    "status": "In Locker",
+                    "compartment": "B-12",
+                }
+            ],
+            "totalRecords": 1,
+        }
+
+        result = await agent.process("Track package SM-982144", context)
+        assert result.agent_name == "Customer"
+        # Assert that package_service.get_packages was called with token=parent_app_token
+        mock_get_packages.assert_awaited_once()
+        _, kwargs = mock_get_packages.call_args
+        assert kwargs.get("token") == parent_app_token
+        assert kwargs.get("token") != "350ab6f7-7dfb-468c-a68a-f7b150b489f3"
+
+
 
 

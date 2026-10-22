@@ -284,13 +284,18 @@ class CustomerAgent(BaseAgent):
                 except Exception as sql_err:
                     logger.debug(f"Optional Text-to-SQL audit log skipped: {sql_err}")
 
-                # Query Smiota Server endpoint:
-                # - If standard RFC-4122 UUID: GET /api/v1/packages•uuid=...
-                # - If Tracking Number / Name: GET /api/v1/packages•byNameOrNumber=...
+                # Query Smiota Server endpoint using verified parent app token:
+                parent_token = (
+                    getattr(context, "parent_token", None)
+                    or (context.user.get("parent_token") if isinstance(context.user, dict) else None)
+                    or (context.metadata.get("parent_token") if isinstance(context.metadata, dict) else None)
+                    or (context.metadata.get("token") if isinstance(context.metadata, dict) else None)
+                    or None
+                )
                 if is_uuid:
-                    api_result = await package_service.get_packages(uuid=pkg_id)
+                    api_result = await package_service.get_packages(uuid=pkg_id, token=parent_token)
                 else:
-                    api_result = await package_service.get_packages(by_name_or_number=pkg_id)
+                    api_result = await package_service.get_packages(by_name_or_number=pkg_id, token=parent_token)
 
                 if not api_result.get("success"):
                     return AgentResult(
@@ -367,8 +372,15 @@ class CustomerAgent(BaseAgent):
                 except Exception as sql_err:
                     logger.debug(f"Optional Text-to-SQL audit log skipped: {sql_err}")
 
-                # Query Smiota Server endpoint: GET /api/v1/packages•byNameOrNumber=...
-                api_result = await package_service.get_packages(by_name_or_number=identifier)
+                # Query Smiota Server endpoint: GET /api/v1/packages?byNameOrNumber=... using parent token
+                parent_token = (
+                    getattr(context, "parent_token", None)
+                    or (context.user.get("parent_token") if isinstance(context.user, dict) else None)
+                    or (context.metadata.get("parent_token") if isinstance(context.metadata, dict) else None)
+                    or (context.metadata.get("token") if isinstance(context.metadata, dict) else None)
+                    or None
+                )
+                api_result = await package_service.get_packages(by_name_or_number=identifier, token=parent_token)
                 if not api_result.get("success"):
                     return AgentResult(
                         agent_name=self.name,

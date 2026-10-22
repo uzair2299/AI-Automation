@@ -15,6 +15,9 @@ class AgentContext(BaseModel):
     roles: list[str] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
     conversation_history: list[dict[str, str]] = Field(default_factory=list)
+    user: dict[str, Any] = Field(default_factory=dict)
+    parent_token: Optional[str] = Field(default=None, description="Session token from parent application")
+
 
 
 class AgentResult(BaseModel):

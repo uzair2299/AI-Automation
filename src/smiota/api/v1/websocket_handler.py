@@ -70,11 +70,38 @@ class WebSocketChatHandler:
         if existing_session and existing_session.user_id != "anonymous" and req_resident_id == "ws-resident":
             req_resident_id = existing_session.user_id
 
+        user_info: dict[str, Any] = {}
+        merged_metadata = dict(existing_session.metadata or {}) if existing_session else {}
+        if existing_session and existing_session.user:
+            user_info = dict(existing_session.user)
+        elif merged_metadata.get("user"):
+            user_info = dict(merged_metadata["user"])
+
+        # Client metadata can provide auxiliary context
+        merged_metadata.update(client_metadata)
+        if user_info:
+            merged_metadata.setdefault("user", user_info)
+
+        parent_token = (
+            (existing_session.metadata.get("parent_token") if existing_session and existing_session.metadata else None)
+            or (user_info.get("parent_token") if isinstance(user_info, dict) else None)
+            or client_metadata.get("parent_token")
+            or client_metadata.get("token")
+            or None
+        )
+        if parent_token:
+            merged_metadata.setdefault("parent_token", parent_token)
+            if isinstance(user_info, dict):
+                user_info.setdefault("parent_token", parent_token)
+
         context = AgentContext(
             session_id=self.session_id,
             user_id=req_resident_id,
             tenant_id=tenant_id,
             channel="webchat",
+            user=user_info,
+            parent_token=parent_token,
+            metadata=merged_metadata,
         )
 
         try:
@@ -148,7 +175,14 @@ class WebSocketChatHandler:
             content_payload["card_data"] = card_data
             content_payload["card_type"] = card_data.get("card_type", "package_pickup")
 
-        await self.ws.send_json({
+        user_info = result.metadata.get("user") or {}
+        completion_metadata: dict[str, Any] = {
+            "requires_approval": result.requires_approval,
+        }
+        if user_info:
+            completion_metadata["user"] = user_info
+
+        completion_payload: dict[str, Any] = {
             "message_id": resp_msg_id,
             "conversation_id": self.session_id,
             "type": "done",
@@ -159,11 +193,13 @@ class WebSocketChatHandler:
                 "id": f"agent-{agent_display.lower()}",
             },
             "content": content_payload,
-            "metadata": {
-                "requires_approval": result.requires_approval,
-            },
+            "metadata": completion_metadata,
             "created_at": datetime.now(UTC).isoformat(),
-        })
+        }
+        if user_info:
+            completion_payload["user"] = user_info
+
+        await self.ws.send_json(completion_payload)
 
     async def _send_error_fallback(self) -> None:
         """Send a graceful fallback error envelope when agent execution fails."""

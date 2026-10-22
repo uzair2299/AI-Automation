@@ -46,27 +46,43 @@ class AgentOrchestrator:
         )
 
         # 1. Ensure session is tracked in the repository
+        user_info = context.user or (context.metadata.get("user") if isinstance(context.metadata, dict) else None) or {}
+        parent_token = getattr(context, "parent_token", None) or user_info.get("parent_token") or context.metadata.get("parent_token")
+        session_metadata = dict(context.metadata)
+        if user_info:
+            session_metadata.setdefault("user", user_info)
+        if parent_token:
+            session_metadata.setdefault("parent_token", parent_token)
+
         repo = get_chat_repository()
         await repo.get_or_create_session(
             session_id=context.session_id,
             user_id=context.user_id,
             tenant_id=context.tenant_id,
             channel=context.channel,
-            metadata=context.metadata,
+            metadata=session_metadata,
         )
 
         # 2. Record incoming user turn in chat repository
         user_display_name = (
             context.metadata.get("user_name")
             or context.metadata.get("recipient_name")
+            or (user_info.get("name") if isinstance(user_info, dict) else None)
             or None
         )
+        user_turn_metadata = dict(context.metadata)
+        if user_info:
+            user_turn_metadata.setdefault("user", user_info)
+        if parent_token:
+            user_turn_metadata.setdefault("parent_token", parent_token)
+
         await repo.append_message(
             session_id=context.session_id,
             role="user",
             content=query,
             sender_name=user_display_name,
             message_type="text",
+            metadata=user_turn_metadata,
         )
 
         # 3. Populate context.conversation_history with recent turns
@@ -112,6 +128,11 @@ class AgentOrchestrator:
             card_data = result.metadata["card_payload"]
 
         # 6. Record assistant response in chat repository
+        assistant_metadata = dict(result.metadata)
+        if user_info:
+            assistant_metadata.setdefault("user", user_info)
+            result.metadata.setdefault("user", user_info)
+
         await repo.append_message(
             session_id=context.session_id,
             role="assistant",
@@ -121,7 +142,7 @@ class AgentOrchestrator:
             message_type=msg_type,
             card_payload=card_data,
             suggested_actions=result.suggested_actions,
-            metadata=result.metadata,
+            metadata=assistant_metadata,
         )
 
         # Record assistant response in legacy conversation memory

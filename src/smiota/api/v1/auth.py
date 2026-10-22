@@ -50,7 +50,26 @@ async def exchange_bootstrap_code(
         if existing_sessions:
             active_session_id = existing_sessions[0].session_id
 
-    # 3. Establish signed JWT session for the chatbot (retaining existing session_id if active)
+    parent_tok = identity.parent_token or getattr(payload, "token", None) or payload.code or ""
+    user_info_dict = {
+        "user_id": identity.user_id,
+        "tenant_id": identity.tenant_id,
+        "name": identity.name or "",
+        "first_name": identity.first_name or "",
+        "last_name": identity.last_name or "",
+        "email": identity.email or "",
+        "phone": identity.phone or "",
+        "tenant_name": identity.tenant_name or "",
+        "location_id": identity.location_id or "",
+        "location_name": identity.location_name or "",
+        "building_id": identity.building_id or "",
+        "building_name": identity.building_name or "",
+        "unit_no": identity.unit_no or "",
+        "roles": identity.roles,
+        "parent_token": parent_tok,
+    }
+
+    # 3. Establish signed JWT session for the chatbot storing complete user information
     token, session_id, expires_in = create_session_token(
         user_id=identity.user_id,
         tenant_id=identity.tenant_id,
@@ -59,6 +78,36 @@ async def exchange_bootstrap_code(
         name=identity.name,
         location_id=identity.location_id,
         session_id=active_session_id,
+        first_name=identity.first_name,
+        last_name=identity.last_name,
+        phone=identity.phone,
+        tenant_name=identity.tenant_name,
+        location_name=identity.location_name,
+        building_id=identity.building_id,
+        building_name=identity.building_name,
+        unit_no=identity.unit_no,
+        parent_token=parent_tok,
+        user_profile=identity.raw_profile,
+    )
+
+    # 4. Attach complete user necessary info to chat session
+    await chat_repo.get_or_create_session(
+        session_id=session_id,
+        user_id=identity.user_id,
+        tenant_id=identity.tenant_id,
+        channel="webchat",
+        metadata={
+            "user": user_info_dict,
+            "user_id": identity.user_id,
+            "tenant_id": identity.tenant_id,
+            "user_name": identity.name,
+            "email": identity.email,
+            "phone": identity.phone,
+            "unit_no": identity.unit_no,
+            "building_id": identity.building_id,
+            "location_id": identity.location_id,
+            "parent_token": parent_tok,
+        },
     )
 
     logger.info(

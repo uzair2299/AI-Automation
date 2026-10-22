@@ -30,14 +30,16 @@ class SmiotaPackageService:
             self.settings, "SAVED_SESSION_TOKEN", "350ab6f7-7dfb-468c-a68a-f7b150b489f3"
         )
 
-    def _log_api_call(self, url: str, params: dict, status: str, details: str) -> None:
+    def _log_api_call(self, url: str, params: dict, status: str, details: str, auth_token: Optional[str] = None) -> None:
         """Log API request details to logs/text_to_sql.log and logs/smiota.log."""
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        tok = auth_token or self.default_token or ""
+        masked = f"{tok[:8]}...{tok[-6:]}" if len(tok) >= 14 else (f"{tok[:4]}***" if tok else "none")
         log_entry = (
             f"\n[{timestamp}] --- [SMIOTA SERVER API CALL] ---\n"
             f"ENDPOINT   : GET {url}\n"
             f"PARAMS     : {params}\n"
-            f"AUTH TOKEN : Bearer {self.default_token[:8]}...{self.default_token[-6:]}\n"
+            f"AUTH TOKEN : Bearer {masked}\n"
             f"STATUS     : {status}\n"
             f"DETAILS    : {details}\n"
             f"------------------------------------------------------------------------\n"
@@ -120,19 +122,20 @@ class SmiotaPackageService:
                         params,
                         f"HTTP 200 OK ({len(packages)} package(s) returned, totalRecords={total_records})",
                         f"Result: {packages}",
+                        auth_token=auth_token,
                     )
                     return {"success": True, "packages": packages, "totalRecords": total_records}
                 elif response.status_code == 401:
                     err_msg = "Smiota server authentication failed (HTTP 401 Unauthorized). The session token is expired or invalid."
-                    self._log_api_call(url, params, "HTTP 401 UNAUTHORIZED", f"Response: {response.text[:200]}")
+                    self._log_api_call(url, params, "HTTP 401 UNAUTHORIZED", f"Response: {response.text[:200]}", auth_token=auth_token)
                     return {"success": False, "error_type": "AUTH_ERROR", "message": err_msg}
                 else:
                     err_msg = f"Smiota server returned HTTP {response.status_code}."
-                    self._log_api_call(url, params, f"HTTP {response.status_code}", f"Response: {response.text[:200]}")
+                    self._log_api_call(url, params, f"HTTP {response.status_code}", f"Response: {response.text[:200]}", auth_token=auth_token)
                     return {"success": False, "error_type": f"HTTP_{response.status_code}", "message": err_msg}
         except Exception as e:
             err_msg = f"Unable to reach Smiota server at {self.base_url} ({e})."
-            self._log_api_call(url, params, "CONNECTION_ERROR", err_msg)
+            self._log_api_call(url, params, "CONNECTION_ERROR", err_msg, auth_token=auth_token)
             return {"success": False, "error_type": "CONNECTION_ERROR", "message": err_msg}
 
 

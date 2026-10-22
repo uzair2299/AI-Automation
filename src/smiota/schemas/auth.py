@@ -1,22 +1,52 @@
 """Schemas for Spring Boot code exchange and chatbot session establishment."""
 
-from typing import Any
+from typing import Any, List, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, model_validator
+
+
+class UserProfileDTO(BaseModel):
+    """Verified user profile returned by Smiota Java server /internal/ai/auth/exchange."""
+    valid: bool = True
+    id: Optional[int] = None
+    uuid: Optional[str] = None
+    firstName: Optional[str] = None
+    lastName: Optional[str] = None
+    recipientName: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    customerId: Optional[int] = None
+    tenantId: Optional[int] = None
+    tenantName: Optional[str] = None
+    locationId: Optional[int] = None
+    locationName: Optional[str] = None
+    buildingId: Optional[int] = None
+    buildingName: Optional[str] = None
+    unitNo: Optional[str] = None
+    roles: List[str] = []
 
 
 class AuthExchangeRequest(BaseModel):
-    """Payload to exchange a single-use bootstrap code for an authenticated chatbot session."""
-    code: str = Field(..., min_length=1, description="One-time bootstrap code issued by Spring Boot backend")
+    """Payload to exchange a single-use bootstrap code or parent app session token for an authenticated chatbot session."""
+    code: str = Field(..., min_length=1, description="One-time bootstrap code or session token issued by parent app / Spring Boot backend")
+    token: str | None = Field(None, description="Session token issued by parent app (alias for code)")
     session_id: str | None = Field(None, description="Optional active session ID to resume conversation continuity")
 
-    @field_validator("code")
+    @model_validator(mode="before")
     @classmethod
-    def validate_code_not_blank(cls, v: str) -> str:
-        trimmed = v.strip()
-        if not trimmed:
-            raise ValueError("Bootstrap code cannot be empty or whitespace.")
-        return trimmed
+    def resolve_code_or_token(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            # If code is missing or None, try token
+            if ("code" not in data or data["code"] is None) and "token" in data and data["token"] is not None:
+                data["code"] = data["token"]
+            raw_code = data.get("code")
+            if raw_code is not None:
+                trimmed = str(raw_code).strip()
+                if not trimmed:
+                    raise ValueError("Bootstrap code cannot be empty or whitespace.")
+                data["code"] = trimmed
+                data.setdefault("token", trimmed)
+        return data
 
 
 class UserIdentityInfo(BaseModel):
@@ -36,6 +66,7 @@ class UserIdentityInfo(BaseModel):
     tenant_name: str | None = Field(None, description="Tenant company name")
     unit_no: str | None = Field(None, description="Unit or suite number")
     passcode: str | None = Field(None, description="Resident pickup or access passcode")
+    parent_token: str | None = Field(None, description="Session token from parent application")
     raw_profile: dict[str, Any] | None = Field(default=None, description="Raw profile payload from Smiota Main Core")
 
 

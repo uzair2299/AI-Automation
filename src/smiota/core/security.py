@@ -14,10 +14,40 @@ class AuthenticatedUser(BaseModel):
     user_id: str
     email: str = ""
     name: str = ""
+    first_name: str = ""
+    last_name: str = ""
+    phone: str = ""
     roles: list[str] = ["user"]
     tenant_id: str = "default"
+    tenant_name: str = ""
     location_id: str = ""
+    location_name: str = ""
+    building_id: str = ""
+    building_name: str = ""
+    unit_no: str = ""
+    parent_token: str | None = None
     session_id: str | None = None
+    user_profile: dict[str, Any] = {}
+
+    def to_user_info_dict(self) -> dict[str, Any]:
+        """Return standardized necessary user information object."""
+        return {
+            "user_id": self.user_id,
+            "tenant_id": self.tenant_id,
+            "name": self.name,
+            "first_name": self.first_name,
+            "last_name": self.last_name,
+            "email": self.email,
+            "phone": self.phone,
+            "tenant_name": self.tenant_name,
+            "location_id": self.location_id,
+            "location_name": self.location_name,
+            "building_id": self.building_id,
+            "building_name": self.building_name,
+            "unit_no": self.unit_no,
+            "roles": self.roles,
+            "parent_token": self.parent_token,
+        }
 
 
 def create_session_token(
@@ -28,8 +58,18 @@ def create_session_token(
     session_id: str | None = None,
     name: str | None = None,
     location_id: str | None = None,
+    first_name: str | None = None,
+    last_name: str | None = None,
+    phone: str | None = None,
+    tenant_name: str | None = None,
+    location_name: str | None = None,
+    building_id: str | None = None,
+    building_name: str | None = None,
+    unit_no: str | None = None,
+    parent_token: str | None = None,
+    user_profile: dict[str, Any] | None = None,
 ) -> tuple[str, str, int]:
-    """Issue a tamper-proof signed JWT session token for an authenticated chatbot session.
+    """Issue a tamper-proof signed JWT session token storing complete user information.
 
     Returns:
         tuple[str, str, int]: (jwt_token, session_id, expires_in_seconds)
@@ -41,6 +81,30 @@ def create_session_token(
     exp = now + expires_delta
     expires_in_seconds = int(expires_delta.total_seconds())
 
+    display_name = name or f"{first_name or ''} {last_name or ''}".strip() or None
+
+    user_info = {
+        "user_id": user_id,
+        "tenant_id": tenant_id,
+        "name": display_name or "",
+        "first_name": first_name or "",
+        "last_name": last_name or "",
+        "email": email or "",
+        "phone": phone or "",
+        "tenant_name": tenant_name or "",
+        "location_id": location_id or "",
+        "location_name": location_name or "",
+        "building_id": building_id or "",
+        "building_name": building_name or "",
+        "unit_no": unit_no or "",
+        "roles": roles,
+        "parent_token": parent_token or "",
+    }
+    if user_profile:
+        for k, v in user_profile.items():
+            if k not in user_info and v is not None:
+                user_info[k] = v
+
     payload = {
         "iss": settings.JWT_ISSUER,
         "aud": settings.JWT_AUDIENCE,
@@ -48,9 +112,19 @@ def create_session_token(
         "tenant_id": tenant_id,
         "roles": roles,
         "email": email or "",
-        "name": name or "",
+        "name": display_name or "",
+        "first_name": first_name or "",
+        "last_name": last_name or "",
+        "phone": phone or "",
+        "tenant_name": tenant_name or "",
         "location_id": location_id or "",
+        "location_name": location_name or "",
+        "building_id": building_id or "",
+        "building_name": building_name or "",
+        "unit_no": unit_no or "",
+        "parent_token": parent_token or "",
         "session_id": active_session_id,
+        "user": user_info,  # Complete user information object stored in token!
         "iat": int(now.timestamp()),
         "exp": int(exp.timestamp()),
         "jti": uuid.uuid4().hex,
