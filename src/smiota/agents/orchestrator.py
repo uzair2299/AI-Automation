@@ -3,6 +3,7 @@ from typing import Optional
 from smiota.agents.base import AgentContext, AgentResult
 from smiota.agents.memory import ConversationMemory
 from smiota.agents.registry import AgentRegistry
+from smiota.agents.routing import BaseIntentRouter, get_intent_router
 from smiota.core.logging import logger
 from smiota.repositories.chat_repository import get_chat_repository
 from smiota.schemas.chat_session import MessageType
@@ -11,8 +12,8 @@ from smiota.schemas.chat_session import MessageType
 class AgentOrchestrator:
     """Orchestrates incoming requests across specialized agents using intent classification."""
 
-    def __init__(self):
-        pass
+    def __init__(self, router: Optional[BaseIntentRouter] = None):
+        self.router = router or get_intent_router()
 
     async def route_and_execute(
         self,
@@ -21,8 +22,28 @@ class AgentOrchestrator:
         preferred_agent: Optional[str] = None,
     ) -> AgentResult:
         """Determines the most appropriate agent or executes the requested agent directly."""
-        selected_agent_name = preferred_agent or self._classify_intent(query, context.channel)
-        logger.info(f"Routing query to agent: [{selected_agent_name}] (Session: {context.session_id})")
+        if preferred_agent:
+            selected_agent_name = preferred_agent
+            routing_metadata = {
+                "routing_method": "preferred_override",
+                "confidence": 1.0,
+                "matched_intent": "manual_override",
+            }
+        else:
+            decision = await self.router.classify(query, context)
+            selected_agent_name = decision.agent_name
+            routing_metadata = {
+                "routing_method": decision.routing_method,
+                "confidence": decision.confidence,
+                "matched_intent": decision.matched_intent,
+                "reasoning": decision.reasoning,
+            }
+
+        logger.info(
+            f"Routing query to agent: [{selected_agent_name}] "
+            f"(Confidence: {routing_metadata.get('confidence', 1.0):.2f}, "
+            f"Method: {routing_metadata.get('routing_method')}, Session: {context.session_id})"
+        )
 
         # 1. Ensure session is tracked in the repository
         repo = get_chat_repository()
@@ -109,36 +130,19 @@ class AgentOrchestrator:
         except Exception:
             pass
 
+        # Attach routing metadata to result
+        result.metadata.setdefault("routing", routing_metadata)
+
         return result
 
     def _classify_intent(self, query: str, channel: Optional[str] = None) -> str:
-        """Classifies intent using keywords or Gemini function calling router.
+        """Synchronous intent classification helper preserving backward compatibility."""
+        from smiota.agents.routing.rules import RuleBasedRouter
 
-        In production, this queries Gemini / Vertex AI with tool/agent definitions.
-        """
-        q = query.lower()
-        # For customer webchat channel, prioritize Customer & Smart Locker intents
-        if channel == "webchat":
-            if any(w in q for w in ["security", "cve", "vulnerability", "iam"]):
-                return "security"
-            if any(w in q for w in ["cpu", "memory", "oom", "restart", "metric", "prometheus", "opensearch", "grafana", "gke", "pod", "incident", "rca", "crash"]):
-                return "aiops"
-            return "customer"
+        rule_router = RuleBasedRouter()
+        ch = (channel or "webchat").lower()
+        if ch == "webchat":
+            return rule_router._classify_webchat(query.lower()).agent_name
+        return rule_router._classify_internal(query.lower()).agent_name
 
-        # 1. Security & Compliance
-        if any(w in q for w in ["security", "cve", "vulnerability", "iam", "wazuh", "threat", "siem", "service account", "revoke", "quarantine", "credential"]):
-            return "security"
-        # 2. QA & Automated Testing
-        if any(w in q for w in ["playwright", "selenium", "flaky", "regression", "test"]):
-            return "qa"
-        # 3. Customer & Smart Locker
-        if any(w in q for w in ["locker", "customer", "ticket", "package", "door", "pickup", "dropoff", "parcel", "compartment", "track", "tracking", "sm-", "pkg-"]):
-            return "customer"
-        # 4. SRE & AIOps (Incident, restart, metrics, OOM, logs)
-        if any(w in q for w in ["cpu", "memory", "oom", "restart", "metric", "prometheus", "opensearch", "grafana", "gke", "pod", "incident", "rca", "crash"]):
-            return "aiops"
-        # 5. Developer & DevOps (PRs, code, terraform, pipelines)
-        if any(w in q for w in ["pr", "pull request", "terraform", "code", "github", "promql", "ci/cd", "pipeline", "diff"]):
-            return "developer"
-        return "aiops"
 
