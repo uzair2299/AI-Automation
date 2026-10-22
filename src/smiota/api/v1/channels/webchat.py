@@ -136,7 +136,7 @@ async def webchat_config():
         "welcome_message": getattr(
             settings,
             "WEBCHAT_WELCOME_MESSAGE",
-            "Hi there! How can I help you today?",
+            "Hi there! Welcome to Smiota. How can I help you today?",
         ),
         "features": {
             "streaming": True,
@@ -167,7 +167,7 @@ async def embed_widget(
     active_msg = welcome_msg or getattr(
         settings,
         "WEBCHAT_WELCOME_MESSAGE",
-        "Hi there! I can help you track your package deliveries, get your pickup PIN, or locate your smart locker compartment. How can I help you today?",
+        "Hi there! Welcome to Smiota. How can I help you today?",
     )
     active_subtitle = subtitle or getattr(settings, "WEBCHAT_SUBTITLE", "Smart Locker & Parcel Concierge")
     active_name = assistant_name or getattr(settings, "WEBCHAT_ASSISTANT_NAME", "Smiota Assistant")

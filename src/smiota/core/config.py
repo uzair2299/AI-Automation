@@ -45,9 +45,7 @@ class BaseAppSettings(BaseSettings):
     WEBCHAT_ASSISTANT_NAME: str = "Smiota Assistant"
     WEBCHAT_SUBTITLE: str = "Smart Locker & Parcel Concierge"
     WEBCHAT_WELCOME_TITLE: str = "Welcome to Smiota!"
-    WEBCHAT_WELCOME_MESSAGE: str = (
-        "Hi there! I can help you track packages, get your pickup PIN, or assist with your smart locker. How can I help you today?"
-    )
+    WEBCHAT_WELCOME_MESSAGE: str = "Hi there! Welcome to Smiota. How can I help you today?"
 
     # Security & Auth
     JWT_SECRET_KEY: str = "smiota-dev-secret-key-change-in-prod"
