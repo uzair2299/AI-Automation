@@ -707,7 +707,8 @@ async def test_customer_agent_blocks_package_lookup_for_unauthenticated_public_u
     with patch.object(package_service, "get_packages", new_callable=AsyncMock) as mock_get_packages:
         result = await agent.process("Where is my package with tracking number d012a7eb840e?", context)
         assert result.agent_name == "Customer"
-        assert "Login Required" in result.content
+        assert "You’re using Smiota Support as a guest" in result.content
+        assert "Log in to your account" in result.suggested_actions
         # Ensure external service was never invoked for unauthenticated user
         mock_get_packages.assert_not_called()
 

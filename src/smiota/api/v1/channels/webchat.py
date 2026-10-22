@@ -553,9 +553,17 @@ async def embed_widget(
             quickRepliesContainer.style.display = 'grid';
             actions.slice(0, 4).forEach(act => {
                 const btn = document.createElement('button');
-                btn.className = "text-xs text-indigo-600 border border-indigo-200 hover:bg-indigo-50 font-medium py-2 px-3 rounded-full transition text-center shadow-xs truncate";
-                btn.innerText = act;
-                btn.onclick = () => sendQuickReply(act);
+                const isLogin = act.toLowerCase().includes('log in') || act.toLowerCase().includes('login');
+                btn.className = isLogin
+                    ? "text-xs text-white bg-indigo-600 hover:bg-indigo-700 font-semibold py-2 px-3 rounded-full transition text-center shadow-xs truncate"
+                    : "text-xs text-indigo-600 border border-indigo-200 hover:bg-indigo-50 font-medium py-2 px-3 rounded-full transition text-center shadow-xs truncate";
+                btn.innerText = (isLogin ? "🔑 " : "") + act;
+                btn.onclick = () => {
+                    if (isLogin) {
+                        window.parent.postMessage({ type: 'open-login' }, '*');
+                    }
+                    sendQuickReply(act);
+                };
                 quickRepliesContainer.appendChild(btn);
             });
             messagesContainer.appendChild(quickRepliesContainer);

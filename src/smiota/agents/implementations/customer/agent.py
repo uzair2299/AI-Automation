@@ -241,6 +241,18 @@ class CustomerAgent(BaseAgent):
                 suggested_actions=["Where is my package?", "Resend pickup PIN", "Locker location and hours"],
             )
 
+        # 1.3 Account Login Request
+        if any(w in q for w in ["log in", "login", "sign in", "signin", "log in to your account"]):
+            return AgentResult(
+                agent_name=self.name,
+                content=(
+                    "To access your account, please log in through your resident or property portal. "
+                    "Once signed in, you will have instant access to your deliveries, locker compartment details, and pickup PINs."
+                ),
+                requires_approval=False,
+                suggested_actions=["Locker location and hours", "Contact support"],
+            )
+
         # 6. Package UUID or Parcel Tracking ID Provided
         uuid_match = re.search(r'\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b', query)
         explicit_match = re.search(
@@ -295,17 +307,12 @@ class CustomerAgent(BaseAgent):
                 if not parent_token:
                     return AgentResult(
                         agent_name=self.name,
-                        content=(
-                            "🔒 **Login Required to View Package Details**\n\n"
-                            "You are currently chatting as a guest. For resident privacy and security, "
-                            "package delivery records and locker details can only be viewed by logged-in users.\n\n"
-                            "Please log in to your Smiota resident portal or open this chat inside your property app to track your packages."
-                        ),
+                        content="You’re using Smiota Support as a guest. For your privacy and security, please log in to your Smiota account.",
                         requires_approval=False,
                         suggested_actions=[
+                            "Log in to your account",
                             "Locker location and hours",
-                            "What does Smiota offer?",
-                            "Locker door did not open",
+                            "Contact support",
                         ],
                     )
 
@@ -318,13 +325,13 @@ class CustomerAgent(BaseAgent):
                     if api_result.get("error_type") in ["UNAUTHENTICATED", "AUTH_ERROR"]:
                         return AgentResult(
                             agent_name=self.name,
-                            content=(
-                                "🔒 **Authentication Required**\n\n"
-                                "Your session token is missing or has expired. "
-                                "Please log in to your Smiota resident account to access package information."
-                            ),
+                            content="You’re using Smiota Support as a guest. For your privacy and security, please log in to your Smiota account.",
                             requires_approval=False,
-                            suggested_actions=["Locker location and hours", "What does Smiota offer?"],
+                            suggested_actions=[
+                                "Log in to your account",
+                                "Locker location and hours",
+                                "Contact support",
+                            ],
                         )
                     return AgentResult(
                         agent_name=self.name,
@@ -411,16 +418,12 @@ class CustomerAgent(BaseAgent):
                 if not parent_token:
                     return AgentResult(
                         agent_name=self.name,
-                        content=(
-                            "🔒 **Login Required to View Package Details**\n\n"
-                            "You are currently chatting as a guest. For resident privacy and security, "
-                            "package delivery records can only be viewed by logged-in users.\n\n"
-                            "Please log in to your Smiota resident portal or open this chat inside your property app to check deliveries."
-                        ),
+                        content="You’re using Smiota Support as a guest. For your privacy and security, please log in to your Smiota account.",
                         requires_approval=False,
                         suggested_actions=[
+                            "Log in to your account",
                             "Locker location and hours",
-                            "What does Smiota offer?",
+                            "Contact support",
                         ],
                     )
 
@@ -429,13 +432,13 @@ class CustomerAgent(BaseAgent):
                     if api_result.get("error_type") in ["UNAUTHENTICATED", "AUTH_ERROR"]:
                         return AgentResult(
                             agent_name=self.name,
-                            content=(
-                                "🔒 **Authentication Required**\n\n"
-                                "Your session token is missing or has expired. "
-                                "Please log in to your Smiota resident account to access package information."
-                            ),
+                            content="You’re using Smiota Support as a guest. For your privacy and security, please log in to your Smiota account.",
                             requires_approval=False,
-                            suggested_actions=["Locker location and hours", "What does Smiota offer?"],
+                            suggested_actions=[
+                                "Log in to your account",
+                                "Locker location and hours",
+                                "Contact support",
+                            ],
                         )
                     return AgentResult(
                         agent_name=self.name,
