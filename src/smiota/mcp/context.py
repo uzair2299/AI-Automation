@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """Server-side MCP Caller Context & Tenant Isolation Boundaries.
 
 Provides thread-safe and coroutine-safe storage of authenticated caller identity,
@@ -71,7 +73,7 @@ def get_caller_context() -> Optional[CallerContext]:
 
 
 def build_caller_context_from_agent_context(
-    agent_context: AgentContext,
+    agent_context: Any,
     correlation_id: Optional[str] = None,
 ) -> CallerContext:
     """Extract and validate caller boundaries from an AgentContext.
