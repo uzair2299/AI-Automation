@@ -1,4 +1,8 @@
+from __future__ import annotations
+
 """Customer Agent: Troubleshooting, Device/Locker Status, Support Ticket Creation, Escalation."""
+from typing import Any, Dict, List, Optional
+
 from smiota.agents.base import BaseAgent, AgentContext, AgentResult
 from smiota.agents.routing.rules import GREETINGS, RuleBasedRouter
 from smiota.schemas.agents import AgentCapability
@@ -6,8 +10,8 @@ from smiota.agents.implementations.customer.prompts import CUSTOMER_SYSTEM_PROMP
 from smiota.agents.implementations.customer.tools import CUSTOMER_BOUND_TOOLS
 from smiota.core.logging import logger
 
-
 from smiota.mcp.context import (
+    CallerContext,
     build_caller_context_from_agent_context,
     reset_caller_context,
     set_caller_context,

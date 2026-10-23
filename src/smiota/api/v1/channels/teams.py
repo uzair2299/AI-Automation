@@ -52,6 +52,7 @@ async def ms_teams_webhook(
 
     # 1. Handle member added / conversation update
     if activity_type == "conversationUpdate":
+        logger.info(f"MS Teams conversationUpdate event acknowledged [user='{user_name}', conv='{conversation_id}']")
         return {
             "type": "message",
             "text": (
@@ -67,6 +68,10 @@ async def ms_teams_webhook(
     if activity_type == "message":
         raw_text = payload.get("text", "")
         cleaned_query = _clean_teams_text(raw_text)
+
+        logger.info(
+            f"MS Teams message received [user='{user_name}', conv='{conversation_id}', query='{cleaned_query[:120]}']"
+        )
 
         if not cleaned_query:
             return {
@@ -95,6 +100,9 @@ async def ms_teams_webhook(
                 query=cleaned_query,
                 context=context,
             )
+            logger.info(
+                f"MS Teams response ready [agent='{agent_result.agent_name}', conv='{conversation_id}', chars={len(agent_result.content)}]"
+            )
             return {
                 "type": "message",
                 "text": agent_result.content,
@@ -108,6 +116,7 @@ async def ms_teams_webhook(
 
     # 3. Handle Invoke / Adaptive Card actions
     if activity_type == "invoke":
+        logger.info(f"MS Teams invoke action received [conv='{conversation_id}']")
         return {
             "status": 200,
             "body": {
@@ -116,4 +125,5 @@ async def ms_teams_webhook(
             },
         }
 
+    logger.debug(f"MS Teams unhandled activity [type={activity_type}, conv={conversation_id}]")
     return {"status": "ignored", "activity_type": activity_type}
