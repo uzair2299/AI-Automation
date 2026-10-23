@@ -60,6 +60,10 @@ class BaseAppSettings(BaseSettings):
     SMIOTA_BACKEND_TIMEOUT_SECONDS: float = 10.0
     SMIOTA_AUTH_DUMMY_MODE: bool = False
 
+    # Microsoft Teams & Bot Framework Connector
+    MICROSOFT_APP_ID: Optional[str] = "c93bfc04-2bf6-4c89-b04f-5d4ef6aa734a"
+    MICROSOFT_APP_PASSWORD: Optional[str] = None
+
     # Chat Session Persistence & Storage Provider
     CHAT_STORAGE_BACKEND: str = "memory"  # Options: 'memory', 'redis', 'postgres'
     CHAT_SESSION_TTL_HOURS: int = 24
