@@ -118,12 +118,6 @@ BOT_MASCOT_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="60 40 100 1
     <path d="M 147 94 C 147 107 134 110.5 124 105.5" fill="none" stroke="#00f5d4" stroke-width="2.6" stroke-linecap="round" filter="url(#cyan-neon-glow)"/>
     <circle cx="123.5" cy="105.5" r="3.2" fill="#00f5d4" filter="url(#cyan-neon-glow)"/>
     <circle cx="122.5" cy="104.5" r="1.2" fill="#ffffff"/>
-
-    <!-- Protected Energy Shield Forcefield Ring (Activated upon successful authentication) -->
-    <g class="mascot-svg-shield" opacity="0">
-      <path d="M 110 38 C 144 38 170 50 170 50 C 170 110 142 148 110 170 C 78 148 50 110 50 50 C 50 50 76 38 110 38 Z"
-            fill="rgba(16, 185, 129, 0.08)" stroke="#00f5d4" stroke-width="2.5" stroke-dasharray="6 4" filter="url(#cyan-neon-glow)"/>
-    </g>
   </g>
 </svg>"""
 
@@ -233,36 +227,6 @@ async def embed_widget(
             0%, 42%, 58%, 100% { transform: scaleY(1); }
             48%, 52% { transform: scaleY(0.08); }
         }
-
-        /* Authenticated Mascot State: SVG Forcefield Shield Animation */
-        .is-authenticated .mascot-svg-shield {
-            opacity: 0.95 !important;
-            animation: shieldEnergySpin 8s linear infinite;
-            transform-box: fill-box;
-            transform-origin: 110px 104px;
-        }
-
-        @keyframes shieldEnergySpin {
-            0% { stroke-dashoffset: 0; stroke: #00f5d4; }
-            50% { stroke: #10b981; }
-            100% { stroke-dashoffset: 40; stroke: #00f5d4; }
-        }
-
-        /* Authenticated Mascot State: Protective Shield Halo around Shell */
-        .is-authenticated #mascot-header-shell {
-            border-color: #34d399 !important;
-            box-shadow: 0 0 0 2.5px #10b981, 0 0 18px rgba(16, 185, 129, 0.75), inset 0 0 8px rgba(52, 211, 153, 0.4) !important;
-            animation: shieldAuraPulse 2.8s ease-in-out infinite;
-        }
-
-        @keyframes shieldAuraPulse {
-            0%, 100% {
-                box-shadow: 0 0 0 2px #10b981, 0 0 14px rgba(16, 185, 129, 0.65), inset 0 0 8px rgba(52, 211, 153, 0.35);
-            }
-            50% {
-                box-shadow: 0 0 0 3.5px #34d399, 0 0 22px rgba(52, 211, 153, 0.9), inset 0 0 12px rgba(52, 211, 153, 0.55);
-            }
-        }
     </style>
 </head>
 <body class="h-full bg-slate-100 flex flex-col overflow-hidden font-sans antialiased m-0 p-0">
@@ -274,17 +238,10 @@ async def embed_widget(
         <div class="bg-gradient-to-r from-violet-600 to-indigo-600 px-5 py-3.5 text-white flex items-center justify-between shrink-0 shadow-sm">
             <div class="flex items-center space-x-3">
                 <div id="mascot-header-avatar" class="relative shrink-0">
-                    <div id="mascot-header-shell" class="w-11 h-11 rounded-full bg-white/20 backdrop-blur-md border border-white/40 shadow-sm flex items-center justify-center p-1 hover:scale-105 transition-all duration-300">
+                    <div id="mascot-header-shell" class="w-11 h-11 rounded-full bg-white/20 backdrop-blur-md border border-white/40 shadow-sm flex items-center justify-center p-1 hover:scale-105 transition-transform">
                         __BOT_SVG__
                     </div>
-                    <span id="mascot-status-dot" class="absolute bottom-0 right-0 w-3 h-3 bg-emerald-400 border-2 border-indigo-600 rounded-full shadow-xs transition-opacity"></span>
-                    
-                    <!-- Protected Shield Badge Overlay (Displayed when authenticated) -->
-                    <span id="mascot-shield-badge" class="hidden absolute -bottom-1 -right-1.5 w-5 h-5 bg-gradient-to-tr from-emerald-500 to-teal-400 border-2 border-indigo-700 rounded-full flex items-center justify-center shadow-md animate-pulse" title="Session Authenticated & Protected">
-                        <svg class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M10 1.944A11.954 11.954 0 012.166 5C2.056 5.649 2 6.319 2 7c0 5.225 3.34 9.67 8 11.317C14.66 16.67 18 12.225 18 7c0-.682-.057-1.35-.166-2.001A11.954 11.954 0 0110 1.944zm1 5.056a1 1 0 10-2 0v4a1 1 0 102 0V7zm-1 8a1.25 1.25 0 100-2.5 1.25 1.25 0 000 2.5z" clip-rule="evenodd"/>
-                        </svg>
-                    </span>
+                    <span id="mascot-status-dot" class="absolute bottom-0 right-0 w-3 h-3 bg-emerald-400 border-2 border-indigo-600 rounded-full shadow-xs"></span>
                 </div>
                 <div>
                     <h1 class="font-semibold text-base tracking-tight leading-tight">Smiota AI Assistant</h1>
@@ -487,26 +444,18 @@ async def embed_widget(
 
         function setAuthenticatedMascotState(isAuthenticated, user = null) {
             const avatarContainer = document.getElementById('mascot-header-avatar');
-            const shieldBadge = document.getElementById('mascot-shield-badge');
-            const statusDot = document.getElementById('mascot-status-dot');
             const subtitleEl = document.getElementById('header-subtitle');
 
             if (isAuthenticated) {
                 document.body.classList.add('is-authenticated');
                 if (avatarContainer) avatarContainer.classList.add('is-authenticated');
-                if (shieldBadge) shieldBadge.classList.remove('hidden');
-                if (statusDot) statusDot.classList.add('hidden');
                 const displayName = user?.name || (user?.first_name ? (user.first_name + " " + (user.last_name || "")) : "");
                 if (subtitleEl && displayName.trim()) {
-                    subtitleEl.innerHTML = `<span class="inline-flex items-center text-emerald-200 font-medium">🛡️ Verified: <strong>${displayName.trim()}</strong></span>`;
-                } else if (subtitleEl) {
-                    subtitleEl.innerHTML = `<span class="inline-flex items-center text-emerald-200 font-medium">🛡️ Protected & Verified Session</span>`;
+                    subtitleEl.innerHTML = `<span class="inline-flex items-center text-emerald-200 font-medium">Verified: <strong>${displayName.trim()}</strong></span>`;
                 }
             } else {
                 document.body.classList.remove('is-authenticated');
                 if (avatarContainer) avatarContainer.classList.remove('is-authenticated');
-                if (shieldBadge) shieldBadge.classList.add('hidden');
-                if (statusDot) statusDot.classList.remove('hidden');
             }
         }
 
