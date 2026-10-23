@@ -268,14 +268,14 @@ async def embed_widget(
             <!-- Bot Welcome Message -->
             <div id="initial-welcome-bubble" class="flex items-end space-x-2.5">
                 <div class="w-8 h-8 rounded-full bg-white border border-indigo-100 shadow-xs flex items-center justify-center p-0.5 shrink-0 select-none relative">__BOT_SVG__</div>
-                <div class="bg-white text-slate-800 px-4 py-3 rounded-[18px] rounded-bl-[4px] max-w-[82%] text-[13.5px] border border-slate-200/80 shadow-[0_2px_8px_rgba(0,0,0,0.03)] leading-relaxed">
+                <div class="bg-white text-slate-800 px-4 py-3 rounded-[18px] rounded-bl-[4px] max-w-[82%] text-sm border border-slate-200/80 shadow-[0_2px_8px_rgba(0,0,0,0.03)] leading-relaxed">
                     <div class="flex items-center justify-between space-x-3 mb-1.5 pb-1 border-b border-slate-100/90">
-                        <span class="text-[10.5px] font-bold uppercase tracking-wider text-indigo-600" id="bot-sender-name">__ASSISTANT_NAME__</span>
-                        <span id="initial-bot-time" class="text-[10px] text-slate-400 font-medium"></span>
+                        <span class="text-[11px] font-bold uppercase tracking-wider text-indigo-600" id="bot-sender-name">__ASSISTANT_NAME__</span>
+                        <span id="initial-bot-time" class="text-[11px] text-slate-400 font-medium"></span>
                     </div>
-                    <div id="welcome-message-body">
-                        <div class="font-semibold text-slate-900 mb-1" id="welcome-title-text">__WELCOME_TITLE__ 👋</div>
-                        <div class="text-slate-600 text-xs sm:text-[13px]" id="welcome-msg-text">__WELCOME_MESSAGE__</div>
+                    <div id="welcome-message-body" class="space-y-1">
+                        <div class="font-semibold text-slate-900 text-sm" id="welcome-title-text">__WELCOME_TITLE__ 👋</div>
+                        <div class="text-slate-700 text-sm leading-relaxed" id="welcome-msg-text">__WELCOME_MESSAGE__</div>
                     </div>
                 </div>
             </div>
@@ -545,20 +545,20 @@ async def embed_widget(
 
                 div.innerHTML = `
                     <div class="w-8 h-8 rounded-full bg-white border border-indigo-100 shadow-xs flex items-center justify-center p-0.5 shrink-0 select-none relative">${botAvatarSvg}</div>
-                    <div class="bg-white text-slate-800 px-4 py-3 rounded-[18px] rounded-bl-[4px] max-w-[82%] text-[13.5px] border border-slate-200/80 shadow-[0_2px_8px_rgba(0,0,0,0.03)] leading-relaxed">
+                    <div class="bg-white text-slate-800 px-4 py-3 rounded-[18px] rounded-bl-[4px] max-w-[82%] text-sm border border-slate-200/80 shadow-[0_2px_8px_rgba(0,0,0,0.03)] leading-relaxed">
                         <div class="flex items-center justify-between space-x-3 mb-1.5 pb-1 border-b border-slate-100/90">
-                            <span class="text-[10.5px] font-bold uppercase tracking-wider text-indigo-600">${agentName} Assistant</span>
-                            <span class="text-[10px] text-slate-400 font-medium">${timeStr}</span>
+                            <span class="text-[11px] font-bold uppercase tracking-wider text-indigo-600">${agentName} Assistant</span>
+                            <span class="text-[11px] text-slate-400 font-medium">${timeStr}</span>
                         </div>
-                        <div class="bot-text-body text-slate-700 space-y-1">${formatMarkdown(text)}</div>
+                        <div class="bot-text-body text-slate-700 text-sm leading-relaxed space-y-1">${formatMarkdown(text)}</div>
                         ${approvalBadge}
                     </div>
                 `;
             } else {
                 div.innerHTML = `
-                    <div class="bg-gradient-to-r from-violet-600 via-indigo-600 to-indigo-700 text-white px-4 py-2.5 rounded-[18px] rounded-br-[4px] max-w-[80%] text-[13.5px] shadow-sm shadow-indigo-500/15 leading-relaxed">
-                        <div class="break-words font-normal">${text}</div>
-                        <div class="flex items-center justify-end space-x-1.5 mt-1 text-[10px] text-indigo-200/90 font-medium select-none">
+                    <div class="bg-gradient-to-r from-violet-600 via-indigo-600 to-indigo-700 text-white px-4 py-2.5 rounded-[18px] rounded-br-[4px] max-w-[80%] text-sm shadow-sm shadow-indigo-500/15 leading-relaxed">
+                        <div class="break-words font-normal text-sm leading-relaxed">${text}</div>
+                        <div class="flex items-center justify-end space-x-1.5 mt-1 text-[11px] text-indigo-200/90 font-medium select-none">
                             <span>${timeStr}</span>
                             <span class="user-tick-status inline-flex items-center">${singleTickSvg}</span>
                         </div>
@@ -590,12 +590,12 @@ async def embed_widget(
             div.className = "flex items-end space-x-2.5 justify-start mb-3";
             div.innerHTML = `
                 <div class="w-8 h-8 rounded-full bg-white border border-indigo-100 shadow-xs flex items-center justify-center p-0.5 shrink-0 select-none relative">${botAvatarSvg}</div>
-                <div class="bg-white text-slate-800 px-4 py-3 rounded-[18px] rounded-bl-[4px] max-w-[82%] text-[13.5px] border border-slate-200/80 shadow-[0_2px_8px_rgba(0,0,0,0.03)] leading-relaxed">
+                <div class="bg-white text-slate-800 px-4 py-3 rounded-[18px] rounded-bl-[4px] max-w-[82%] text-sm border border-slate-200/80 shadow-[0_2px_8px_rgba(0,0,0,0.03)] leading-relaxed">
                     <div class="flex items-center justify-between space-x-3 mb-1.5 pb-1 border-b border-slate-100/90">
-                        <span class="text-[10.5px] font-bold uppercase tracking-wider text-indigo-600">${agentName} Assistant</span>
-                        <span class="text-[10px] text-slate-400 font-medium">${timeStr}</span>
+                        <span class="text-[11px] font-bold uppercase tracking-wider text-indigo-600">${agentName} Assistant</span>
+                        <span class="text-[11px] text-slate-400 font-medium">${timeStr}</span>
                     </div>
-                    <div class="streaming-content text-slate-700 space-y-1"></div>
+                    <div class="streaming-content text-slate-700 text-sm leading-relaxed space-y-1"></div>
                 </div>
             `;
             messagesContainer.appendChild(div);
