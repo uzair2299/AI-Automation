@@ -82,6 +82,8 @@ class WebSocketChatHandler:
         if user_info:
             merged_metadata.setdefault("user", user_info)
 
+        parent_token: Optional[str] = None
+
         # Authenticate via signed session token in client_metadata if present
         session_token = client_metadata.get("session_token") or client_metadata.get("token")
         if session_token:
