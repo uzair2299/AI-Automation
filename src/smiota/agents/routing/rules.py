@@ -125,6 +125,15 @@ class RuleBasedRouter(BaseIntentRouter):
     INFORMATIONAL_PREFIXES = INFORMATIONAL_PREFIXES
     INFORMATIONAL_CATEGORIES = INFORMATIONAL_CATEGORIES
 
+    GRATITUDE = {
+        "thank you", "thanks", "thank u", "thx", "appreciate it", "many thanks",
+        "thank you so much", "thanks a lot", "thank you very much",
+    }
+    FAREWELLS = {
+        "bye", "byee", "goodbye", "cya", "see you", "take care", "have a good day",
+        "have a nice day", "have a great day", "bye bye", "later", "see ya",
+    }
+
     # High-certainty domain identifiers
     CUSTOMER_REGEX = re.compile(r"\b(sm|pkg)-[a-z0-9]+\b|\bpickup code\b|\bcompartment \d+\b", re.IGNORECASE)
     SECURITY_REGEX = re.compile(r"\bcve-\d{4}-\d+\b|\bbrute-force\b|\bwazuh\b|\bsiem\b", re.IGNORECASE)
@@ -179,6 +188,28 @@ class RuleBasedRouter(BaseIntentRouter):
         return False
 
     @classmethod
+    def _is_gratitude(cls, q: str) -> bool:
+        """Check if query expresses gratitude / appreciation."""
+        clean = re.sub(r"[^\w\s]", "", q).strip().lower()
+        if clean in cls.GRATITUDE:
+            return True
+        tokens = clean.split()
+        if len(tokens) <= 5 and any(clean == g or clean.startswith(g + " ") for g in cls.GRATITUDE):
+            return True
+        return False
+
+    @classmethod
+    def _is_farewell(cls, q: str) -> bool:
+        """Check if query is a closing / farewell."""
+        clean = re.sub(r"[^\w\s]", "", q).strip().lower()
+        if clean in cls.FAREWELLS:
+            return True
+        tokens = clean.split()
+        if len(tokens) <= 5 and any(clean == f or clean.startswith(f + " ") for f in cls.FAREWELLS):
+            return True
+        return False
+
+    @classmethod
     def _match_informational(cls, q: str) -> Optional[tuple[str, str]]:
         """Check if query matches any informational prefix pattern.
 
@@ -220,6 +251,27 @@ class RuleBasedRouter(BaseIntentRouter):
                 matched_intent="greeting",
                 routing_method="rule_greeting",
                 reasoning=f"Matched standard greeting intent in {channel} channel",
+            )
+
+        # 1.1 Gratitude & Farewell checks (Immediate high confidence < 1ms)
+        if self._is_gratitude(q):
+            target_agent = "customer" if channel == "webchat" else "aiops"
+            return RouteDecision(
+                agent_name=target_agent,
+                confidence=0.98,
+                matched_intent="gratitude",
+                routing_method="rule_conversational",
+                reasoning=f"Matched gratitude intent in {channel} channel",
+            )
+
+        if self._is_farewell(q):
+            target_agent = "customer" if channel == "webchat" else "aiops"
+            return RouteDecision(
+                agent_name=target_agent,
+                confidence=0.98,
+                matched_intent="farewell",
+                routing_method="rule_conversational",
+                reasoning=f"Matched farewell intent in {channel} channel",
             )
 
         # 2. Multi-turn continuity check: Short queries in active conversations
@@ -278,6 +330,25 @@ class RuleBasedRouter(BaseIntentRouter):
                 matched_intent="greeting",
                 routing_method="rule_greeting",
                 reasoning="Matched standard greeting in webchat channel",
+            )
+
+        # 1.1 Check gratitude and farewell in webchat
+        if self._is_gratitude(q):
+            return RouteDecision(
+                agent_name="customer",
+                confidence=0.98,
+                matched_intent="gratitude",
+                routing_method="rule_conversational",
+                reasoning="Matched gratitude in webchat channel",
+            )
+
+        if self._is_farewell(q):
+            return RouteDecision(
+                agent_name="customer",
+                confidence=0.98,
+                matched_intent="farewell",
+                routing_method="rule_conversational",
+                reasoning="Matched farewell in webchat channel",
             )
 
         # 2. Check Informational questions in webchat (How-to, Definitions, Policies, Instructions, Capabilities, etc.)

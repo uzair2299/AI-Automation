@@ -48,6 +48,11 @@ async def lifespan(app: FastAPI):
     await RabbitMQService.close()
     await close_cache()
     await close_db()
+    try:
+        from smiota.clients.smiota_api_client import get_smiota_api_client
+        await get_smiota_api_client().close()
+    except Exception as client_err:
+        logger.debug(f"Error closing SmiotaApiClient: {client_err}")
 
 
 def create_app() -> FastAPI:

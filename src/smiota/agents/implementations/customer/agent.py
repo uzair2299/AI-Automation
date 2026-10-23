@@ -1,10 +1,18 @@
 """Customer Agent: Troubleshooting, Device/Locker Status, Support Ticket Creation, Escalation."""
 from smiota.agents.base import BaseAgent, AgentContext, AgentResult
-from smiota.agents.routing.rules import GREETINGS
+from smiota.agents.routing.rules import GREETINGS, RuleBasedRouter
 from smiota.schemas.agents import AgentCapability
 from smiota.agents.implementations.customer.prompts import CUSTOMER_SYSTEM_PROMPT
 from smiota.agents.implementations.customer.tools import CUSTOMER_BOUND_TOOLS
 from smiota.core.logging import logger
+
+
+from smiota.mcp.context import (
+    build_caller_context_from_agent_context,
+    reset_caller_context,
+    set_caller_context,
+)
+from smiota.mcp.client import MCPClient
 
 
 class CustomerAgent(BaseAgent):
@@ -20,6 +28,11 @@ class CustomerAgent(BaseAgent):
                 AgentCapability(name="parcel_tracking", description="Look up package dropoff and pickup audit events"),
                 AgentCapability(name="ticketing", description="Create and escalate ServiceNow / Zendesk support tickets"),
                 AgentCapability(name="remote_door_unlock", description="Remotely unlock locker compartment door", access_level="remediation"),
+                AgentCapability(name="package_search", description="Search pending, released, outbound, and perishable packages"),
+                AgentCapability(name="pickup_pin", description="Retrieve 6-digit pickup verification PIN and locker door"),
+                AgentCapability(name="locker_details", description="Query locker bank, compartment door, and location details"),
+                AgentCapability(name="delivery_timeline", description="Retrieve chain-of-custody audit timeline and dock scans"),
+                AgentCapability(name="user_preferences", description="Retrieve ADA accessibility settings and proxy delegates"),
             ],
             system_prompt=CUSTOMER_SYSTEM_PROMPT,
             bound_tools=CUSTOMER_BOUND_TOOLS,
@@ -118,6 +131,14 @@ class CustomerAgent(BaseAgent):
         ]
 
     async def process(self, query: str, context: AgentContext) -> AgentResult:
+        caller_ctx = build_caller_context_from_agent_context(context)
+        ctx_token = set_caller_context(caller_ctx)
+        try:
+            return await self._process_internal(query, context, caller_ctx)
+        finally:
+            reset_caller_context(ctx_token)
+
+    async def _process_internal(self, query: str, context: AgentContext, caller_ctx: Any) -> AgentResult:
         import re
         q = query.lower()
 
@@ -133,6 +154,32 @@ class CustomerAgent(BaseAgent):
                     "Resend pickup PIN",
                     "Locker location and hours",
                     "Locker door did not open",
+                ],
+            )
+
+        # 1.01 Gratitude & Appreciation ("thank you", "thanks", "appreciate it")
+        if RuleBasedRouter._is_gratitude(clean_q) or any(w in clean_q for w in ["thank you", "thanks", "thank u", "thx", "appreciate it"]):
+            return AgentResult(
+                agent_name=self.name,
+                content="You're very welcome! If you need any more help with your deliveries or locker access, please feel free to ask. Have a great day!",
+                requires_approval=False,
+                suggested_actions=[
+                    "Where is my package?",
+                    "Resend pickup PIN",
+                    "Locker location and hours",
+                ],
+            )
+
+        # 1.02 Closings & Farewells ("bye", "byee", "goodbye", "see you", "have a good day")
+        if RuleBasedRouter._is_farewell(clean_q) or any(w in clean_q for w in ["bye", "byee", "goodbye", "see you", "take care", "have a good day", "have a nice day", "have a great day"]):
+            return AgentResult(
+                agent_name=self.name,
+                content="Goodbye! Have a wonderful day. If you ever need help with package pickups or your Smiota locker in the future, feel free to reach out!",
+                requires_approval=False,
+                suggested_actions=[
+                    "Where is my package?",
+                    "Locker location and hours",
+                    "Contact support concierge",
                 ],
             )
 
@@ -174,6 +221,39 @@ class CustomerAgent(BaseAgent):
 
         # 4. Resend Pickup PIN
         if any(w in q for w in ["pin", "code", "pickup pin", "resend pin", "access code"]):
+            if getattr(caller_ctx, "is_authenticated", False):
+                try:
+                    mcp_res = await MCPClient().execute_tool("get_my_pickup_pin", {})
+                    if mcp_res.success and mcp_res.output:
+                        out = mcp_res.output
+                        if out.get("success") and out.get("data"):
+                            data = out["data"]
+                            primary = data.get("primary_pickup") or data
+                            pin = primary.get("pickup_pin")
+                            door = primary.get("locker_door")
+                            bank = primary.get("locker_bank")
+                            tracking = primary.get("tracking_number")
+                            if pin:
+                                return AgentResult(
+                                    agent_name=self.name,
+                                    content=(
+                                        f"🔑 **Your Smiota Pickup PIN**:\n\n"
+                                        f"• **6-Digit PIN**: `{pin}`\n"
+                                        f"• **Locker Door**: **{door}**\n"
+                                        f"• **Locker Bank**: {bank}\n"
+                                        + (f"• **Tracking Number**: `{tracking}`\n\n" if tracking else "\n")
+                                        + f"Enter your PIN on the kiosk touchscreen console to release compartment door **{door}**."
+                                    ),
+                                    requires_approval=False,
+                                    suggested_actions=[
+                                        "Locker location and hours",
+                                        "Locker door did not open",
+                                        "Where is my package?",
+                                    ],
+                                )
+                except Exception as pin_err:
+                    logger.debug(f"MCP get_my_pickup_pin skipped or errored: {pin_err}")
+
             return AgentResult(
                 agent_name=self.name,
                 content=(
@@ -481,7 +561,6 @@ class CustomerAgent(BaseAgent):
                 )
 
         # Identify informational intent before calling LLM or evaluating generic tracking prompts
-        from smiota.agents.routing.rules import RuleBasedRouter
         info_match = RuleBasedRouter._match_informational(query)
         is_informational = info_match is not None
         info_prefix = info_match[0] if info_match else None

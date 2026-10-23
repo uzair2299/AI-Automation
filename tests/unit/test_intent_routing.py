@@ -310,3 +310,35 @@ async def test_customer_agent_handles_informational_query(base_context):
         assert "[Informational Query - Category: how_to, Pattern: 'how do i']" in prompt_arg
 
 
+@pytest.mark.asyncio
+async def test_rule_router_gratitude_and_farewell_fast_paths(base_context):
+    from smiota.agents.routing.rules import RuleBasedRouter
+
+    router = RuleBasedRouter()
+
+    for phrase in ["thank you", "thanks", "thank you so much", "bye", "byee", "goodbye"]:
+        decision = await router.classify(phrase, base_context)
+        assert decision.agent_name == "customer"
+        assert decision.confidence >= 0.95
+        assert decision.routing_method == "rule_conversational"
+
+
+@pytest.mark.asyncio
+async def test_customer_agent_gratitude_and_farewell_deterministic(base_context):
+    from unittest.mock import patch
+    from smiota.agents.implementations.customer.agent import CustomerAgent
+
+    agent = CustomerAgent()
+    with patch("smiota.llm.provider.GeminiProvider.generate_completion", new_callable=AsyncMock) as mock_llm:
+        # Gratitude
+        res1 = await agent.process("thank you", base_context)
+        assert "welcome" in res1.content.lower()
+        mock_llm.assert_not_called()
+
+        # Farewells
+        res2 = await agent.process("byee", base_context)
+        assert "goodbye" in res2.content.lower()
+        mock_llm.assert_not_called()
+
+
+
