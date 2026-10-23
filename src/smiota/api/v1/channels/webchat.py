@@ -266,26 +266,26 @@ async def embed_widget(
             </div>
 
             <!-- Bot Welcome Message -->
-            <div id="initial-welcome-bubble" class="flex items-end space-x-2">
-                <div class="w-9 h-9 rounded-full bg-indigo-50 border border-indigo-200/90 shadow-xs flex items-center justify-center p-1 shrink-0 relative">__BOT_SVG__</div>
-                <div class="bg-slate-100 text-slate-800 px-4 py-3 rounded-2xl rounded-bl-sm max-w-[85%] text-sm shadow-xs leading-relaxed">
-                    <div class="flex items-center justify-between space-x-3 mb-1">
-                        <span class="text-[10px] font-bold uppercase tracking-wider text-indigo-600" id="bot-sender-name">__ASSISTANT_NAME__</span>
+            <div id="initial-welcome-bubble" class="flex items-end space-x-2.5">
+                <div class="w-8 h-8 rounded-full bg-white border border-indigo-100 shadow-xs flex items-center justify-center p-0.5 shrink-0 select-none relative">__BOT_SVG__</div>
+                <div class="bg-white text-slate-800 px-4 py-3 rounded-[18px] rounded-bl-[4px] max-w-[82%] text-[13.5px] border border-slate-200/80 shadow-[0_2px_8px_rgba(0,0,0,0.03)] leading-relaxed">
+                    <div class="flex items-center justify-between space-x-3 mb-1.5 pb-1 border-b border-slate-100/90">
+                        <span class="text-[10.5px] font-bold uppercase tracking-wider text-indigo-600" id="bot-sender-name">__ASSISTANT_NAME__</span>
                         <span id="initial-bot-time" class="text-[10px] text-slate-400 font-medium"></span>
                     </div>
                     <div id="welcome-message-body">
                         <div class="font-semibold text-slate-900 mb-1" id="welcome-title-text">__WELCOME_TITLE__ 👋</div>
-                        <div class="text-slate-600 text-xs sm:text-sm" id="welcome-msg-text">__WELCOME_MESSAGE__</div>
+                        <div class="text-slate-600 text-xs sm:text-[13px]" id="welcome-msg-text">__WELCOME_MESSAGE__</div>
                     </div>
                 </div>
             </div>
 
             <!-- Interactive Quick Reply Pill Buttons -->
             <div id="quick-replies-container" class="grid grid-cols-2 gap-2 pt-1 px-8">
-                <button type="button" onclick="sendQuickReply('Where is my package?')" class="text-xs text-indigo-600 border border-indigo-200 hover:bg-indigo-50 font-medium py-2 px-3 rounded-full transition text-center shadow-xs truncate">📦 Track package</button>
-                <button type="button" onclick="sendQuickReply('Resend pickup PIN')" class="text-xs text-indigo-600 border border-indigo-200 hover:bg-indigo-50 font-medium py-2 px-3 rounded-full transition text-center shadow-xs truncate">🔑 Get pickup PIN</button>
-                <button type="button" onclick="sendQuickReply('What does Smiota offer?')" class="text-xs text-indigo-600 border border-indigo-200 hover:bg-indigo-50 font-medium py-2 px-3 rounded-full transition text-center shadow-xs truncate">🏢 Smiota smart lockers</button>
-                <button type="button" onclick="sendQuickReply('Locker door did not open')" class="text-xs text-indigo-600 border border-indigo-200 hover:bg-indigo-50 font-medium py-2 px-3 rounded-full transition text-center shadow-xs truncate">🚪 Locker door help</button>
+                <button type="button" onclick="sendQuickReply('Where is my package?')" class="text-xs text-indigo-600 bg-white hover:bg-indigo-50/80 border border-indigo-200/80 hover:border-indigo-300 font-medium py-2 px-3 rounded-xl transition text-center shadow-xs truncate">📦 Track package</button>
+                <button type="button" onclick="sendQuickReply('Resend pickup PIN')" class="text-xs text-indigo-600 bg-white hover:bg-indigo-50/80 border border-indigo-200/80 hover:border-indigo-300 font-medium py-2 px-3 rounded-xl transition text-center shadow-xs truncate">🔑 Get pickup PIN</button>
+                <button type="button" onclick="sendQuickReply('What does Smiota offer?')" class="text-xs text-indigo-600 bg-white hover:bg-indigo-50/80 border border-indigo-200/80 hover:border-indigo-300 font-medium py-2 px-3 rounded-xl transition text-center shadow-xs truncate">🏢 Smiota smart lockers</button>
+                <button type="button" onclick="sendQuickReply('Locker door did not open')" class="text-xs text-indigo-600 bg-white hover:bg-indigo-50/80 border border-indigo-200/80 hover:border-indigo-300 font-medium py-2 px-3 rounded-xl transition text-center shadow-xs truncate">🚪 Locker door help</button>
             </div>
         </div>
 
@@ -490,22 +490,47 @@ async def embed_widget(
             const parts = str.split('**');
             let res = '';
             for (let i = 0; i < parts.length; i++) {
-                res += (i % 2 === 1) ? ('<strong>' + parts[i] + '</strong>') : parts[i];
+                res += (i % 2 === 1) ? ('<strong class="font-semibold text-slate-900">' + parts[i] + '</strong>') : parts[i];
             }
             const codeParts = res.split('`');
             let resCode = '';
             for (let i = 0; i < codeParts.length; i++) {
-                resCode += (i % 2 === 1) ? ('<code class="bg-indigo-50 text-indigo-700 px-1 py-0.5 rounded font-mono text-xs">' + codeParts[i] + '</code>') : codeParts[i];
+                resCode += (i % 2 === 1) ? ('<code class="bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded font-mono text-xs border border-indigo-100 font-medium">' + codeParts[i] + '</code>') : codeParts[i];
             }
             const nl = String.fromCharCode(10);
             return resCode.split(nl).join('<br>');
+        }
+
+        function getUserAvatarHtml() {
+            const displayName = authenticatedUser?.name || (authenticatedUser?.first_name ? (authenticatedUser.first_name + " " + (authenticatedUser.last_name || "")) : "");
+            if (displayName && displayName.trim()) {
+                const parts = displayName.trim().split(/\s+/);
+                let initials = "";
+                if (parts.length >= 2) {
+                    initials = (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+                } else {
+                    initials = parts[0].substring(0, 2).toUpperCase();
+                }
+                return `
+                    <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-violet-600 to-indigo-600 text-white flex items-center justify-center text-[11px] font-bold tracking-tight shadow-sm shrink-0 border border-white/80 select-none" title="${displayName.trim()}">
+                        ${initials}
+                    </div>
+                `;
+            }
+            return `
+                <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-slate-200 to-indigo-100 text-indigo-600 flex items-center justify-center shadow-xs shrink-0 border border-white/80 select-none" title="User">
+                    <svg class="w-4 h-4 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/>
+                    </svg>
+                </div>
+            `;
         }
 
         function appendMessage(sender, text, agentName = 'AI', requiresApproval = false, suggestedActions = []) {
             const isUser = sender === 'user';
             const timeStr = getFormattedTime();
             const div = document.createElement('div');
-            div.className = `flex items-end space-x-2 ${isUser ? 'justify-end' : 'justify-start'}`;
+            div.className = `flex items-end space-x-2.5 ${isUser ? 'justify-end' : 'justify-start'} mb-3`;
             
             if (!isUser) {
                 let approvalBadge = '';
@@ -519,25 +544,26 @@ async def embed_widget(
                 }
 
                 div.innerHTML = `
-                    <div class="w-9 h-9 rounded-full bg-indigo-50 border border-indigo-200/90 shadow-xs flex items-center justify-center p-1 shrink-0 relative">${botAvatarSvg}</div>
-                    <div class="bg-slate-100 text-slate-800 px-4 py-2.5 rounded-2xl rounded-bl-sm max-w-[85%] text-sm shadow-xs leading-relaxed">
-                        <div class="flex items-center justify-between space-x-3 mb-1">
-                            <span class="text-[10px] font-bold uppercase tracking-wider text-indigo-600">${agentName} Assistant</span>
+                    <div class="w-8 h-8 rounded-full bg-white border border-indigo-100 shadow-xs flex items-center justify-center p-0.5 shrink-0 select-none relative">${botAvatarSvg}</div>
+                    <div class="bg-white text-slate-800 px-4 py-3 rounded-[18px] rounded-bl-[4px] max-w-[82%] text-[13.5px] border border-slate-200/80 shadow-[0_2px_8px_rgba(0,0,0,0.03)] leading-relaxed">
+                        <div class="flex items-center justify-between space-x-3 mb-1.5 pb-1 border-b border-slate-100/90">
+                            <span class="text-[10.5px] font-bold uppercase tracking-wider text-indigo-600">${agentName} Assistant</span>
                             <span class="text-[10px] text-slate-400 font-medium">${timeStr}</span>
                         </div>
-                        <div class="bot-text-body">${formatMarkdown(text)}</div>
+                        <div class="bot-text-body text-slate-700 space-y-1">${formatMarkdown(text)}</div>
                         ${approvalBadge}
                     </div>
                 `;
             } else {
                 div.innerHTML = `
-                    <div class="bg-gradient-to-r from-violet-600 to-indigo-600 text-white px-4 py-2.5 rounded-2xl rounded-br-sm max-w-[85%] text-sm shadow-xs leading-relaxed">
-                        <div>${text}</div>
-                        <div class="flex items-center justify-end space-x-1 mt-1 text-[10px] text-indigo-200/90 font-medium select-none">
+                    <div class="bg-gradient-to-r from-violet-600 via-indigo-600 to-indigo-700 text-white px-4 py-2.5 rounded-[18px] rounded-br-[4px] max-w-[80%] text-[13.5px] shadow-sm shadow-indigo-500/15 leading-relaxed">
+                        <div class="break-words font-normal">${text}</div>
+                        <div class="flex items-center justify-end space-x-1.5 mt-1 text-[10px] text-indigo-200/90 font-medium select-none">
                             <span>${timeStr}</span>
                             <span class="user-tick-status inline-flex items-center">${singleTickSvg}</span>
                         </div>
                     </div>
+                    ${getUserAvatarHtml()}
                 `;
             }
 
@@ -561,15 +587,15 @@ async def embed_widget(
             const timeStr = getFormattedTime();
             currentStreamText = "";
             const div = document.createElement('div');
-            div.className = "flex items-end space-x-2 justify-start";
+            div.className = "flex items-end space-x-2.5 justify-start mb-3";
             div.innerHTML = `
-                <div class="w-9 h-9 rounded-full bg-indigo-50 border border-indigo-200/90 shadow-xs flex items-center justify-center p-1 shrink-0 relative">${botAvatarSvg}</div>
-                <div class="bg-slate-100 text-slate-800 px-4 py-2.5 rounded-2xl rounded-bl-sm max-w-[85%] text-sm shadow-xs leading-relaxed">
-                    <div class="flex items-center justify-between space-x-3 mb-1">
-                        <span class="text-[10px] font-bold uppercase tracking-wider text-indigo-600">${agentName} Assistant</span>
+                <div class="w-8 h-8 rounded-full bg-white border border-indigo-100 shadow-xs flex items-center justify-center p-0.5 shrink-0 select-none relative">${botAvatarSvg}</div>
+                <div class="bg-white text-slate-800 px-4 py-3 rounded-[18px] rounded-bl-[4px] max-w-[82%] text-[13.5px] border border-slate-200/80 shadow-[0_2px_8px_rgba(0,0,0,0.03)] leading-relaxed">
+                    <div class="flex items-center justify-between space-x-3 mb-1.5 pb-1 border-b border-slate-100/90">
+                        <span class="text-[10.5px] font-bold uppercase tracking-wider text-indigo-600">${agentName} Assistant</span>
                         <span class="text-[10px] text-slate-400 font-medium">${timeStr}</span>
                     </div>
-                    <div class="streaming-content text-slate-800"></div>
+                    <div class="streaming-content text-slate-700 space-y-1"></div>
                 </div>
             `;
             messagesContainer.appendChild(div);
@@ -599,8 +625,8 @@ async def embed_widget(
                 const btn = document.createElement('button');
                 const isLogin = act.toLowerCase().includes('log in') || act.toLowerCase().includes('login');
                 btn.className = isLogin
-                    ? "text-xs text-white bg-indigo-600 hover:bg-indigo-700 font-semibold py-2 px-3 rounded-full transition text-center shadow-xs truncate"
-                    : "text-xs text-indigo-600 border border-indigo-200 hover:bg-indigo-50 font-medium py-2 px-3 rounded-full transition text-center shadow-xs truncate";
+                    ? "text-xs text-white bg-indigo-600 hover:bg-indigo-700 font-semibold py-2 px-3 rounded-xl transition text-center shadow-xs truncate"
+                    : "text-xs text-indigo-600 bg-white hover:bg-indigo-50/80 border border-indigo-200/80 hover:border-indigo-300 font-medium py-2 px-3 rounded-xl transition text-center shadow-xs truncate";
                 btn.innerText = (isLogin ? "🔑 " : "") + act;
                 btn.onclick = () => {
                     if (isLogin) {
