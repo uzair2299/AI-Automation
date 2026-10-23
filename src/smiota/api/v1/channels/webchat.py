@@ -395,6 +395,7 @@ async def embed_widget(
                 });
                 if (res.ok) {
                     const data = await res.json();
+                    const prevSessionId = sessionId;
                     chatSessionToken = data.access_token;
                     authenticatedUser = data.user;
                     if (data.session_id) {
@@ -403,6 +404,15 @@ async def embed_widget(
                     }
                     console.log("Chatbot session established for user:", data.user?.user_id, "session:", sessionId);
                     window.parent.postMessage({ type: 'auth-success', user: data.user, session_id: data.session_id }, '*');
+
+                    // If session changed or socket is not connected, reconnect with authenticated session
+                    if (!wsConnected || (data.session_id && data.session_id !== prevSessionId)) {
+                        console.log("Re-initializing WebSocket connection with authenticated session:", sessionId);
+                        if (wsSocket) {
+                            try { wsSocket.close(); } catch(e){}
+                        }
+                        initWebSocket();
+                    }
 
                     // Automatically restore previous conversation history so closing/reopening drawer retains chat!
                     await restoreChatHistory(data.session_id, data.access_token);
@@ -710,7 +720,9 @@ async def embed_widget(
                     metadata: {
                         locale: navigator.language || "en-US",
                         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-                        client: "webchat"
+                        client: "webchat",
+                        token: chatSessionToken || undefined,
+                        parent_token: (authenticatedUser && authenticatedUser.parent_token) ? authenticatedUser.parent_token : undefined,
                     },
                     created_at: new Date().toISOString()
                 };
@@ -784,6 +796,9 @@ async def embed_widget(
         notifyParentHeight();
         initWebSocket();
         window.addEventListener('load', notifyParentHeight);
+        try {
+            window.parent.postMessage({ type: 'chatbot-ready' }, '*');
+        } catch(e) {}
     </script>
 </body>
 </html>

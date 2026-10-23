@@ -82,13 +82,33 @@ class WebSocketChatHandler:
         if user_info:
             merged_metadata.setdefault("user", user_info)
 
-        parent_token = (
-            (existing_session.metadata.get("parent_token") if existing_session and existing_session.metadata else None)
-            or (user_info.get("parent_token") if isinstance(user_info, dict) else None)
-            or client_metadata.get("parent_token")
-            or client_metadata.get("token")
-            or None
-        )
+        # Authenticate via signed session token in client_metadata if present
+        session_token = client_metadata.get("session_token") or client_metadata.get("token")
+        if session_token:
+            try:
+                from smiota.core.security import verify_session_token
+                tok_payload = verify_session_token(session_token)
+                if tok_payload.get("parent_token"):
+                    parent_token = tok_payload["parent_token"]
+                user_data = tok_payload.get("user") or tok_payload.get("user_profile")
+                if user_data and isinstance(user_data, dict):
+                    user_info.update(user_data)
+                if tok_payload.get("sub") and req_resident_id in {"ws-resident", "anonymous", "guest", ""}:
+                    req_resident_id = tok_payload["sub"]
+                if tok_payload.get("tenant_id") and tenant_id == "default":
+                    tenant_id = tok_payload["tenant_id"]
+            except Exception:
+                pass
+
+        if not parent_token:
+            parent_token = (
+                (existing_session.metadata.get("parent_token") if existing_session and existing_session.metadata else None)
+                or (user_info.get("parent_token") if isinstance(user_info, dict) else None)
+                or client_metadata.get("parent_token")
+                or client_metadata.get("token")
+                or None
+            )
+
         if parent_token:
             merged_metadata.setdefault("parent_token", parent_token)
             if isinstance(user_info, dict):
