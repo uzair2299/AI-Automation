@@ -156,7 +156,7 @@ Defined in [`src/smiota/schemas/chat_session.py`](file:///d:/repos/smiota-ai/src
     "suggested_actions": ["Unlock door remotely", "Resend pickup PIN", "Locker hours"]
   },
   "metadata": {
-    "model": "gemini-2.5-flash",
+    "model": "gemini-3.7-flash",
     "requires_approval": false
   },
   "created_at": "2026-10-21T13:30:02Z"
