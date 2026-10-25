@@ -79,31 +79,47 @@ async def _post_reply_to_teams(
     app_password: str,
 ) -> bool:
     """Send an activity message back to Teams via the Bot Connector REST API."""
+    if not app_password:
+        logger.error(
+            "Cannot dispatch reply to Teams: MICROSOFT_APP_PASSWORD is missing/empty! Please set it in environment variables."
+        )
+        return False
+
     token = await _get_bot_framework_token(app_id, app_password)
     if not token:
-        logger.warning("Could not dispatch reply to Teams serviceUrl: missing OAuth token")
+        logger.error("Could not dispatch reply to Teams: failed to obtain OAuth token")
         return False
 
     clean_service_url = service_url.rstrip("/")
-    target_url = f"{clean_service_url}/v3/conversations/{conversation_id}/activities"
+    reply_to_id = reply_activity.get("replyToId")
     headers = {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json",
     }
 
+    # In Bot Framework REST API:
+    # 1. Reply endpoint: POST /v3/conversations/{conversationId}/activities/{activityId}
+    # 2. Direct conversation endpoint: POST /v3/conversations/{conversationId}/activities
+    endpoints = []
+    if reply_to_id:
+        endpoints.append(f"{clean_service_url}/v3/conversations/{conversation_id}/activities/{reply_to_id}")
+    endpoints.append(f"{clean_service_url}/v3/conversations/{conversation_id}/activities")
+
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
-            resp = await client.post(target_url, headers=headers, json=reply_activity)
-            if resp.status_code in (200, 201, 202):
-                logger.info(
-                    f"Successfully delivered Teams reply via Bot Connector [status={resp.status_code}, conv={conversation_id}]"
-                )
-                return True
-            else:
-                logger.error(
-                    f"Bot Connector rejected activity [status={resp.status_code}, conv={conversation_id}]: {resp.text}"
-                )
-                return False
+            for target_url in endpoints:
+                resp = await client.post(target_url, headers=headers, json=reply_activity)
+                if resp.status_code in (200, 201, 202):
+                    logger.info(
+                        f"Successfully delivered Teams reply via Bot Connector [status={resp.status_code}, conv={conversation_id}]"
+                    )
+                    return True
+                else:
+                    corr_id = resp.headers.get("X-Correlating-OperationId", "")
+                    logger.error(
+                        f"Bot Connector rejected activity [url={target_url}, status={resp.status_code}, corr={corr_id}]: {resp.text}"
+                    )
+            return False
     except Exception as e:
         logger.error(f"Exception posting activity to Teams Bot Connector: {e}", exc_info=True)
         return False
@@ -128,15 +144,25 @@ async def ms_teams_webhook(
     conversation = payload.get("conversation", {})
     conversation_id = conversation.get("id", "teams-conversation")
     service_url = payload.get("serviceUrl")
-    bot_recipient = payload.get("recipient", {"id": "bot", "name": "Smiota_ai"})
+    bot_recipient = payload.get("recipient", {})
 
     settings = get_settings()
-    app_id = settings.MICROSOFT_APP_ID or os.getenv("MICROSOFT_APP_ID")
+    app_id = settings.MICROSOFT_APP_ID or os.getenv("MICROSOFT_APP_ID") or "c93bfc04-2bf6-4c89-b04f-5d4ef6aa734a"
     app_password = settings.MICROSOFT_APP_PASSWORD or os.getenv("MICROSOFT_APP_PASSWORD")
 
+    # Format bot sender identity (Teams expects 28:<app_id>)
+    bot_from_id = bot_recipient.get("id") or f"28:{app_id}"
+    bot_name = bot_recipient.get("name") or "Smiota_ai"
+    bot_sender = {"id": bot_from_id, "name": bot_name}
+
     logger.info(
-        f"MS Teams activity received [type={activity_type}, user={user_name}, conv={conversation_id}]"
+        f"MS Teams activity received [type={activity_type}, user={user_name}, conv={conversation_id}, serviceUrl={service_url}, has_password={bool(app_password)}]"
     )
+
+    if not app_password:
+        logger.error(
+            "CRITICAL: MICROSOFT_APP_PASSWORD is not set in environment! Outbound replies to Teams cannot be sent."
+        )
 
     # 1. Handle member added / conversation update
     if activity_type == "conversationUpdate":
@@ -150,7 +176,7 @@ async def ms_teams_webhook(
         )
         reply_activity = {
             "type": "message",
-            "from": bot_recipient,
+            "from": bot_sender,
             "recipient": from_user,
             "conversation": conversation,
             "replyToId": payload.get("id"),
@@ -178,7 +204,7 @@ async def ms_teams_webhook(
         if not cleaned_query:
             prompt_activity = {
                 "type": "message",
-                "from": bot_recipient,
+                "from": bot_sender,
                 "recipient": from_user,
                 "conversation": conversation,
                 "replyToId": payload.get("id"),
@@ -220,7 +246,7 @@ async def ms_teams_webhook(
             )
             reply_activity = {
                 "type": "message",
-                "from": bot_recipient,
+                "from": bot_sender,
                 "recipient": from_user,
                 "conversation": conversation,
                 "replyToId": payload.get("id"),
@@ -239,7 +265,7 @@ async def ms_teams_webhook(
             logger.error(f"Error processing Teams message through orchestrator: {err}", exc_info=True)
             err_activity = {
                 "type": "message",
-                "from": bot_recipient,
+                "from": bot_sender,
                 "recipient": from_user,
                 "conversation": conversation,
                 "replyToId": payload.get("id"),
