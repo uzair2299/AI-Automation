@@ -53,9 +53,12 @@ class CustomerAgent(BaseAgent):
         if tracking_num:
             lines.append(f"• **Tracking Number**: `{tracking_num}`")
 
+        pkg_id = pkg.get("id")
         uuid_val = pkg.get("uuid")
         if uuid_val and uuid_val != tracking_num:
             lines.append(f"• **Package UUID**: `{uuid_val}`")
+        elif pkg_id and str(pkg_id) != str(tracking_num):
+            lines.append(f"• **Package ID**: `{pkg_id}`")
 
         recipient = pkg.get("recipientName")
         if not recipient:
@@ -67,17 +70,21 @@ class CustomerAgent(BaseAgent):
         if recipient:
             lines.append(f"• **Recipient**: {recipient}")
 
-        status_name = pkg.get("statusName")
+        status_name = pkg.get("statusName") or pkg.get("status")
         if status_name:
             lines.append(f"• **Delivery Status**: **{status_name}**")
 
-        building = pkg.get("currentlyBuildingName") or pkg.get("receivedBuildingName")
+        building = pkg.get("currentlyBuildingName") or pkg.get("receivedBuildingName") or pkg.get("buildingName")
         intended_bldg = pkg.get("intendedBuildingName")
         if building:
             if intended_bldg and intended_bldg != building:
                 lines.append(f"• **Location / Building**: {building} *(Intended for: {intended_bldg})*")
             else:
                 lines.append(f"• **Location / Building**: {building}")
+
+        storage_type = pkg.get("storageType")
+        if storage_type:
+            lines.append(f"• **Storage Type**: {storage_type}")
 
         carrier = pkg.get("courier") or pkg.get("carrier")
         pkg_type = pkg.get("packageTypeLabel")
@@ -97,6 +104,10 @@ class CustomerAgent(BaseAgent):
         received_time = pkg.get("receivedTime")
         if received_time:
             lines.append(f"• **Received At**: {received_time}")
+
+        expiration_time = pkg.get("expirationTime")
+        if expiration_time:
+            lines.append(f"• **Expires At**: {expiration_time}")
 
         time_released = pkg.get("timeReleased")
         if time_released:
@@ -120,7 +131,7 @@ class CustomerAgent(BaseAgent):
         if not packages:
             return ["Where is my package?", "Look up by phone number", "Contact support concierge"]
         
-        status = (packages[0].get("statusName") or "").lower()
+        status = (packages[0].get("statusName") or packages[0].get("status") or "").lower()
         if any(w in status for w in ["released", "picked up", "delivered", "collected"]):
             return [
                 "Track another package",
@@ -223,8 +234,13 @@ class CustomerAgent(BaseAgent):
                 ],
             )
 
-        # 4. Resend Pickup PIN
-        if any(w in q for w in ["pin", "code", "pickup pin", "resend pin", "access code"]):
+        # 4. Resend Pickup PIN (Explicit PIN requests only - do not intercept tracking code queries)
+        is_pin_query = bool(
+            re.search(r'\b(?:pickup\s+pin|resend\s+pin|access\s+code|locker\s+pin|my\s+pin|resend\s+code|pickup\s+code|pin\s+code)\b', q)
+            or (re.search(r'\bpin\b', q) and not any(k in q for k in ["tracking", "parcel", "package", "delivery", "status", "where is"]))
+        ) and not any(k in q for k in ["tracking code", "track code", "package code", "parcel code", "status of"])
+
+        if is_pin_query:
             if getattr(caller_ctx, "is_authenticated", False):
                 try:
                     mcp_res = await MCPClient().execute_tool("get_my_pickup_pin", {})
@@ -332,15 +348,25 @@ class CustomerAgent(BaseAgent):
         # 6. Package UUID or Parcel Tracking ID Provided
         uuid_match = re.search(r'\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b', query)
         explicit_match = re.search(
-            r'(?:tracking|package|parcel|uuid|number|id|#)\s*(?:is|number|id|#)?\s*[:=\s]\s*([a-zA-Z0-9_-]{6,50})',
+            r'(?:tracking|package|parcel|uuid|number|id|code|#)\s*(?:is|number|id|code|#)?\s*[:=\s]\s*([a-zA-Z0-9_-]{4,50})',
             query,
             re.IGNORECASE,
         )
-        # Tracking match: carrier prefixes, numeric (8-35 digits), or alphanumeric with AT LEAST ONE DIGIT (prevents matching English words like 'response' or 'something')
-        tracking_match = re.search(
-            r'\b(sm-[0-9a-zA-Z_-]+|pkg-[0-9a-zA-Z_-]+|1z[0-9a-zA-Z]+|[0-9]{8,35}|(?=[a-zA-Z0-9_-]{8,35})(?=.*\d)[a-zA-Z0-9_-]+)\b',
+        track_cmd_match = re.search(
+            r'\b(?:track|status\s+of|status\s+for)\s+([a-zA-Z0-9_-]{4,50})\b',
+            query,
+            re.IGNORECASE,
+        )
+        standalone_match = re.search(
+            r'\b(sm-[0-9a-zA-Z_-]+|pkg-[0-9a-zA-Z_-]+|1z[0-9a-zA-Z]+|[0-9]{4,35}|(?=[a-zA-Z0-9_-]*\d)[a-zA-Z0-9_-]{5,35})\b',
             q,
         )
+
+        stop_words = {
+            "delivery", "customer", "tracking", "package", "building", "resident",
+            "status", "number", "details", "update", "pickup", "here", "there",
+            "please", "code", "today", "yesterday", "tomorrow", "account"
+        }
 
         pkg_id = None
         is_uuid = False
@@ -348,105 +374,119 @@ class CustomerAgent(BaseAgent):
         if uuid_match:
             pkg_id = uuid_match.group(0).lower()
             is_uuid = True
-        elif explicit_match:
-            candidate = explicit_match.group(1).strip()
-            if candidate.lower() not in ["status", "number", "details", "update", "pickup", "here", "there", "please"]:
-                pkg_id = candidate.lower()
-        elif tracking_match:
-            candidate = tracking_match.group(0).strip()
-            if candidate.lower() not in ["delivery", "customer", "tracking", "package", "building", "resident"]:
-                pkg_id = candidate.lower()
+        elif explicit_match and explicit_match.group(1).lower() not in stop_words:
+            pkg_id = explicit_match.group(1).lower()
+        elif track_cmd_match and track_cmd_match.group(1).lower() not in stop_words:
+            pkg_id = track_cmd_match.group(1).lower()
+        elif standalone_match and standalone_match.group(0).lower() not in stop_words:
+            pkg_id = standalone_match.group(0).lower()
 
         if pkg_id:
-            try:
-                from smiota.services.package_service import package_service
-
-                # Optional Text-to-SQL audit log (non-blocking)
-                try:
-                    from smiota.database.sql_generator import TextToSQLEngine
-                    engine = TextToSQLEngine()
-                    await engine.generate_sql(
-                        query,
-                        user_context={"resident_id": context.user_id, "channel": context.channel, "tenant_id": context.tenant_id},
-                    )
-                except Exception as sql_err:
-                    logger.debug(f"Optional Text-to-SQL audit log skipped: {sql_err}")
-
-                # Query Smiota Server endpoint using verified parent app token:
-                parent_token = (
-                    getattr(context, "parent_token", None)
-                    or (context.user.get("parent_token") if isinstance(context.user, dict) else None)
-                    or (context.metadata.get("parent_token") if isinstance(context.metadata, dict) else None)
-                    or (context.metadata.get("token") if isinstance(context.metadata, dict) else None)
-                    or None
-                )
-                if not parent_token:
-                    return AgentResult(
-                        agent_name=self.name,
-                        content="You’re using Smiota Support as a guest. For your privacy and security, please log in to your Smiota account.",
-                        requires_approval=False,
-                        suggested_actions=[
-                            "Log in to your account",
-                            "Locker location and hours",
-                            "Contact support",
-                        ],
-                    )
-
-                if is_uuid:
-                    api_result = await package_service.get_packages(uuid=pkg_id, token=parent_token)
-                else:
-                    api_result = await package_service.get_packages(by_name_or_number=pkg_id, token=parent_token)
-
-                if not api_result.get("success"):
-                    if api_result.get("error_type") in ["UNAUTHENTICATED", "AUTH_ERROR"]:
-                        return AgentResult(
-                            agent_name=self.name,
-                            content="You’re using Smiota Support as a guest. For your privacy and security, please log in to your Smiota account.",
-                            requires_approval=False,
-                            suggested_actions=[
-                                "Log in to your account",
-                                "Locker location and hours",
-                                "Contact support",
-                            ],
-                        )
-                    return AgentResult(
-                        agent_name=self.name,
-                        content="I apologize, I'm taking a bit longer than expected to look that up. Please try again.",
-                        requires_approval=False,
-                        suggested_actions=["Where is my package?", "Resend pickup PIN", "Locker location and hours"],
-                    )
-
-                packages = api_result.get("packages", [])
-                if isinstance(packages, dict):
-                    packages = packages.get("data", [])
-
-                if not packages:
-                    id_label = "Package UUID" if is_uuid else "tracking number"
-                    return AgentResult(
-                        agent_name=self.name,
-                        content=(
-                            f"I couldn't find any packages with {id_label} **{pkg_id}** in our system. 📦\n\n"
-                            f"Please double-check the {id_label}, or contact your property management office if you need further help."
-                        ),
-                        requires_approval=False,
-                        suggested_actions=["Where is my package?", "Look up by phone number", "Contact support concierge"],
-                    )
-
-                if len(packages) == 1:
-                    details_lines = self._format_package_record(packages[0])
-                    body = "📦 **Package Delivery Details**\n\n" + "\n".join(details_lines)
-                else:
-                    body_parts = [f"📦 **Found {len(packages)} Packages**\n"]
-                    for idx, p in enumerate(packages[:5], 1):
-                        p_lines = self._format_package_record(p)
-                        body_parts.append(f"**Package {idx}:**\n" + "\n".join(p_lines))
-                    body = "\n\n".join(body_parts)
-
+            # Check guest vs authenticated
+            if not getattr(caller_ctx, "is_authenticated", False):
                 return AgentResult(
                     agent_name=self.name,
-                    content=body,
+                    content="You’re using Smiota Support as a guest. For your privacy and security, please log in to your Smiota account.",
                     requires_approval=False,
-                    suggested_actions=self._get_suggested_actions(packages),
+                    suggested_actions=[
+                        "Log in to your account",
+                        "Locker location and hours",
+                        "Contact support",
+                    ],
+                )
+
+            try:
+                # Query packages via verified MCP tool search_packages
+                all_packages = []
+                try:
+                    mcp_res = await MCPClient().execute_tool("search_packages", {"status_group": "ALL"})
+                    if mcp_res.success and mcp_res.output:
+                        out_data = mcp_res.output.get("data") if isinstance(mcp_res.output, dict) else {}
+                        if isinstance(out_data, dict):
+                            all_packages = out_data.get("packages") or []
+                except Exception as mcp_err:
+                    logger.debug(f"MCP search_packages lookup error: {mcp_err}")
+
+                # Find package matching tracking number, id, or uuid
+                matched_packages = [
+                    p for p in all_packages
+                    if str(p.get("trackingNumber", "")).lower() == pkg_id
+                    or str(p.get("id", "")).lower() == pkg_id
+                    or str(p.get("uuid", "")).lower() == pkg_id
+                ]
+
+                # Fallback to legacy package_service if not found in MCP packages list
+                if not matched_packages:
+                    parent_token = getattr(caller_ctx, "parent_token", None) or (context.user.get("parent_token") if isinstance(context.user, dict) else None)
+                    if parent_token:
+                        try:
+                            from smiota.services.package_service import package_service
+                            if is_uuid:
+                                api_result = await package_service.get_packages(uuid=pkg_id, token=parent_token)
+                            else:
+                                api_result = await package_service.get_packages(by_name_or_number=pkg_id, token=parent_token)
+                            if api_result.get("success"):
+                                legacy_pkgs = api_result.get("packages", [])
+                                if isinstance(legacy_pkgs, dict):
+                                    legacy_pkgs = legacy_pkgs.get("data", [])
+                                if legacy_pkgs:
+                                    matched_packages = legacy_pkgs
+                        except Exception as legacy_err:
+                            logger.debug(f"Legacy package_service fallback skipped: {legacy_err}")
+
+                if matched_packages:
+                    if len(matched_packages) == 1:
+                        details_lines = self._format_package_record(matched_packages[0])
+                        body = "📦 **Package Delivery Details**\n\n" + "\n".join(details_lines)
+                    else:
+                        body_parts = [f"📦 **Found {len(matched_packages)} Packages**\n"]
+                        for idx, p in enumerate(matched_packages[:5], 1):
+                            p_lines = self._format_package_record(p)
+                            body_parts.append(f"**Package {idx}:**\n" + "\n".join(p_lines))
+                        body = "\n\n".join(body_parts)
+
+                    return AgentResult(
+                        agent_name=self.name,
+                        content=body,
+                        requires_approval=False,
+                        suggested_actions=self._get_suggested_actions(matched_packages),
+                    )
+
+                # Check if resident has pending packages awaiting pickup
+                pending_pkgs = [
+                    p for p in all_packages
+                    if str(p.get("status", "")).lower() in ["processed", "pending", "stored", "ready_for_pickup", "received"]
+                ]
+
+                if pending_pkgs:
+                    body = (
+                        f"I couldn't find any packages with tracking code or ID **{pkg_id}** in your account. 📦\n\n"
+                        f"However, you currently have **{len(pending_pkgs)} active package(s)** awaiting pickup:\n\n"
+                    )
+                    for idx, p in enumerate(pending_pkgs[:5], 1):
+                        trk = p.get("trackingNumber") or p.get("id")
+                        st = p.get("status") or p.get("statusName") or "Pending"
+                        loc = p.get("buildingName") or "Warehouse"
+                        storage = p.get("storageType") or "Locker"
+                        body += f"• **Package {idx}**: Tracking `{trk}` | Status: **{st}** | Storage: **{storage}** ({loc})\n"
+
+                    body += "\nPlease double-check your tracking code or select one of your active packages above."
+                    return AgentResult(
+                        agent_name=self.name,
+                        content=body,
+                        requires_approval=False,
+                        suggested_actions=[f"Track: {p.get('trackingNumber') or p.get('id')}" for p in pending_pkgs[:2]] + ["Locker location and hours"],
+                    )
+
+                id_label = "Package UUID" if is_uuid else "tracking code"
+                return AgentResult(
+                    agent_name=self.name,
+                    content=(
+                        f"I couldn't find any packages with {id_label} **{pkg_id}** in our system. 📦\n\n"
+                        f"Please double-check the {id_label}, or contact your property management office if you need further help."
+                    ),
+                    requires_approval=False,
+                    suggested_actions=["Where is my package?", "Look up by phone number", "Contact support concierge"],
                 )
             except Exception as e:
                 import traceback
@@ -570,8 +610,45 @@ class CustomerAgent(BaseAgent):
         info_prefix = info_match[0] if info_match else None
         info_category = info_match[1] if info_match else None
 
-        # 8. Check Parcel / Tracking Inquiry (Prompt for Package ID or Tracking Number if none given)
-        if not is_informational and any(w in q for w in ["parcel", "package", "tracking", "track", "delivery", "pickup", "where is my"]):
+        # 8. Check Parcel / Tracking Inquiry (Proactively check active pending packages for authenticated residents)
+        if not is_informational and any(w in q for w in ["parcel", "package", "tracking", "track", "delivery", "pickup", "where is my", "my packages"]):
+            if getattr(caller_ctx, "is_authenticated", False):
+                try:
+                    mcp_res = await MCPClient().execute_tool("search_packages", {"status_group": "PENDING"})
+                    if mcp_res.success and mcp_res.output:
+                        out_data = mcp_res.output.get("data") if isinstance(mcp_res.output, dict) else {}
+                        if isinstance(out_data, dict):
+                            pkgs = out_data.get("packages") or []
+                            if pkgs:
+                                if len(pkgs) == 1:
+                                    details_lines = self._format_package_record(pkgs[0])
+                                    body = "📦 **You have 1 pending package awaiting pickup:**\n\n" + "\n".join(details_lines)
+                                else:
+                                    body_parts = [f"📦 **You have {len(pkgs)} pending packages awaiting pickup:**\n"]
+                                    for idx, p in enumerate(pkgs[:5], 1):
+                                        p_lines = self._format_package_record(p)
+                                        body_parts.append(f"**Package {idx}:**\n" + "\n".join(p_lines))
+                                    body = "\n\n".join(body_parts)
+
+                                return AgentResult(
+                                    agent_name=self.name,
+                                    content=body,
+                                    requires_approval=False,
+                                    suggested_actions=self._get_suggested_actions(pkgs),
+                                )
+                            else:
+                                return AgentResult(
+                                    agent_name=self.name,
+                                    content=(
+                                        "You currently have no pending packages awaiting pickup. 📦\n\n"
+                                        "If you are looking for a past delivery or have a specific tracking number, please provide it and I'll look it up!"
+                                    ),
+                                    requires_approval=False,
+                                    suggested_actions=["Track another package", "Resend pickup PIN", "Locker location and hours"],
+                                )
+                except Exception as mcp_err:
+                    logger.debug(f"MCP search_packages pending query skipped or errored: {mcp_err}")
+
             return AgentResult(
                 agent_name=self.name,
                 content=(
