@@ -637,7 +637,13 @@ class CustomerAgent(BaseAgent):
         info_prefix = info_match[0] if info_match else None
         info_category = info_match[1] if info_match else None
 
-        # 8. Check Parcel / Tracking / Collection Inquiry (Proactively check active pending packages for authenticated residents)
+        # 8. Check Parcel / Tracking / Collection / History Inquiry
+        is_history_query = any(w in q for w in [
+            "history", "past", "previously", "already picked", "already collected",
+            "past deliveries", "pickup history", "last 30 days", "last 7 days",
+            "last month", "last week", "prior pickup", "old deliveries", "picked up"
+        ])
+
         package_inquiry_terms = [
             "parcel", "package", "tracking", "track", "delivery", "deliveries",
             "pickup", "pick up", "collect", "collection", "mail", "anything to collect",
@@ -647,24 +653,42 @@ class CustomerAgent(BaseAgent):
             "my packages", "my delivery", "to collect", "ready for collection", "pending",
             "uncollected", "unclaimed", "awaiting pickup", "waiting for pickup"
         ]
-        if not is_informational and any(w in q for w in package_inquiry_terms):
+        if not is_informational and (is_history_query or any(w in q for w in package_inquiry_terms)):
             if getattr(caller_ctx, "is_authenticated", False):
                 try:
-                    mcp_res = await MCPClient().execute_tool("search_packages", {"status_group": "PENDING"})
+                    status_group = "RELEASED" if is_history_query else "PENDING"
+                    days: Optional[int] = None
+                    if is_history_query:
+                        days_match = re.search(r'\b(\d{1,3})\s*days?\b', q)
+                        if days_match:
+                            days = min(int(days_match.group(1)), 365)
+                        elif "month" in q:
+                            days = 30
+                        elif "week" in q:
+                            days = 7
+                        else:
+                            days = 30  # Default 30 days for general history requests
+
+                    tool_args: dict[str, Any] = {"status_group": status_group}
+                    if days is not None:
+                        tool_args["days"] = days
+
+                    mcp_res = await MCPClient().execute_tool("search_packages", tool_args)
                     if mcp_res.success and mcp_res.output:
                         out_data = mcp_res.output.get("data") if isinstance(mcp_res.output, dict) else {}
                         if isinstance(out_data, dict):
                             pkgs = out_data.get("packages") or []
                             if pkgs:
-                                if len(pkgs) == 1:
-                                    details_lines = self._format_package_record(pkgs[0])
-                                    body = "📦 **You have 1 pending package awaiting pickup:**\n\n" + "\n".join(details_lines)
+                                if is_history_query:
+                                    day_str = f"the past {days} days" if days else "your account history"
+                                    body_parts = [f"📜 **Here is your pickup history for {day_str} ({len(pkgs)} package{'s' if len(pkgs) > 1 else ''}):**\n"]
                                 else:
-                                    body_parts = [f"📦 **You have {len(pkgs)} pending packages awaiting pickup:**\n"]
-                                    for idx, p in enumerate(pkgs[:5], 1):
-                                        p_lines = self._format_package_record(p)
-                                        body_parts.append(f"**Package {idx}:**\n" + "\n".join(p_lines))
-                                    body = "\n\n".join(body_parts)
+                                    body_parts = [f"📦 **You have {len(pkgs)} pending package{'s' if len(pkgs) > 1 else ''} awaiting pickup:**\n"]
+
+                                for idx, p in enumerate(pkgs[:5], 1):
+                                    p_lines = self._format_package_record(p)
+                                    body_parts.append(f"**Package {idx}:**\n" + "\n".join(p_lines))
+                                body = "\n\n".join(body_parts)
 
                                 return AgentResult(
                                     agent_name=self.name,
@@ -673,15 +697,27 @@ class CustomerAgent(BaseAgent):
                                     suggested_actions=self._get_suggested_actions(pkgs),
                                 )
                             else:
-                                return AgentResult(
-                                    agent_name=self.name,
-                                    content=(
-                                        "You currently have no pending packages awaiting pickup. 📦\n\n"
-                                        "If you are looking for a past delivery or have a specific tracking number, please provide it and I'll look it up!"
-                                    ),
-                                    requires_approval=False,
-                                    suggested_actions=["Track another package", "Resend pickup PIN", "Locker location and hours"],
-                                )
+                                if is_history_query:
+                                    day_str = f"the past {days} days" if days else "this period"
+                                    return AgentResult(
+                                        agent_name=self.name,
+                                        content=(
+                                            f"You have no completed pickups recorded over {day_str}. 📦\n\n"
+                                            "If you are looking for an active delivery currently waiting for pickup, just let me know!"
+                                        ),
+                                        requires_approval=False,
+                                        suggested_actions=["Do I have anything to collect right now?", "Where is my package?", "Locker location and hours"],
+                                    )
+                                else:
+                                    return AgentResult(
+                                        agent_name=self.name,
+                                        content=(
+                                            "You currently have no pending packages awaiting pickup. 📦\n\n"
+                                            "If you are looking for a past delivery or have a specific tracking number, please provide it and I'll look it up!"
+                                        ),
+                                        requires_approval=False,
+                                        suggested_actions=["Track another package", "Resend pickup PIN", "Locker location and hours"],
+                                    )
                 except Exception as mcp_err:
                     logger.debug(f"MCP search_packages pending query skipped or errored: {mcp_err}")
 
