@@ -38,7 +38,8 @@ from smiota.services.smiota_mcp_service import get_smiota_mcp_service
     access_level=ToolAccessLevel.READ_ONLY,
     description=(
         "1. Purpose: Search, filter, and list packages for the authenticated resident.\n"
-        "2. When to use: When the customer asks 'Where are my packages?', 'Do I have any deliveries waiting?', "
+        "2. When to use: When the customer asks 'Do I have anything to collect right now?', 'Do I have anything to pick up?', "
+        "'Where are my packages?', 'Do I have any deliveries waiting?', 'What items are ready for pickup?', "
         "'Show my package history', or filters by carrier (e.g. FedEx, Amazon), perishable items, or past days.\n"
         "3. When not to use: When the customer asks for a specific 6-digit pickup PIN (use get_my_pickup_pin) or asks "
         "about locker door troubleshooting (use query_locker_door_status).\n"
@@ -48,7 +49,7 @@ from smiota.services.smiota_mcp_service import get_smiota_mcp_service
         "6. Authentication: Required. Unauthenticated guests are rejected with AUTHENTICATION_REQUIRED.\n"
         "7. Authorization: Customer and tenant scope derived exclusively from verified session context.\n"
         "8. Data returned: List of packages with tracking numbers, carriers, status, received/released timestamps, "
-        "and locker compartment assignments.\n"
+        "storage type (LOCKER/SHELF), and locker compartment assignments.\n"
         "9. Limitations: Returns maximum 50 records per query; historical queries beyond 365 days are truncated.\n"
         "10. Failure behavior: Returns standard envelope with success=false and status code if unauthenticated, "
         "rate limited, timed out, or unavailable."

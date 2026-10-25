@@ -610,8 +610,16 @@ class CustomerAgent(BaseAgent):
         info_prefix = info_match[0] if info_match else None
         info_category = info_match[1] if info_match else None
 
-        # 8. Check Parcel / Tracking Inquiry (Proactively check active pending packages for authenticated residents)
-        if not is_informational and any(w in q for w in ["parcel", "package", "tracking", "track", "delivery", "pickup", "where is my", "my packages"]):
+        # 8. Check Parcel / Tracking / Collection Inquiry (Proactively check active pending packages for authenticated residents)
+        package_inquiry_terms = [
+            "parcel", "package", "tracking", "track", "delivery", "deliveries",
+            "pickup", "pick up", "collect", "collection", "mail", "anything to collect",
+            "anything to pick", "anything for me", "anything waiting", "what do i have",
+            "do i have anything", "do i have any", "any packages", "any parcels",
+            "my items", "my stuff", "items pending", "pending items", "where is my",
+            "my packages", "my delivery", "to collect", "ready for collection", "pending"
+        ]
+        if not is_informational and any(w in q for w in package_inquiry_terms):
             if getattr(caller_ctx, "is_authenticated", False):
                 try:
                     mcp_res = await MCPClient().execute_tool("search_packages", {"status_group": "PENDING"})
@@ -667,6 +675,26 @@ class CustomerAgent(BaseAgent):
 
         # 9. Fallback Account Lookup Prompt (Phone / Email)
         if not is_informational and any(w in q for w in ["phone", "email", "don't have", "dont have", "no tracking"]):
+            if getattr(caller_ctx, "is_authenticated", False):
+                try:
+                    mcp_res = await MCPClient().execute_tool("search_packages", {"status_group": "PENDING"})
+                    if mcp_res.success and mcp_res.output:
+                        out_data = mcp_res.output.get("data") if isinstance(mcp_res.output, dict) else {}
+                        pkgs = out_data.get("packages") or [] if isinstance(out_data, dict) else []
+                        if pkgs:
+                            body_parts = [f"📦 **You have {len(pkgs)} pending package(s) registered under your account:**\n"]
+                            for idx, p in enumerate(pkgs[:5], 1):
+                                p_lines = self._format_package_record(p)
+                                body_parts.append(f"**Package {idx}:**\n" + "\n".join(p_lines))
+                            return AgentResult(
+                                agent_name=self.name,
+                                content="\n\n".join(body_parts),
+                                requires_approval=False,
+                                suggested_actions=self._get_suggested_actions(pkgs),
+                            )
+                except Exception as e:
+                    logger.debug(f"MCP search_packages lookup error: {e}")
+
             return AgentResult(
                 agent_name=self.name,
                 content=(
@@ -704,12 +732,22 @@ class CustomerAgent(BaseAgent):
         try:
             from smiota.llm.provider import GeminiProvider
             llm = GeminiProvider()
+            auth_instruction = ""
+            if getattr(caller_ctx, "is_authenticated", False):
+                user_name = getattr(caller_ctx, "name", "") or (context.user.get("name") if isinstance(context.user, dict) else "") or "Resident"
+                auth_instruction = (
+                    f"\n[AUTHENTICATED USER CONTEXT]\n"
+                    f"The resident is already verified and signed in as '{user_name}' (ID: {caller_ctx.user_id}).\n"
+                    f"IMPORTANT: NEVER ask the resident for their full name, phone number, or email address because they are already authenticated.\n"
+                )
+
             prompt = (
                 f"[Informational Query - Category: {info_category}, Pattern: '{info_prefix}']\n"
+                f"{auth_instruction}"
                 f"Resident query: {query}\n"
                 f"Provide a helpful, polite, and concise instructional answer for the resident."
                 if is_informational
-                else f"Resident query: {query}\nProvide a helpful, polite, and concise answer for the resident."
+                else f"{auth_instruction}Resident query: {query}\nProvide a helpful, polite, and concise answer for the resident."
             )
             llm_reply = await llm.generate_completion(
                 prompt=prompt,
