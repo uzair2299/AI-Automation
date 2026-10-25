@@ -106,6 +106,16 @@ class SearchPackagesInput(BaseModel):
         default="PENDING",
         description="Filter by package lifecycle group: PENDING (awaiting pickup), RELEASED (collected history), OUTBOUND (returns), ALL.",
     )
+    status: Optional[str] = Field(
+        default=None,
+        description=(
+            "Optional specific package status filter. Supported Smiota statuses: "
+            "'pickup_request_submitted', 'received', 'delivered_to_station', 'released', "
+            "'sent back', 'attempted to deliver', 'courier to mailroom', 'in transit', "
+            "'return to hub', 'Ready to Ship', 'In Transit to Warehouse', 'In Transit to Pod', "
+            "'Hold', 'In Warehouse', 'Research', 'Transferred', 'Processed'."
+        ),
+    )
     carrier: Optional[str] = Field(
         default=None,
         description="Optional carrier filter (e.g., 'Amazon', 'FedEx', 'UPS', 'USPS', 'DHL'). Substring match.",

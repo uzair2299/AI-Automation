@@ -61,4 +61,17 @@ __all__ = [
     "VectorSearchResponse",
     "ComponentHealth",
     "SystemHealthResponse",
+    "PackageStatus",
+    "PackageLifecycleGroup",
+    "PACKAGE_STATUS_CATALOG",
+    "get_status_definition",
+    "get_status_resident_explanation",
 ]
+
+from smiota.schemas.package_status import (
+    PackageStatus,
+    PackageLifecycleGroup,
+    PACKAGE_STATUS_CATALOG,
+    get_status_definition,
+    get_status_resident_explanation,
+)

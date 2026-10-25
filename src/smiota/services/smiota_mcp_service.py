@@ -45,6 +45,7 @@ class SmiotaMcpService:
     async def search_packages(
         self,
         status_group: str = "PENDING",
+        status: Optional[str] = None,
         carrier: Optional[str] = None,
         storage_type: str = "ALL",
         days: Optional[int] = None,
@@ -63,6 +64,7 @@ class SmiotaMcpService:
             data = await self._api_client.search_packages(
                 caller=resolved_caller,
                 status_group=status_group,
+                status=status,
                 carrier=carrier,
                 storage_type=storage_type,
                 days=days,
@@ -70,11 +72,23 @@ class SmiotaMcpService:
             )
 
             packages = data.get("packages") or []
+            if status:
+                from smiota.schemas.package_status import normalize_status_key
+                target_key = normalize_status_key(status)
+                packages = [
+                    p for p in packages
+                    if normalize_status_key(p.get("status") or p.get("statusName")) == target_key
+                ]
+                data = dict(data)
+                data["packages"] = packages
+                data["total_count"] = len(packages)
+
             total_count = data.get("total_count", len(packages))
 
             if total_count == 0 or len(packages) == 0:
+                filter_desc = f"status '{status}'" if status else f"status group '{status_group}'"
                 return SmiotaToolResult.empty_result(
-                    message=f"No packages found matching status '{status_group}'" + (f" for carrier '{carrier}'" if carrier else "") + ".",
+                    message=f"No packages found matching {filter_desc}" + (f" for carrier '{carrier}'" if carrier else "") + ".",
                     correlation_id=cid,
                 )
 

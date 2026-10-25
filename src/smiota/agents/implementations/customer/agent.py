@@ -72,7 +72,12 @@ class CustomerAgent(BaseAgent):
 
         status_name = pkg.get("statusName") or pkg.get("status")
         if status_name:
-            lines.append(f"• **Delivery Status**: **{status_name}**")
+            from smiota.schemas.package_status import get_status_definition
+            defn = get_status_definition(status_name)
+            if defn:
+                lines.append(f"• **Delivery Status**: {defn.icon} **{defn.display_name}** *({defn.customer_summary})*")
+            else:
+                lines.append(f"• **Delivery Status**: **{status_name}**")
 
         building = pkg.get("currentlyBuildingName") or pkg.get("receivedBuildingName") or pkg.get("buildingName")
         intended_bldg = pkg.get("intendedBuildingName")
@@ -344,6 +349,28 @@ class CustomerAgent(BaseAgent):
                 requires_approval=False,
                 suggested_actions=["Locker location and hours", "Contact support"],
             )
+
+        # 1.4 Direct Package Status Meaning / Explanation
+        if any(term in q for term in ["status mean", "what does status", "what is status", "explain status", "meaning of status", "status meaning"]):
+            from smiota.schemas.package_status import PACKAGE_STATUS_CATALOG
+            for raw_key, defn in PACKAGE_STATUS_CATALOG.items():
+                if defn.canonical_key.lower() in q or defn.display_name.lower() in q or raw_key.replace("_", " ") in q:
+                    return AgentResult(
+                        agent_name=self.name,
+                        content=(
+                            f"{defn.icon} **Smiota Delivery Status: {defn.display_name}**\n\n"
+                            f"• **What it means**: {defn.customer_summary}\n"
+                            f"• **Resident Action**: {defn.resident_guidance}\n"
+                            f"• **Lifecycle Phase**: `{defn.status_group.value}`\n"
+                            f"• **Ready for Pickup Now?**: {'Yes, ready for collection ✅' if defn.is_collectible_now else 'Not yet (underway or pending next step) ⏳'}"
+                        ),
+                        requires_approval=False,
+                        suggested_actions=[
+                            "Do I have anything to collect right now?",
+                            "Where is my package?",
+                            "Locker location and hours",
+                        ],
+                    )
 
         # 6. Package UUID or Parcel Tracking ID Provided
         uuid_match = re.search(r'\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b', query)

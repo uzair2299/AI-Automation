@@ -44,8 +44,11 @@ from smiota.services.smiota_mcp_service import get_smiota_mcp_service
         "3. When not to use: When the customer asks for a specific 6-digit pickup PIN (use get_my_pickup_pin) or asks "
         "about locker door troubleshooting (use query_locker_door_status).\n"
         "4. Required arguments: None.\n"
-        "5. Optional arguments: status_group ('PENDING', 'RELEASED', 'OUTBOUND', 'ALL'), carrier (string), "
-        "storage_type ('ALL', 'LOCKER', 'SHELF'), days (0-365), is_perishable (boolean).\n"
+        "5. Optional arguments: status_group ('PENDING', 'RELEASED', 'OUTBOUND', 'ALL'), "
+        "status (specific status: 'pickup_request_submitted', 'received', 'delivered_to_station', 'released', "
+        "'sent back', 'attempted to deliver', 'courier to mailroom', 'in transit', 'return to hub', 'Ready to Ship', "
+        "'In Transit to Warehouse', 'In Transit to Pod', 'Hold', 'In Warehouse', 'Research', 'Transferred', 'Processed'), "
+        "carrier (string), storage_type ('ALL', 'LOCKER', 'SHELF'), days (0-365), is_perishable (boolean).\n"
         "6. Authentication: Required. Unauthenticated guests are rejected with AUTHENTICATION_REQUIRED.\n"
         "7. Authorization: Customer and tenant scope derived exclusively from verified session context.\n"
         "8. Data returned: List of packages with tracking numbers, carriers, status, received/released timestamps, "
@@ -58,6 +61,7 @@ from smiota.services.smiota_mcp_service import get_smiota_mcp_service
 )
 async def search_packages(
     status_group: str = "PENDING",
+    status: Optional[str] = None,
     carrier: Optional[str] = None,
     storage_type: str = "ALL",
     days: Optional[int] = None,
@@ -67,6 +71,7 @@ async def search_packages(
     service = get_smiota_mcp_service()
     result: SmiotaToolResult = await service.search_packages(
         status_group=status_group,
+        status=status,
         carrier=carrier,
         storage_type=storage_type,
         days=days,

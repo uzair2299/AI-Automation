@@ -523,6 +523,7 @@ class SmiotaApiClient:
         self,
         caller: Optional[CallerContext] = None,
         status_group: Optional[str] = "PENDING",
+        status: Optional[str] = None,
         carrier: Optional[str] = None,
         storage_type: Optional[str] = "ALL",
         days: Optional[int] = None,
@@ -532,6 +533,8 @@ class SmiotaApiClient:
         params: Dict[str, Any] = {}
         if status_group:
             params["status_group"] = status_group
+        if status:
+            params["status"] = status
         if carrier:
             params["carrier"] = carrier
         if storage_type:

@@ -84,10 +84,32 @@ Retrieves packages matching multi-dimensional filters, along with aggregated cou
 | `location_id` | Query / Header (`X-Location-Id`) | Long | No | `null` | Facility or campus location ID. |
 | `user_id` | Query / Header (`X-User-Id`) | Long | No | `null` | Recipient user ID. |
 | `status_group` | Query | String | No | `PENDING` | `PENDING` (awaiting pickup), `RELEASED` (history), `OUTBOUND` (returns), `ALL`. |
+| `status` | Query | String | No | `null` | Exact package status filter (e.g. `delivered_to_station`, `received`, `Hold`, `Research`, `Processed`). |
 | `carrier` | Query | String | No | `null` | Substring carrier search (e.g., `Amazon`, `FedEx`, `UPS`, `DHL`, `USPS`). |
 | `storage_type` | Query | String | No | `ALL` | `LOCKER` (in smart locker), `SHELF` (mailroom shelf/counter), `ALL`. |
 | `days` | Query | Integer | No | `null` | Lookback window: `0` for today, `30` for past month, `90` for past quarter. |
 | `is_perishable` | Query | Boolean | No | `null` | Filter by cold-storage / perishable tag (`true` or `false`). |
+
+#### Supported Smiota Package Statuses & Lifecycle Groups
+| Status Name | Canonical Key | Lifecycle Group | Collectible Now? | Description |
+|---|---|---|---|---|
+| `pickup_request_submitted` | `pickup_request_submitted` | `PENDING` | No | Pickup request submitted by resident/sender; awaiting mailroom/courier collection. |
+| `received` | `received` | `PENDING` | No | Intake scan completed at facility; being prepared for locker loading or shelf staging. |
+| `delivered_to_station` / `Delivered To Station` | `delivered_to_station` | `PENDING` | **Yes** | Arrived at locker station or kiosk; ready for resident collection. |
+| `released` | `released` | `RELEASED` | No | Package picked up and released to resident or proxy. |
+| `sent back` | `sent back` | `OUTBOUND` | No | Returned to sender (undeliverable or expired past hold threshold). |
+| `attempted to deliver` | `attempted to deliver` | `PENDING` | No | Delivery attempted (e.g., lockers full); queued for retry or shelf placement. |
+| `courier to mailroom` | `courier to mailroom` | `IN_TRANSIT` | No | Handed over by carrier courier to central mailroom staff. |
+| `in transit` | `in transit` | `IN_TRANSIT` | No | Moving between campus facilities or buildings. |
+| `return to hub` | `return to hub` | `IN_TRANSIT` | No | Returning to central mailroom hub for re-sorting or special handling. |
+| `Ready to Ship` | `Ready to Ship` | `OUTBOUND` | No | Packaged and staged for outbound carrier courier dispatch. |
+| `In Transit to Warehouse` | `In Transit to Warehouse` | `IN_TRANSIT` | No | En route to central warehouse distribution center. |
+| `In Transit to Pod` | `In Transit to Pod` | `IN_TRANSIT` | No | En route to smart locker pod; PIN generated upon compartment loading. |
+| `Hold` | `Hold` | `HOLD` | No | On administrative or vacation hold. |
+| `In Warehouse` | `In Warehouse` | `PENDING` | No | Stored at central warehouse awaiting building dispatch. |
+| `Research` | `Research` | `EXCEPTION` | No | Under mailroom staff investigation (damaged label, OCR mismatch, missing unit). |
+| `Transferred` | `Transferred` | `IN_TRANSIT` | At new location | Transferred to an alternate building or overflow locker bank. |
+| `Processed` | `Processed` | `PENDING` | **Yes** | Processed into system and staged on mailroom shelf or in smart locker. |
 
 #### Request Example (Scoped by Token)
 ```http
