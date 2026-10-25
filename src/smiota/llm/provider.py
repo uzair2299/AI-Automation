@@ -60,8 +60,8 @@ def _ensure_gcp_credentials() -> Optional[str]:
         logger.info(f"Using Google Cloud credentials file from {creds_val}")
         return creds_val
 
-    # Case D: On Windows, auto-detect gcloud CLI application default credentials if not specified
-    if not creds_val:
+    # Case D: On Windows, auto-detect gcloud CLI application default credentials if not specified or file doesn't exist
+    if not creds_val or not os.path.exists(creds_val):
         appdata = os.environ.get("APPDATA")
         if appdata:
             gcloud_adc = os.path.join(appdata, "gcloud", "application_default_credentials.json")
