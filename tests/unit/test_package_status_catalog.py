@@ -114,3 +114,28 @@ def test_format_package_record_with_status_decoration():
     status_line = next(line for line in lines if "Delivery Status" in line)
     assert "In Transit to Pod" in status_line
     assert "En route to designated smart locker pod" in status_line
+
+
+@pytest.mark.asyncio
+async def test_customer_agent_uncollected_parcels_inquiry():
+    """Verify logged-in user asking 'Show me all my uncollected parcels' returns pending packages directly."""
+    import smiota.mcp.servers.customer.tools  # Ensure MCP tools registered
+    agent = CustomerAgent()
+    context = AgentContext(
+        session_id="test-uncollected-sess",
+        user_id="10063863",
+        tenant_id="413",
+        channel="webchat",
+        user={
+            "is_authenticated": True,
+            "user_id": "10063863",
+            "customer_id": 2,
+            "tenant_id": 413,
+            "location_id": 37,
+            "parent_token": "dedfb7c0-aa9a-4789-8009-755e283ab3e7",
+        },
+    )
+    res = await agent.process("Show me all my uncollected parcels.", context=context)
+    assert res.agent_name == "Customer"
+    assert "pending package" in res.content.lower() or "awaiting pickup" in res.content.lower()
+    assert res.requires_approval is False

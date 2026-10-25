@@ -133,8 +133,13 @@ def build_caller_context_from_agent_context(
         except (ValueError, TypeError):
             pass
 
-    # An authenticated caller must have an active parent token or verified user profile
-    is_authenticated = bool(parent_token or (not is_guest and (customer_id or tenant_id)))
+    # An authenticated caller has explicit auth flag, active parent token, or verified user profile
+    explicit_auth = bool(
+        user_data.get("is_authenticated")
+        or metadata.get("is_authenticated")
+        or getattr(agent_context, "is_authenticated", False)
+    )
+    is_authenticated = bool(explicit_auth or parent_token or (not is_guest and (customer_id or tenant_id or user_id)))
 
     roles = list(agent_context.roles or user_data.get("roles") or [])
     active_corr_id = correlation_id or correlation_id_ctx.get()

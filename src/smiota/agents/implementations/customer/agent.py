@@ -644,7 +644,8 @@ class CustomerAgent(BaseAgent):
             "anything to pick", "anything for me", "anything waiting", "what do i have",
             "do i have anything", "do i have any", "any packages", "any parcels",
             "my items", "my stuff", "items pending", "pending items", "where is my",
-            "my packages", "my delivery", "to collect", "ready for collection", "pending"
+            "my packages", "my delivery", "to collect", "ready for collection", "pending",
+            "uncollected", "unclaimed", "awaiting pickup", "waiting for pickup"
         ]
         if not is_informational and any(w in q for w in package_inquiry_terms):
             if getattr(caller_ctx, "is_authenticated", False):

@@ -155,6 +155,7 @@ class RuleBasedRouter(BaseIntentRouter):
         "locker", "customer", "ticket", "package", "door", "pickup", "dropoff",
         "parcel", "compartment", "track", "tracking", "sm-", "pkg-", "pin",
         "resident", "unlock", "delivery", "box", "deliveries", "collect", "collection", "mail",
+        "uncollected", "unclaimed",
     ]
 
     AIOPS_KEYWORDS = [
