@@ -164,3 +164,28 @@ async def test_customer_agent_pickup_history_inquiry():
     assert res.agent_name == "Customer"
     assert "past 30 days" in res.content.lower() or "pickup history" in res.content.lower()
     assert res.requires_approval is False
+
+
+@pytest.mark.asyncio
+async def test_customer_agent_pending_packages_lookback_inquiry():
+    """Verify user asking 'Show me a list of all pending packages over the last 30 days?' queries status_group=PENDING."""
+    import smiota.mcp.servers.customer.tools
+    agent = CustomerAgent()
+    context = AgentContext(
+        session_id="test-pending-30-sess",
+        user_id="10063863",
+        tenant_id="413",
+        channel="webchat",
+        user={
+            "is_authenticated": True,
+            "user_id": "10063863",
+            "customer_id": 2,
+            "tenant_id": 413,
+            "location_id": 37,
+            "parent_token": "dedfb7c0-aa9a-4789-8009-755e283ab3e7",
+        },
+    )
+    res = await agent.process("Show me a list of all pending packages over the last 30 days?", context=context)
+    assert res.agent_name == "Customer"
+    assert "pending package" in res.content.lower()
+    assert res.requires_approval is False

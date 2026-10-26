@@ -127,9 +127,9 @@ class SearchPackagesInput(BaseModel):
     )
     days: Optional[int] = Field(
         default=None,
-        description="Historical lookback window in days (e.g. 0 for today, 30 for past month, 90 for past quarter). Maximum 365.",
+        description="Historical lookback window in days (can be any number, maximum 30 days for now).",
         ge=0,
-        le=365,
+        le=30,
     )
     is_perishable: Optional[bool] = Field(
         default=None,

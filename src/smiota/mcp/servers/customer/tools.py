@@ -48,7 +48,7 @@ from smiota.services.smiota_mcp_service import get_smiota_mcp_service
         "status (specific status: 'pickup_request_submitted', 'received', 'delivered_to_station', 'released', "
         "'sent back', 'attempted to deliver', 'courier to mailroom', 'in transit', 'return to hub', 'Ready to Ship', "
         "'In Transit to Warehouse', 'In Transit to Pod', 'Hold', 'In Warehouse', 'Research', 'Transferred', 'Processed'), "
-        "carrier (string), storage_type ('ALL', 'LOCKER', 'SHELF'), days (0-365), is_perishable (boolean).\n"
+        "carrier (string), storage_type ('ALL', 'LOCKER', 'SHELF'), days (any number, 0-30 for now), is_perishable (boolean).\n"
         "6. Authentication: Required. Unauthenticated guests are rejected with AUTHENTICATION_REQUIRED.\n"
         "7. Authorization: Customer and tenant scope derived exclusively from verified session context.\n"
         "8. Data returned: List of packages with tracking numbers, carriers, status, received/released timestamps, "

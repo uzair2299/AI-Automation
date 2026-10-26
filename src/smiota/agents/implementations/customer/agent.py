@@ -638,11 +638,42 @@ class CustomerAgent(BaseAgent):
         info_category = info_match[1] if info_match else None
 
         # 8. Check Parcel / Tracking / Collection / History Inquiry
-        is_history_query = any(w in q for w in [
-            "history", "past", "previously", "already picked", "already collected",
-            "past deliveries", "pickup history", "last 30 days", "last 7 days",
-            "last month", "last week", "prior pickup", "old deliveries", "picked up"
+        # Extract dynamic lookback days (supports any number, capped at 30 days max for now)
+        days: Optional[int] = None
+        days_match = re.search(r'\b(\d{1,3})\s*days?\b', q)
+        if days_match:
+            days = min(int(days_match.group(1)), 30)
+        elif "month" in q:
+            days = 30
+        elif "week" in q:
+            days = 7
+
+        is_explicit_pending = any(w in q for w in [
+            "pending", "uncollected", "unclaimed", "awaiting pickup", "to collect",
+            "ready for collection", "waiting for pickup", "waiting for me", "ready for pickup", "items pending"
         ])
+
+        is_explicit_released = any(w in q for w in [
+            "history", "released", "previously picked", "already picked", "already collected",
+            "pickup history", "prior pickup", "old deliveries", "picked up"
+        ])
+
+        if is_explicit_pending:
+            status_group = "PENDING"
+            is_history_query = False
+        elif is_explicit_released:
+            status_group = "RELEASED"
+            is_history_query = True
+            if days is None:
+                days = 30
+        elif days is not None or any(w in q for w in ["past", "history", "previously"]):
+            status_group = "RELEASED"
+            is_history_query = True
+            if days is None:
+                days = 30
+        else:
+            status_group = "PENDING"
+            is_history_query = False
 
         package_inquiry_terms = [
             "parcel", "package", "tracking", "track", "delivery", "deliveries",
@@ -653,22 +684,9 @@ class CustomerAgent(BaseAgent):
             "my packages", "my delivery", "to collect", "ready for collection", "pending",
             "uncollected", "unclaimed", "awaiting pickup", "waiting for pickup"
         ]
-        if not is_informational and (is_history_query or any(w in q for w in package_inquiry_terms)):
+        if not is_informational and (is_history_query or is_explicit_pending or any(w in q for w in package_inquiry_terms)):
             if getattr(caller_ctx, "is_authenticated", False):
                 try:
-                    status_group = "RELEASED" if is_history_query else "PENDING"
-                    days: Optional[int] = None
-                    if is_history_query:
-                        days_match = re.search(r'\b(\d{1,3})\s*days?\b', q)
-                        if days_match:
-                            days = min(int(days_match.group(1)), 365)
-                        elif "month" in q:
-                            days = 30
-                        elif "week" in q:
-                            days = 7
-                        else:
-                            days = 30  # Default 30 days for general history requests
-
                     tool_args: dict[str, Any] = {"status_group": status_group}
                     if days is not None:
                         tool_args["days"] = days
@@ -683,7 +701,8 @@ class CustomerAgent(BaseAgent):
                                     day_str = f"the past {days} days" if days else "your account history"
                                     body_parts = [f"📜 **Here is your pickup history for {day_str} ({len(pkgs)} package{'s' if len(pkgs) > 1 else ''}):**\n"]
                                 else:
-                                    body_parts = [f"📦 **You have {len(pkgs)} pending package{'s' if len(pkgs) > 1 else ''} awaiting pickup:**\n"]
+                                    day_str = f" received over the past {days} days" if days else ""
+                                    body_parts = [f"📦 **You have {len(pkgs)} pending package{'s' if len(pkgs) > 1 else ''}{day_str} awaiting pickup:**\n"]
 
                                 for idx, p in enumerate(pkgs[:5], 1):
                                     p_lines = self._format_package_record(p)
@@ -709,10 +728,35 @@ class CustomerAgent(BaseAgent):
                                         suggested_actions=["Do I have anything to collect right now?", "Where is my package?", "Locker location and hours"],
                                     )
                                 else:
+                                    # If days filter was applied to pending packages and returned 0, check all pending packages
+                                    if days is not None:
+                                        try:
+                                            all_pending_res = await MCPClient().execute_tool("search_packages", {"status_group": "PENDING"})
+                                            if all_pending_res.success and all_pending_res.output:
+                                                all_out = all_pending_res.output.get("data") if isinstance(all_pending_res.output, dict) else {}
+                                                older_pkgs = all_out.get("packages") or [] if isinstance(all_out, dict) else []
+                                                if older_pkgs:
+                                                    body_parts = [
+                                                        f"You have no pending packages received in the past {days} days. 📦\n\n"
+                                                        f"However, you have **{len(older_pkgs)} pending package(s)** received earlier that are still awaiting pickup:\n"
+                                                    ]
+                                                    for idx, p in enumerate(older_pkgs[:5], 1):
+                                                        p_lines = self._format_package_record(p)
+                                                        body_parts.append(f"**Package {idx}:**\n" + "\n".join(p_lines))
+                                                    return AgentResult(
+                                                        agent_name=self.name,
+                                                        content="\n\n".join(body_parts),
+                                                        requires_approval=False,
+                                                        suggested_actions=self._get_suggested_actions(older_pkgs),
+                                                    )
+                                        except Exception as check_err:
+                                            logger.debug(f"Error checking older pending packages: {check_err}")
+
+                                    day_str = f" received over the past {days} days" if days else ""
                                     return AgentResult(
                                         agent_name=self.name,
                                         content=(
-                                            "You currently have no pending packages awaiting pickup. 📦\n\n"
+                                            f"You currently have no pending packages{day_str} awaiting pickup. 📦\n\n"
                                             "If you are looking for a past delivery or have a specific tracking number, please provide it and I'll look it up!"
                                         ),
                                         requires_approval=False,
