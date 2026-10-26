@@ -116,10 +116,32 @@ def test_format_package_record_with_status_decoration():
     assert "En route to designated smart locker pod" in status_line
 
 
+def test_format_package_record_with_human_readable_timestamps():
+    """Verify ISO timestamps and epochs are converted to human-readable strings."""
+    agent = CustomerAgent()
+    pkg = {
+        "id": 330790,
+        "trackingNumber": "85366e70244e",
+        "status": "Processed",
+        "storageType": "SHELF",
+        "carrier": "Associate",
+        "receivedTime": "2026-07-06T16:57:43Z",
+        "expirationTime": "2026-07-07T08:00:00Z",
+    }
+    lines = agent._format_package_record(pkg)
+    rec_line = next(line for line in lines if "Received At" in line)
+    exp_line = next(line for line in lines if "Expires At" in line)
+    assert "July 6, 2026 at 4:57 PM" in rec_line
+    assert "July 7, 2026 at 8:00 AM" in exp_line
+
+
 @pytest.mark.asyncio
 async def test_customer_agent_uncollected_parcels_inquiry():
     """Verify logged-in user asking 'Show me all my uncollected parcels' returns pending packages directly."""
-    import smiota.mcp.servers.customer.tools  # Ensure MCP tools registered
+    from unittest.mock import AsyncMock, patch
+    from smiota.mcp.client import MCPClient
+    from smiota.schemas.mcp import MCPToolExecutionResult
+
     agent = CustomerAgent()
     context = AgentContext(
         session_id="test-uncollected-sess",
@@ -132,19 +154,40 @@ async def test_customer_agent_uncollected_parcels_inquiry():
             "customer_id": 2,
             "tenant_id": 413,
             "location_id": 37,
-            "parent_token": "dedfb7c0-aa9a-4789-8009-755e283ab3e7",
+            "parent_token": "test-token",
         },
     )
-    res = await agent.process("Show me all my uncollected parcels.", context=context)
-    assert res.agent_name == "Customer"
-    assert "pending package" in res.content.lower() or "awaiting pickup" in res.content.lower()
-    assert res.requires_approval is False
+    mock_packages = [
+        {
+            "id": 330790,
+            "trackingNumber": "85366e70244e",
+            "status": "Processed",
+            "storageType": "SHELF",
+            "receivedTime": "2026-07-06T16:57:43Z",
+        }
+    ]
+    mock_res = MCPToolExecutionResult(
+        tool_name="search_packages",
+        success=True,
+        output={"success": True, "data": {"packages": mock_packages, "total_count": 1}},
+        execution_time_ms=10.0,
+    )
+    with patch.object(MCPClient, "execute_tool", new_callable=AsyncMock, return_value=mock_res):
+        res = await agent.process("Show me all my uncollected parcels.", context=context)
+        assert res.agent_name == "Customer"
+        assert "pending package" in res.content.lower() or "awaiting pickup" in res.content.lower()
+        assert "85366e70244e" in res.content
+        assert "July 6, 2026 at 4:57 PM" in res.content
+        assert res.requires_approval is False
 
 
 @pytest.mark.asyncio
 async def test_customer_agent_pickup_history_inquiry():
     """Verify logged-in user asking 'My past 30 days pickup history' queries status_group=RELEASED."""
-    import smiota.mcp.servers.customer.tools
+    from unittest.mock import AsyncMock, patch
+    from smiota.mcp.client import MCPClient
+    from smiota.schemas.mcp import MCPToolExecutionResult
+
     agent = CustomerAgent()
     context = AgentContext(
         session_id="test-history-sess",
@@ -157,19 +200,40 @@ async def test_customer_agent_pickup_history_inquiry():
             "customer_id": 2,
             "tenant_id": 413,
             "location_id": 37,
-            "parent_token": "dedfb7c0-aa9a-4789-8009-755e283ab3e7",
+            "parent_token": "test-token",
         },
     )
-    res = await agent.process("My past 30 days pickup history.", context=context)
-    assert res.agent_name == "Customer"
-    assert "past 30 days" in res.content.lower() or "pickup history" in res.content.lower()
-    assert res.requires_approval is False
+    mock_released = [
+        {
+            "id": 330100,
+            "trackingNumber": "REL-12345",
+            "status": "released",
+            "storageType": "LOCKER",
+            "timeReleased": "2026-07-05T14:30:00Z",
+        }
+    ]
+    mock_res = MCPToolExecutionResult(
+        tool_name="search_packages",
+        success=True,
+        output={"success": True, "data": {"packages": mock_released, "total_count": 1}},
+        execution_time_ms=10.0,
+    )
+    with patch.object(MCPClient, "execute_tool", new_callable=AsyncMock, return_value=mock_res):
+        res = await agent.process("My past 30 days pickup history.", context=context)
+        assert res.agent_name == "Customer"
+        assert "pickup history" in res.content.lower() or "past 30 days" in res.content.lower()
+        assert "REL-12345" in res.content
+        assert "July 5, 2026 at 2:30 PM" in res.content
+        assert res.requires_approval is False
 
 
 @pytest.mark.asyncio
 async def test_customer_agent_pending_packages_lookback_inquiry():
     """Verify user asking 'Show me a list of all pending packages over the last 30 days?' queries status_group=PENDING."""
-    import smiota.mcp.servers.customer.tools
+    from unittest.mock import AsyncMock, patch
+    from smiota.mcp.client import MCPClient
+    from smiota.schemas.mcp import MCPToolExecutionResult
+
     agent = CustomerAgent()
     context = AgentContext(
         session_id="test-pending-30-sess",
@@ -182,10 +246,29 @@ async def test_customer_agent_pending_packages_lookback_inquiry():
             "customer_id": 2,
             "tenant_id": 413,
             "location_id": 37,
-            "parent_token": "dedfb7c0-aa9a-4789-8009-755e283ab3e7",
+            "parent_token": "test-token",
         },
     )
-    res = await agent.process("Show me a list of all pending packages over the last 30 days?", context=context)
-    assert res.agent_name == "Customer"
-    assert "pending package" in res.content.lower()
-    assert res.requires_approval is False
+    mock_packages = [
+        {
+            "id": 330790,
+            "trackingNumber": "85366e70244e",
+            "status": "Processed",
+            "storageType": "SHELF",
+            "receivedTime": "2026-07-06T16:57:43Z",
+        }
+    ]
+    mock_res = MCPToolExecutionResult(
+        tool_name="search_packages",
+        success=True,
+        output={"success": True, "data": {"packages": mock_packages, "total_count": 1}},
+        execution_time_ms=10.0,
+    )
+    with patch.object(MCPClient, "execute_tool", new_callable=AsyncMock, return_value=mock_res):
+        res = await agent.process("Show me a list of all pending packages over the last 30 days?", context=context)
+        assert res.agent_name == "Customer"
+        assert "pending package" in res.content.lower()
+        assert "85366e70244e" in res.content
+        assert "July 6, 2026 at 4:57 PM" in res.content
+        assert res.requires_approval is False
+

@@ -42,6 +42,59 @@ class CustomerAgent(BaseAgent):
             bound_tools=CUSTOMER_BOUND_TOOLS,
         )
 
+    @staticmethod
+    def _format_datetime(ts_val: Any) -> str:
+        """Convert ISO timestamp or epoch to friendly readable format (e.g., 'July 8, 2026 at 9:19 AM')."""
+        if not ts_val:
+            return ""
+        from datetime import datetime, timezone
+
+        if isinstance(ts_val, (int, float)):
+            try:
+                if ts_val > 1e11:
+                    ts_val = ts_val / 1000.0
+                dt = datetime.fromtimestamp(ts_val, tz=timezone.utc)
+                month = dt.strftime("%B")
+                time_str = dt.strftime("%I:%M %p").lstrip("0")
+                return f"{month} {dt.day}, {dt.year} at {time_str}"
+            except Exception:
+                return str(ts_val)
+
+        raw = str(ts_val).strip()
+        if raw.isdigit():
+            try:
+                num = float(raw)
+                if num > 1e11:
+                    num = num / 1000.0
+                dt = datetime.fromtimestamp(num, tz=timezone.utc)
+                month = dt.strftime("%B")
+                time_str = dt.strftime("%I:%M %p").lstrip("0")
+                return f"{month} {dt.day}, {dt.year} at {time_str}"
+            except Exception:
+                pass
+
+        try:
+            clean_ts = raw.replace("Z", "+00:00")
+            dt = datetime.fromisoformat(clean_ts)
+            month = dt.strftime("%B")
+            time_str = dt.strftime("%I:%M %p").lstrip("0")
+            return f"{month} {dt.day}, {dt.year} at {time_str}"
+        except Exception:
+            pass
+
+        for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d"):
+            try:
+                dt = datetime.strptime(raw, fmt)
+                month = dt.strftime("%B")
+                if " " in raw:
+                    time_str = dt.strftime("%I:%M %p").lstrip("0")
+                    return f"{month} {dt.day}, {dt.year} at {time_str}"
+                return f"{month} {dt.day}, {dt.year}"
+            except Exception:
+                continue
+
+        return raw
+
     def _format_package_record(self, pkg: dict) -> list[str]:
         """
         Format package data strictly using fields present in the API response payload.
@@ -106,17 +159,20 @@ class CustomerAgent(BaseAgent):
         if locker and locker not in ("0", 0, "None", None, "Kiosk Terminal") and locker_id not in (0, "0"):
             lines.append(f"• **Locker Compartment**: {locker}")
 
-        received_time = pkg.get("receivedTime")
+        received_time = pkg.get("receivedTime") or pkg.get("received_time")
         if received_time:
-            lines.append(f"• **Received At**: {received_time}")
+            formatted_recv = self._format_datetime(received_time)
+            lines.append(f"• **Received At**: {formatted_recv}")
 
-        expiration_time = pkg.get("expirationTime")
+        expiration_time = pkg.get("expirationTime") or pkg.get("expiration_time")
         if expiration_time:
-            lines.append(f"• **Expires At**: {expiration_time}")
+            formatted_exp = self._format_datetime(expiration_time)
+            lines.append(f"• **Expires At**: {formatted_exp}")
 
-        time_released = pkg.get("timeReleased")
+        time_released = pkg.get("timeReleased") or pkg.get("time_released") or pkg.get("released_time")
         if time_released:
-            lines.append(f"• **Released At**: {time_released}")
+            formatted_rel = self._format_datetime(time_released)
+            lines.append(f"• **Released At**: {formatted_rel}")
 
         released_to = pkg.get("releasedToUserName")
         if released_to:
