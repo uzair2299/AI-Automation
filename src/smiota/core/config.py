@@ -71,6 +71,11 @@ class BaseAppSettings(BaseSettings):
     CHAT_SESSION_TTL_HOURS: int = 24
     CHAT_SESSION_MAX_TURNS: int = 20
 
+    # RAG Knowledge Engine & Vector Store Backend
+    VECTOR_STORE_BACKEND: str = "memory"  # Options: 'memory', future: 'pgvector'
+    RAG_KNOWLEDGE_DIR: str = "data/knowledge/public"
+    RAG_INPUT_JSONL_PATH: str = "data/knowledge/public/website_content.jsonl"
+
 
     # Model Context Protocol & Safety Gates
     MCP_READ_ONLY_DEFAULT: bool = True

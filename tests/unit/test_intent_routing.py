@@ -1,15 +1,16 @@
 """Unit tests for Intent Routing & Classification Layer."""
-import pytest
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+
 from smiota.agents.base import AgentContext
+from smiota.agents.orchestrator import AgentOrchestrator
 from smiota.agents.routing import (
     CompositeIntentRouter,
     RouteDecision,
     RuleBasedRouter,
     SemanticRouter,
-    get_intent_router,
 )
-from smiota.agents.orchestrator import AgentOrchestrator
 
 
 @pytest.fixture
@@ -190,7 +191,6 @@ async def test_rule_router_greetings_classification(base_context):
 
 @pytest.mark.asyncio
 async def test_rule_router_greetings_internal_channel():
-    from smiota.agents.routing.rules import GREETINGS
 
     router = RuleBasedRouter()
     internal_ctx = AgentContext(
@@ -229,7 +229,6 @@ async def test_composite_router_greetings_fast_path(base_context):
 
 @pytest.mark.asyncio
 async def test_rule_router_informational_prefixes_webchat(base_context):
-    from smiota.agents.routing.rules import INFORMATIONAL_CATEGORIES
 
     router = RuleBasedRouter()
 
@@ -295,6 +294,7 @@ async def test_composite_router_informational_fast_path(base_context):
 @pytest.mark.asyncio
 async def test_customer_agent_handles_informational_query(base_context):
     from unittest.mock import patch
+
     from smiota.agents.implementations.customer.agent import CustomerAgent
 
     agent = CustomerAgent()
@@ -326,6 +326,7 @@ async def test_rule_router_gratitude_and_farewell_fast_paths(base_context):
 @pytest.mark.asyncio
 async def test_customer_agent_gratitude_and_farewell_deterministic(base_context):
     from unittest.mock import patch
+
     from smiota.agents.implementations.customer.agent import CustomerAgent
 
     agent = CustomerAgent()
@@ -339,6 +340,87 @@ async def test_customer_agent_gratitude_and_farewell_deterministic(base_context)
         res2 = await agent.process("byee", base_context)
         assert "goodbye" in res2.content.lower()
         mock_llm.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_public_user_webchat_routes_to_knowledge_assistant():
+    """Verify that unauthenticated/anonymous visitors without login details are routed to KnowledgeAssistant."""
+    from smiota.agents.routing.rules import RuleBasedRouter
+
+    router = RuleBasedRouter()
+    public_context = AgentContext(
+        session_id="public-session-001",
+        user_id="anonymous",
+        tenant_id="public",
+        channel="webchat",
+        roles=["public"],
+    )
+
+    queries = [
+        "Can you explain how smart lockers work?",
+        "What are the specifications for outdoor smart lockers?",
+        "How does parcel delivery automation work?",
+    ]
+
+    for q in queries:
+        decision = await router.classify(q, public_context)
+        assert decision.agent_name == "knowledge_assistant", f"Failed for public query: {q}"
+        assert decision.confidence >= 0.95
+
+
+@pytest.mark.asyncio
+async def test_authenticated_user_specific_integrations_routes_to_knowledge():
+    """Verify that specific enterprise integration queries route to KnowledgeAssistant even for logged-in users."""
+    from smiota.agents.routing.rules import RuleBasedRouter
+
+    router = RuleBasedRouter()
+    logged_in_context = AgentContext(
+        session_id="auth-session-001",
+        user_id="user-123",
+        tenant_id="tenant-123",
+        channel="webchat",
+    )
+
+    decision = await router.classify("Does Smiota support Koha and Yardi integrations?", logged_in_context)
+    assert decision.agent_name == "knowledge_assistant"
+
+
+@pytest.mark.asyncio
+async def test_knowledge_assistant_security_isolation_and_refusals():
+    """Verify KnowledgeAssistantAgent has no tools and strictly refuses private/carrier operations."""
+    from unittest.mock import AsyncMock
+
+    from smiota.agents.implementations.knowledge.agent import KnowledgeAssistantAgent
+
+    agent = KnowledgeAssistantAgent()
+
+    # 1. Zero bound tools contract
+    assert len(agent.bound_tools) == 0
+
+    ctx = AgentContext(
+        session_id="public-user-session",
+        user_id="anonymous",
+        tenant_id="public",
+        channel="webchat",
+    )
+
+    # 2. Refuses private resident locker controls
+    res_private = await agent.process("Where is my package and what is my locker pin?", ctx)
+    assert "cannot access live tenant accounts" in res_private.content
+    assert res_private.metadata.get("refusal_type") == "private_resident_data"
+
+    # 3. Refuses carrier tracking
+    res_carrier = await agent.process("Track UPS package 1Z9999999999999999", ctx)
+    assert "do not have access to live carrier tracking networks" in res_carrier.content
+    assert res_carrier.metadata.get("refusal_type") == "carrier_tracking"
+
+    # 4. Valid product query uses retrieval without mutation tools
+    agent.retrieval_service.retrieve = AsyncMock(return_value=[])
+    agent.llm_provider.generate_completion = AsyncMock(return_value="Smiota provides outdoor smart lockers.")
+
+    res_valid = await agent.process("Tell me about outdoor smart lockers", ctx)
+    assert "Smiota provides outdoor smart lockers" in res_valid.content
+    assert res_valid.metadata.get("is_grounded") is True
 
 
 

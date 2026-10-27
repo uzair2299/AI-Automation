@@ -24,6 +24,10 @@ class AgentRegistry:
             register_default_agents()
         name_key = name.lower()
         if name_key not in cls._agents:
+            collapsed = name_key.replace("-", "").replace("_", "")
+            for registered_key, agent in cls._agents.items():
+                if registered_key.replace("-", "").replace("_", "") == collapsed:
+                    return agent
             raise KeyError(f"Agent '{name}' is not registered. Available agents: {list(cls._agents.keys())}")
         return cls._agents[name_key]
 

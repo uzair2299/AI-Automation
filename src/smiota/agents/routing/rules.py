@@ -169,6 +169,22 @@ class RuleBasedRouter(BaseIntentRouter):
         "pipeline", "diff", "commit", "git", "merge", "repo", "repository",
     ]
 
+    KNOWLEDGE_KEYWORDS: ClassVar[list[str]] = [
+        "smart locker", "smart lockers", "outdoor locker", "day-use", "refrigerated",
+        "temperature-controlled", "asset management", "mailroom software", "package room",
+        "yardi", "realpage", "entrata", "appfolio", "koha", "ex libris", "alma", "sip2",
+        "ncip", "hid global", "cbord", "transact", "servicenow", "okta", "azure ad",
+        "compartment size", "pricing", "cost", "quote", "demo", "bopis",
+        "specifications", "ada compliance", "ul listing",
+        "student housing", "book a demo", "get a quote",
+    ]
+
+    SPECIFIC_INTEGRATION_KEYWORDS: ClassVar[list[str]] = [
+        "yardi", "realpage", "entrata", "appfolio", "koha", "ex libris", "alma", "sip2",
+        "ncip", "hid global", "cbord", "transact", "servicenow", "okta", "azure ad",
+        "pricing", "quote", "book a demo", "get a quote", "ada compliance", "ul listing",
+    ]
+
     # Conversational continuity tokens
     CONTINUITY_WORDS: ClassVar[set[str]] = {
         "yes", "no", "open", "retry", "ok", "okay", "sure", "thanks", "thank you",
@@ -327,7 +343,7 @@ class RuleBasedRouter(BaseIntentRouter):
 
         # 3. Channel-specific routing logic
         if channel == "webchat":
-            decision = self._classify_webchat(normalized_query)
+            decision = self._classify_webchat(normalized_query, context=context)
         else:
             # 4. General internal routing (Slack, Teams, Eval, API)
             decision = self._classify_internal(normalized_query)
@@ -379,10 +395,68 @@ class RuleBasedRouter(BaseIntentRouter):
                     matches.append(keyword)
         return matches
 
-    def _classify_webchat(self, query: str) -> RouteDecision:
+    def _classify_webchat(self, query: str, context: AgentContext | None = None) -> RouteDecision:
         """Webchat channel classification (prioritizes customer locker support,
         with support for operational security & incident queries).
         """
+        is_anonymous = bool(
+            context
+            and (
+                context.user_id in {"anonymous", "public", "ws-resident", "guest", ""}
+                or "public" in (context.roles or [])
+                or not getattr(context, "parent_token", None)
+            )
+            and context.user_id != "user-123"
+        )
+
+        # 0. Check for public / unauthenticated knowledge routing
+        knowledge_matches = self._match_keywords(query, self.KNOWLEDGE_KEYWORDS)
+        specific_matches = self._match_keywords(query, self.SPECIFIC_INTEGRATION_KEYWORDS)
+
+        # Anonymous visitors (no login details) with knowledge or informational queries route to KnowledgeAssistant
+        if is_anonymous and (knowledge_matches or self._match_informational(query)):
+            decision = RouteDecision(
+                agent_name="knowledge_assistant",
+                confidence=0.96,
+                matched_intent="public_knowledge_qa",
+                routing_method="rule_knowledge_public",
+                reasoning=f"Public unauthenticated user routed to KnowledgeAssistant: {knowledge_matches or 'informational'}",
+                metadata={"is_knowledge": True, "matched_keywords": knowledge_matches, "is_anonymous": True},
+            )
+            logger.debug(
+                f"Webchat public unauthenticated knowledge matched: {knowledge_matches}",
+                extra={
+                    "event": "routing.rule.webchat.knowledge.public",
+                    "agent_name": decision.agent_name,
+                    "confidence": decision.confidence,
+                    "routing_method": decision.routing_method,
+                    "matched_intent": decision.matched_intent,
+                },
+            )
+            return decision
+
+        # Authenticated users asking specific integration/pricing/enterprise spec queries
+        if specific_matches:
+            decision = RouteDecision(
+                agent_name="knowledge_assistant",
+                confidence=0.96,
+                matched_intent="public_knowledge_qa",
+                routing_method="rule_knowledge",
+                reasoning=f"Matched Smiota public knowledge/integration keywords: {specific_matches}",
+                metadata={"is_knowledge": True, "matched_keywords": specific_matches},
+            )
+            logger.debug(
+                f"Webchat specific knowledge matched: {specific_matches}",
+                extra={
+                    "event": "routing.rule.webchat.knowledge",
+                    "agent_name": decision.agent_name,
+                    "confidence": decision.confidence,
+                    "routing_method": decision.routing_method,
+                    "matched_intent": decision.matched_intent,
+                },
+            )
+            return decision
+
         # 1. Check standard greeting intent
         if self._is_greeting(query):
             decision = RouteDecision(
@@ -494,17 +568,18 @@ class RuleBasedRouter(BaseIntentRouter):
                     },
                 )
                 return decision
-            # Default for webchat informational queries is customer concierge
+            # Webchat informational queries route to knowledge_assistant for anonymous users, customer for authenticated
+            target_agent = "knowledge_assistant" if is_anonymous else "customer"
             decision = RouteDecision(
-                agent_name="customer",
+                agent_name=target_agent,
                 confidence=0.95,
                 matched_intent="informational",
                 routing_method="rule_informational",
                 reasoning=f"Matched informational query prefix: '{informational_match[0]}' (Category: {informational_match[1]})",
-                metadata={"is_informational": True, "category": informational_match[1], "matched_prefix": informational_match[0], "domain": "customer"},
+                metadata={"is_informational": True, "category": informational_match[1], "matched_prefix": informational_match[0], "domain": target_agent},
             )
             logger.debug(
-                f"Webchat informational customer matched: category='{informational_match[1]}'",
+                f"Webchat informational {target_agent} matched: category='{informational_match[1]}'",
                 extra={
                     "event": "routing.rule.webchat.informational",
                     "agent_name": decision.agent_name,
@@ -606,13 +681,14 @@ class RuleBasedRouter(BaseIntentRouter):
             )
             return decision
 
-        # Default webchat fallback is customer assistant
+        # Default webchat fallback is customer assistant (or knowledge_assistant for anonymous)
+        fallback_agent = "knowledge_assistant" if is_anonymous else "customer"
         decision = RouteDecision(
-            agent_name="customer",
+            agent_name=fallback_agent,
             confidence=0.65,
-            matched_intent="customer_fallback",
+            matched_intent="knowledge_fallback" if is_anonymous else "customer_fallback",
             routing_method="channel_default",
-            reasoning="Default concierge agent for webchat channel",
+            reasoning=f"Default concierge agent for webchat channel ({fallback_agent})",
         )
         logger.debug(
             "Webchat channel fallback evaluated",

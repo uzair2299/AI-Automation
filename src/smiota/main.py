@@ -41,6 +41,39 @@ async def lifespan(app: FastAPI):
     # 2. Setup Telemetry & OpenTelemetry Tracing
     setup_telemetry(app)
 
+    # 3. Background indexing of public knowledge base
+    import asyncio
+
+    async def _index_public_knowledge_on_startup() -> None:
+        from pathlib import Path
+
+        from smiota.rag.config import RAGConfig
+        from smiota.rag.ingestion.ingestion_service import IngestionService
+        from smiota.rag.vector_store.factory import VectorStoreFactory
+
+        try:
+            config = RAGConfig.from_settings()
+            store = VectorStoreFactory.get_vector_store(config=config)
+            count = await store.count()
+            if count == 0 and Path(config.knowledge_dir).exists():
+                logger.info(
+                    f"Indexing public knowledge directory: '{config.knowledge_dir}'",
+                    extra={"event": "rag.startup.indexing_started", "dir": config.knowledge_dir},
+                )
+                service = IngestionService(vector_store=store, config=config)
+                stats = await service.ingest_directory(config.knowledge_dir)
+                logger.info(
+                    f"Public knowledge indexed: {stats.chunks_upserted} chunks from {stats.valid_records} records",
+                    extra={"event": "rag.startup.indexing_completed", "chunks": stats.chunks_upserted},
+                )
+        except (OSError, RuntimeError, ValueError) as exc:
+            logger.warning(
+                f"Startup knowledge indexing skipped: {exc}",
+                extra={"event": "rag.startup.indexing_failed", "error": str(exc)},
+            )
+
+    asyncio.create_task(_index_public_knowledge_on_startup())
+
     logger.info("Smiota Agent Core + MCP successfully initialized and ready to serve requests.")
     yield
 
