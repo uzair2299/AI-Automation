@@ -42,7 +42,14 @@ class AgentOrchestrator:
         logger.info(
             f"Routing query to agent: [{selected_agent_name}] "
             f"(Confidence: {routing_metadata.get('confidence', 1.0):.2f}, "
-            f"Method: {routing_metadata.get('routing_method')}, Session: {context.session_id})"
+            f"Method: {routing_metadata.get('routing_method')}, Session: {context.session_id})",
+            extra={
+                "event": "routing.decision.selected",
+                "agent_name": selected_agent_name,
+                "confidence": routing_metadata.get("confidence", 1.0),
+                "routing_method": routing_metadata.get("routing_method"),
+                "session_id": context.session_id,
+            },
         )
 
         # 1. Ensure session is tracked in the repository

@@ -20,16 +20,41 @@ class CorrelationFilter(logging.Filter):
 class CloudJSONFormatter(logging.Formatter):
     """Google Cloud Logging & Datadog compliant structured JSON formatter."""
 
+    STANDARD_ATTRS = {
+        "args", "asctime", "created", "exc_info", "exc_text", "filename",
+        "funcName", "levelname", "levelno", "lineno", "module", "msecs",
+        "message", "msg", "name", "pathname", "process", "processName",
+        "relativeCreated", "stack_info", "thread", "threadName",
+    }
+
     def format(self, record: logging.LogRecord) -> str:
+        settings = get_settings()
         payload = {
             "timestamp": self.formatTime(record, "%Y-%m-%dT%H:%M:%S%z"),
+            "level": record.levelname,
             "severity": record.levelname,
+            "service": "smiota-ai",
+            "environment": getattr(settings, "ENVIRONMENT", "development"),
             "logger": record.name,
             "message": record.getMessage(),
             "correlation_id": getattr(record, "correlation_id", "-"),
         }
+        if hasattr(record, "event"):
+            payload["event"] = record.event
+        if hasattr(record, "duration_ms"):
+            payload["duration_ms"] = record.duration_ms
+        if hasattr(record, "error_type"):
+            payload["error_type"] = record.error_type
+
+        # Extract allowlisted structured extras
+        for key, value in record.__dict__.items():
+            if key not in self.STANDARD_ATTRS and key not in payload and not key.startswith("_"):
+                payload[key] = value
+
         if record.exc_info:
             payload["exception"] = self.formatException(record.exc_info)
+            if "error_type" not in payload and record.exc_info[0]:
+                payload["error_type"] = record.exc_info[0].__name__
         return json.dumps(payload)
 
 

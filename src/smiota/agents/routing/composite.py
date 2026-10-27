@@ -36,20 +36,52 @@ class CompositeIntentRouter(BaseIntentRouter):
         if rule_decision.confidence >= self.confidence_threshold:
             logger.debug(
                 f"RuleBasedRouter matched [{rule_decision.agent_name}] "
-                f"with confidence {rule_decision.confidence:.2f} (Method: {rule_decision.routing_method})"
+                f"with confidence {rule_decision.confidence:.2f} (Method: {rule_decision.routing_method})",
+                extra={
+                    "event": "routing.rule.matched",
+                    "agent_name": rule_decision.agent_name,
+                    "confidence": rule_decision.confidence,
+                    "routing_method": rule_decision.routing_method,
+                    "session_id": context.session_id,
+                },
             )
             return rule_decision
 
         # 2. AI Fallback: Disambiguate with Gemini Semantic Router
         logger.info(
             f"Rule confidence ({rule_decision.confidence:.2f}) is below threshold "
-            f"({self.confidence_threshold:.2f}). Consulting SemanticRouter..."
+            f"({self.confidence_threshold:.2f}). Consulting SemanticRouter...",
+            extra={
+                "event": "routing.semantic.consulting",
+                "rule_agent": rule_decision.agent_name,
+                "rule_confidence": rule_decision.confidence,
+                "confidence_threshold": self.confidence_threshold,
+                "session_id": context.session_id,
+            },
         )
         try:
             semantic_decision = await self.semantic_router.classify(query, context)
             if semantic_decision.confidence > rule_decision.confidence:
+                logger.info(
+                    f"SemanticRouter matched [{semantic_decision.agent_name}] with confidence {semantic_decision.confidence:.2f}",
+                    extra={
+                        "event": "routing.semantic.matched",
+                        "agent_name": semantic_decision.agent_name,
+                        "confidence": semantic_decision.confidence,
+                        "routing_method": semantic_decision.routing_method,
+                        "session_id": context.session_id,
+                    },
+                )
                 return semantic_decision
         except Exception as e:
-            logger.warning(f"SemanticRouter consultation failed: {e}. Falling back to rule decision.")
+            logger.warning(
+                f"SemanticRouter consultation failed: {e}. Falling back to rule decision.",
+                extra={
+                    "event": "routing.semantic.failed",
+                    "error_type": type(e).__name__,
+                    "fallback_agent": rule_decision.agent_name,
+                    "session_id": context.session_id,
+                },
+            )
 
         return rule_decision

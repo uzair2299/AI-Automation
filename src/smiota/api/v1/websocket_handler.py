@@ -5,6 +5,7 @@ agent response streaming, and error handling into a modular session worker.
 Architected to decouple socket transport from business logic, enabling seamless
 future scaling with message brokers (RabbitMQ / Redis PubSub).
 """
+
 import asyncio
 from datetime import UTC, datetime
 import json
@@ -17,7 +18,7 @@ from smiota.agents.base import AgentContext, AgentResult
 from smiota.agents.orchestrator import AgentOrchestrator
 from smiota.api.deps import get_chat_repo, get_orchestrator
 from smiota.api.v1.websocket_manager import ws_manager
-from smiota.core.logging import logger
+from smiota.core.logging import correlation_id_ctx, logger
 from smiota.repositories.chat_repository import BaseChatRepository
 
 
@@ -40,42 +41,93 @@ class WebSocketChatHandler:
 
     async def handle(self) -> None:
         """Main lifecycle entrypoint: connect, process incoming frames, and gracefully clean up."""
+        corr_id = (
+            self.ws.headers.get("X-Correlation-ID")
+            or self.ws.query_params.get("correlation_id")
+            or f"corr-{uuid.uuid4().hex[:12]}"
+        )
+        token = correlation_id_ctx.set(corr_id)
+
         await ws_manager.connect(self.session_id, self.ws, self.resident_id)
+        logger.info(
+            "WebSocket client connected",
+            extra={
+                "event": "websocket.connected",
+                "session_id": self.session_id,
+                "resident_id": self.resident_id or "anonymous",
+            },
+        )
 
         try:
             async for raw_data in self.ws.iter_text():
                 await self._process_frame(raw_data)
-        except WebSocketDisconnect:
-            pass
+        except WebSocketDisconnect as ws_disc:
+            logger.info(
+                "WebSocket client disconnected cleanly",
+                extra={
+                    "event": "websocket.disconnected",
+                    "session_id": self.session_id,
+                    "disconnect_code": getattr(ws_disc, "code", 1000),
+                },
+            )
         except Exception as e:
-            logger.error(f"WebSocket fatal error on session {self.session_id}: {e}", exc_info=True)
+            logger.error(
+                f"WebSocket fatal error on session {self.session_id}: {type(e).__name__}",
+                exc_info=True,
+                extra={
+                    "event": "websocket.session.failed",
+                    "session_id": self.session_id,
+                    "error_type": type(e).__name__,
+                },
+            )
         finally:
             await ws_manager.disconnect(self.session_id)
+            correlation_id_ctx.reset(token)
 
     async def _process_frame(self, raw_data: str) -> None:
         """Process a single incoming frame from the client."""
         # Handle heartbeat ping
         if raw_data.strip() == "ping":
             await self.ws.send_text("pong")
+            logger.debug(
+                "WebSocket heartbeat ping/pong acknowledged",
+                extra={"event": "websocket.heartbeat", "session_id": self.session_id},
+            )
             return
 
         # Parse standard envelope or plain text
-        user_message, req_resident_id, client_metadata, attachments = self._parse_incoming(raw_data)
+        user_message, req_resident_id, client_metadata, attachments = (
+            self._parse_incoming(raw_data)
+        )
         if not user_message.strip():
             return
 
         # Resolve tenant & user from session state if available
         existing_session = await self.chat_repo.get_session(self.session_id)
         tenant_id = existing_session.tenant_id if existing_session else "default"
-        if existing_session and existing_session.user_id != "anonymous" and req_resident_id == "ws-resident":
+        if (
+            existing_session
+            and existing_session.user_id != "anonymous"
+            and req_resident_id == "ws-resident"
+        ):
             req_resident_id = existing_session.user_id
 
         user_info: dict[str, Any] = {}
-        merged_metadata = dict(existing_session.metadata or {}) if existing_session else {}
+        merged_metadata = (
+            dict(existing_session.metadata or {}) if existing_session else {}
+        )
         if existing_session and existing_session.user:
             user_info = dict(existing_session.user)
         elif merged_metadata.get("user"):
             user_info = dict(merged_metadata["user"])
+
+        # Check for per-frame correlation ID from client envelope
+        frame_corr = client_metadata.get("correlation_id") or client_metadata.get(
+            "trace_id"
+        )
+        frame_token = None
+        if frame_corr and isinstance(frame_corr, str) and 4 <= len(frame_corr) <= 64:
+            frame_token = correlation_id_ctx.set(frame_corr)
 
         # Client metadata can provide auxiliary context
         merged_metadata.update(client_metadata)
@@ -85,27 +137,58 @@ class WebSocketChatHandler:
         parent_token: Optional[str] = None
 
         # Authenticate via signed session token in client_metadata if present
-        session_token = client_metadata.get("session_token") or client_metadata.get("token")
+        session_token = client_metadata.get("session_token") or client_metadata.get(
+            "token"
+        )
         if session_token:
             try:
                 from smiota.core.security import verify_session_token
+
                 tok_payload = verify_session_token(session_token)
                 if tok_payload.get("parent_token"):
                     parent_token = tok_payload["parent_token"]
                 user_data = tok_payload.get("user") or tok_payload.get("user_profile")
                 if user_data and isinstance(user_data, dict):
                     user_info.update(user_data)
-                if tok_payload.get("sub") and req_resident_id in {"ws-resident", "anonymous", "guest", ""}:
+                if tok_payload.get("sub") and req_resident_id in {
+                    "ws-resident",
+                    "anonymous",
+                    "guest",
+                    "",
+                }:
                     req_resident_id = tok_payload["sub"]
                 if tok_payload.get("tenant_id") and tenant_id == "default":
                     tenant_id = tok_payload["tenant_id"]
-            except Exception:
-                pass
+                logger.debug(
+                    "WebSocket session token verified",
+                    extra={
+                        "event": "websocket.auth.token_verified",
+                        "session_id": self.session_id,
+                        "user_id": req_resident_id,
+                    },
+                )
+            except Exception as tok_err:
+                logger.warning(
+                    "WebSocket session token verification rejected",
+                    extra={
+                        "event": "websocket.auth.token_rejected",
+                        "session_id": self.session_id,
+                        "error_type": type(tok_err).__name__,
+                    },
+                )
 
         if not parent_token:
             parent_token = (
-                (existing_session.metadata.get("parent_token") if existing_session and existing_session.metadata else None)
-                or (user_info.get("parent_token") if isinstance(user_info, dict) else None)
+                (
+                    existing_session.metadata.get("parent_token")
+                    if existing_session and existing_session.metadata
+                    else None
+                )
+                or (
+                    user_info.get("parent_token")
+                    if isinstance(user_info, dict)
+                    else None
+                )
                 or client_metadata.get("parent_token")
                 or client_metadata.get("token")
                 or None
@@ -126,15 +209,49 @@ class WebSocketChatHandler:
             metadata=merged_metadata,
         )
 
+        logger.info(
+            "Processing WebSocket chat query",
+            extra={
+                "event": "websocket.message.received",
+                "session_id": self.session_id,
+                "user_id": req_resident_id,
+                "tenant_id": tenant_id,
+                "channel": "webchat",
+                "message_length": len(user_message),
+            },
+        )
+
         try:
             # Route to multi-agent core
             result = await self.orchestrator.route_and_execute(user_message, context)
+            logger.info(
+                "Agent execution completed for WebSocket chat",
+                extra={
+                    "event": "agent.execution.completed",
+                    "session_id": self.session_id,
+                    "agent_name": result.agent_name,
+                    "requires_approval": result.requires_approval,
+                },
+            )
             await self._stream_response(result)
         except Exception as agent_err:
-            logger.error(f"Error processing message in session {self.session_id}: {agent_err}", exc_info=True)
+            logger.error(
+                f"Agent execution failed for session {self.session_id}: {type(agent_err).__name__}",
+                exc_info=True,
+                extra={
+                    "event": "agent.execution.failed",
+                    "session_id": self.session_id,
+                    "error_type": type(agent_err).__name__,
+                },
+            )
             await self._send_error_fallback()
+        finally:
+            if frame_token is not None:
+                correlation_id_ctx.reset(frame_token)
 
-    def _parse_incoming(self, raw_data: str) -> tuple[str, str, dict[str, Any], list[dict[str, Any]]]:
+    def _parse_incoming(
+        self, raw_data: str
+    ) -> tuple[str, str, dict[str, Any], list[dict[str, Any]]]:
         """Parse incoming raw frame enforcing the Standard Message Envelope."""
         user_message = ""
         req_resident_id = self.resident_id or "ws-resident"
@@ -157,8 +274,24 @@ class WebSocketChatHandler:
 
                 if isinstance(parsed.get("metadata"), dict):
                     client_metadata = parsed["metadata"]
-        except Exception:
-            pass
+        except json.JSONDecodeError:
+            logger.debug(
+                "Non-JSON WebSocket frame received, treating as plain text",
+                extra={
+                    "event": "websocket.frame.non_json",
+                    "session_id": self.session_id,
+                    "error_type": "JSONDecodeError",
+                },
+            )
+        except Exception as parse_err:
+            logger.debug(
+                "Unexpected error parsing WebSocket envelope, falling back to raw payload",
+                extra={
+                    "event": "websocket.frame.parse_fallback",
+                    "session_id": self.session_id,
+                    "error_type": type(parse_err).__name__,
+                },
+            )
 
         return user_message, req_resident_id, client_metadata, attachments
 
@@ -169,25 +302,29 @@ class WebSocketChatHandler:
 
         # Stream response tokens using Standard Envelope
         for token in result.content.split():
-            await self.ws.send_json({
-                "message_id": resp_msg_id,
-                "conversation_id": self.session_id,
-                "type": "stream_token",
-                "sender": {
-                    "role": "assistant",
-                    "name": agent_display,
-                    "id": f"agent-{agent_display.lower()}",
-                },
-                "content": {
-                    "token": token + " ",
-                },
-                "metadata": {},
-                "created_at": datetime.now(UTC).isoformat(),
-            })
+            await self.ws.send_json(
+                {
+                    "message_id": resp_msg_id,
+                    "conversation_id": self.session_id,
+                    "type": "stream_token",
+                    "sender": {
+                        "role": "assistant",
+                        "name": agent_display,
+                        "id": f"agent-{agent_display.lower()}",
+                    },
+                    "content": {
+                        "token": token + " ",
+                    },
+                    "metadata": {},
+                    "created_at": datetime.now(UTC).isoformat(),
+                }
+            )
             await asyncio.sleep(0.02)
 
         # Send completion envelope with dynamic card / action payload
-        card_data = getattr(result, "card_payload", None) or result.metadata.get("card_payload")
+        card_data = getattr(result, "card_payload", None) or result.metadata.get(
+            "card_payload"
+        )
         event_type = "agent_card" if card_data else "agent_message"
         content_payload: dict[str, Any] = {
             "text": result.content,
@@ -222,30 +359,62 @@ class WebSocketChatHandler:
             completion_payload["user"] = user_info
 
         await self.ws.send_json(completion_payload)
+        logger.debug(
+            "WebSocket response payload delivered to client",
+            extra={
+                "event": "websocket.response.delivered",
+                "session_id": self.session_id,
+                "agent_name": agent_display,
+                "has_card": bool(card_data),
+            },
+        )
 
     async def _send_error_fallback(self) -> None:
         """Send a graceful fallback error envelope when agent execution fails."""
         err_msg_id = f"msg_{uuid.uuid4().hex[:12]}"
         err_text = "I'm having trouble retrieving that information right now. Please try again or ask our concierge."
-        await self.ws.send_json({
-            "message_id": err_msg_id,
-            "conversation_id": self.session_id,
-            "type": "stream_token",
-            "sender": {"role": "assistant", "name": "Customer", "id": "agent-customer"},
-            "content": {"token": err_text},
-            "metadata": {},
-            "created_at": datetime.now(UTC).isoformat(),
-        })
-        await self.ws.send_json({
-            "message_id": err_msg_id,
-            "conversation_id": self.session_id,
-            "type": "done",
-            "event": "agent_message",
-            "sender": {"role": "assistant", "name": "Customer", "id": "agent-customer"},
-            "content": {
-                "text": err_text,
-                "suggested_actions": ["Where is my package?", "Resend pickup PIN", "Locker location and hours"],
+        await self.ws.send_json(
+            {
+                "message_id": err_msg_id,
+                "conversation_id": self.session_id,
+                "type": "stream_token",
+                "sender": {
+                    "role": "assistant",
+                    "name": "Customer",
+                    "id": "agent-customer",
+                },
+                "content": {"token": err_text},
+                "metadata": {},
+                "created_at": datetime.now(UTC).isoformat(),
+            }
+        )
+        await self.ws.send_json(
+            {
+                "message_id": err_msg_id,
+                "conversation_id": self.session_id,
+                "type": "done",
+                "event": "agent_message",
+                "sender": {
+                    "role": "assistant",
+                    "name": "Customer",
+                    "id": "agent-customer",
+                },
+                "content": {
+                    "text": err_text,
+                    "suggested_actions": [
+                        "Where is my package?",
+                        "Resend pickup PIN",
+                        "Locker location and hours",
+                    ],
+                },
+                "metadata": {"error": True},
+                "created_at": datetime.now(UTC).isoformat(),
+            }
+        )
+        logger.info(
+            "Dispatched fallback error envelope to client",
+            extra={
+                "event": "websocket.fallback.delivered",
+                "session_id": self.session_id,
             },
-            "metadata": {"error": True},
-            "created_at": datetime.now(UTC).isoformat(),
-        })
+        )
