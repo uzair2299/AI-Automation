@@ -63,6 +63,7 @@ class BaseAppSettings(BaseSettings):
     # Microsoft Teams & Bot Framework Connector
     MICROSOFT_APP_ID: Optional[str] = "c93bfc04-2bf6-4c89-b04f-5d4ef6aa734a"
     MICROSOFT_APP_PASSWORD: Optional[str] = None
+    MICROSOFT_APP_TENANT_ID: Optional[str] = "a0bd7ccc-cdd6-4e8a-be39-63dc7bbf315a"
     TEAMS_APP_ID: Optional[str] = "d6c463d0-d6a3-4704-bd53-f5fcb06256a2"
 
     # Chat Session Persistence & Storage Provider

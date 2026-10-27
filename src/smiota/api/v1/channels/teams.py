@@ -37,38 +37,66 @@ def _clean_teams_text(raw_text: str) -> str:
     return cleaned.strip()
 
 
-async def _get_bot_framework_token(app_id: str, app_password: str) -> Optional[str]:
-    """Obtain a Bearer token from Microsoft Bot Framework OAuth endpoint."""
+def _resolve_tenant_id(payload: Optional[Dict[str, Any]] = None, service_url: Optional[str] = None) -> Optional[str]:
+    """Resolve Microsoft Entra ID Tenant ID from payload, service URL, or environment."""
+    if payload:
+        tenant_from_channel = payload.get("channelData", {}).get("tenant", {}).get("id")
+        if tenant_from_channel:
+            return str(tenant_from_channel).strip()
+
+    if service_url:
+        for part in service_url.strip("/").split("/"):
+            if len(part) == 36 and part.count("-") == 4:
+                return part
+
+    settings = get_settings()
+    configured_tid = getattr(settings, "MICROSOFT_APP_TENANT_ID", None) or os.getenv("MICROSOFT_APP_TENANT_ID")
+    if configured_tid:
+        return str(configured_tid).strip()
+    return None
+
+
+async def _get_bot_framework_token(app_id: str, app_password: str, tenant_id: Optional[str] = None) -> Optional[str]:
+    """Obtain a Bearer token from Microsoft Bot Framework / Entra ID OAuth endpoint."""
     now = time.time()
-    cached = _BOT_TOKEN_CACHE.get(app_id)
+    authority = tenant_id or "botframework.com"
+    cache_key = f"{app_id}:{authority}"
+    cached = _BOT_TOKEN_CACHE.get(cache_key)
     if cached and cached[1] > now + 60:
         return cached[0]
 
-    token_url = "https://login.microsoftonline.com/botframework.com/oauth2/v2.0/token"
+    # Try tenant-specific endpoint first if available, with botframework.com as fallback
+    authorities_to_try = [authority]
+    if authority != "botframework.com":
+        authorities_to_try.append("botframework.com")
+
     payload = {
         "grant_type": "client_credentials",
         "client_id": app_id,
         "client_secret": app_password,
         "scope": "https://api.botframework.com/.default",
     }
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.post(token_url, data=payload)
-            if resp.status_code == 200:
-                data = resp.json()
-                token = data.get("access_token")
-                expires_in = data.get("expires_in", 3600)
-                _BOT_TOKEN_CACHE[app_id] = (token, now + expires_in)
-                logger.info("Successfully acquired Microsoft Bot Framework OAuth token")
-                return token
-            else:
-                logger.error(
-                    f"Failed to fetch Microsoft Bot token: HTTP {resp.status_code} - {resp.text}"
-                )
-                return None
-    except Exception as e:
-        logger.error(f"Exception fetching Microsoft Bot token: {e}", exc_info=True)
-        return None
+
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        for auth_target in authorities_to_try:
+            token_url = f"https://login.microsoftonline.com/{auth_target}/oauth2/v2.0/token"
+            try:
+                resp = await client.post(token_url, data=payload)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    token = data.get("access_token")
+                    expires_in = data.get("expires_in", 3600)
+                    _BOT_TOKEN_CACHE[cache_key] = (token, now + expires_in)
+                    logger.info(f"Successfully acquired Microsoft Bot Framework OAuth token [authority={auth_target}]")
+                    return token
+                else:
+                    logger.warning(
+                        f"Failed to fetch Microsoft Bot token from {auth_target}: HTTP {resp.status_code} - {resp.text}"
+                    )
+            except Exception as e:
+                logger.error(f"Exception fetching Microsoft Bot token from {auth_target}: {e}", exc_info=True)
+
+    return None
 
 
 async def _post_reply_to_teams(
@@ -77,6 +105,7 @@ async def _post_reply_to_teams(
     reply_activity: Dict[str, Any],
     app_id: str,
     app_password: str,
+    tenant_id: Optional[str] = None,
 ) -> bool:
     """Send an activity message back to Teams via the Bot Connector REST API."""
     if not app_password:
@@ -85,7 +114,7 @@ async def _post_reply_to_teams(
         )
         return False
 
-    token = await _get_bot_framework_token(app_id, app_password)
+    token = await _get_bot_framework_token(app_id, app_password, tenant_id=tenant_id)
     if not token:
         logger.error("Could not dispatch reply to Teams: failed to obtain OAuth token")
         return False
@@ -149,6 +178,7 @@ async def ms_teams_webhook(
     settings = get_settings()
     app_id = settings.MICROSOFT_APP_ID or os.getenv("MICROSOFT_APP_ID") or "c93bfc04-2bf6-4c89-b04f-5d4ef6aa734a"
     app_password = settings.MICROSOFT_APP_PASSWORD or os.getenv("MICROSOFT_APP_PASSWORD")
+    tenant_id = _resolve_tenant_id(payload=payload, service_url=service_url)
 
     # Format bot sender identity (Teams expects 28:<app_id>)
     bot_from_id = bot_recipient.get("id") or f"28:{app_id}"
@@ -156,7 +186,7 @@ async def ms_teams_webhook(
     bot_sender = {"id": bot_from_id, "name": bot_name}
 
     logger.info(
-        f"MS Teams activity received [type={activity_type}, user={user_name}, conv={conversation_id}, serviceUrl={service_url}, has_password={bool(app_password)}]"
+        f"MS Teams activity received [type={activity_type}, user={user_name}, conv={conversation_id}, tenant={tenant_id}, serviceUrl={service_url}, has_password={bool(app_password)}]"
     )
 
     if not app_password:
@@ -189,6 +219,7 @@ async def ms_teams_webhook(
                 reply_activity=reply_activity,
                 app_id=app_id,
                 app_password=app_password,
+                tenant_id=tenant_id,
             )
         return reply_activity
 
@@ -217,6 +248,7 @@ async def ms_teams_webhook(
                     reply_activity=prompt_activity,
                     app_id=app_id,
                     app_password=app_password,
+                    tenant_id=tenant_id,
                 )
             return prompt_activity
 
@@ -259,6 +291,7 @@ async def ms_teams_webhook(
                     reply_activity=reply_activity,
                     app_id=app_id,
                     app_password=app_password,
+                    tenant_id=tenant_id,
                 )
             return reply_activity
         except Exception as err:
@@ -278,6 +311,7 @@ async def ms_teams_webhook(
                     reply_activity=err_activity,
                     app_id=app_id,
                     app_password=app_password,
+                    tenant_id=tenant_id,
                 )
             return err_activity
 
