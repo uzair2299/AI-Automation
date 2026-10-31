@@ -53,6 +53,13 @@ async def lifespan(app: FastAPI):
 
         try:
             config = RAGConfig.from_settings()
+            if not config.auto_index_on_startup:
+                logger.info(
+                    "Startup public knowledge indexing is disabled by configuration.",
+                    extra={"event": "rag.startup.indexing_disabled"},
+                )
+                return
+
             store = VectorStoreFactory.get_vector_store(config=config)
             count = await store.count()
             if count == 0 and Path(config.knowledge_dir).exists():

@@ -87,6 +87,10 @@ def setup_logging() -> logging.Logger:
     root_logger.handlers.clear()
     root_logger.addHandler(handler)
 
+    # Mute noisy low-level third-party network & transport loggers
+    for noisy in ("httpcore", "httpx", "urllib3", "google.auth", "google.api_core"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
+
     # File handler: write all application logs to logs/smiota.log
     try:
         import os

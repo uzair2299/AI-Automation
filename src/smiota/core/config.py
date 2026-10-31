@@ -30,10 +30,11 @@ class BaseAppSettings(BaseSettings):
     CORS_ORIGINS: list[str] = ["*"]
 
     # GCP & Vertex AI Configuration
-    GCP_PROJECT_ID: str = "vertex-ai-510710"
+    GCP_PROJECT_ID: str = "project-smiota-psi-1"
     GCP_REGION: str = "global"
     GEMINI_MODEL: str = "gemini-3.7-flash"
     GEMINI_EMBEDDING_MODEL: str = "text-embedding-004"
+    GOOGLE_APPLICATION_CREDENTIALS: Optional[str] = None
 
     # Database, Cache & Message Broker
     DATABASE_URL: str = "postgresql+asyncpg://smiota_user:password@localhost:5432/smiota_ai"
@@ -73,6 +74,8 @@ class BaseAppSettings(BaseSettings):
 
     # RAG Knowledge Engine & Vector Store Backend
     VECTOR_STORE_BACKEND: str = "memory"  # Options: 'memory', future: 'pgvector'
+    RAG_EMBEDDING_PROVIDER: str = "vertex"  # Options: 'vertex', 'deterministic'
+    RAG_AUTO_INDEX_ON_STARTUP: bool = True
     RAG_KNOWLEDGE_DIR: str = "data/knowledge/public"
     RAG_INPUT_JSONL_PATH: str = "data/knowledge/public/website_content.jsonl"
 
@@ -93,7 +96,7 @@ class DevelopmentSettings(BaseAppSettings):
     LOG_LEVEL: str = "DEBUG"
     ENABLE_SWAGGER: bool = True
     CORS_ORIGINS: list[str] = ["*"]
-    GCP_PROJECT_ID: str = "smiota-cloud-dev"
+    GCP_PROJECT_ID: str = "project-smiota-psi-1"
 
 
 class StagingSettings(BaseAppSettings):
@@ -136,6 +139,8 @@ class TestSettings(BaseAppSettings):
     GCP_PROJECT_ID: str = "smiota-cloud-test"
     SMIOTA_AUTH_DUMMY_MODE: bool = False
     REQUIRE_HUMAN_APPROVAL_FOR_REMEDIATION: bool = True
+    RAG_EMBEDDING_PROVIDER: str = "deterministic"
+    RAG_AUTO_INDEX_ON_STARTUP: bool = False
 
 
 

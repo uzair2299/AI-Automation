@@ -88,6 +88,34 @@ class VertexEmbeddingService(BaseEmbeddingService):
 
         return [0.0] * self._dimension
 
+    async def _embed_batch_with_retry(self, texts: list[str]) -> list[list[float]]:
+        """Fetch embeddings for a batch of text chunks in a single API call with retry."""
+        if not texts:
+            return []
+
+        # If provider supports native batching, send the entire batch in 1 request
+        if hasattr(self.provider, "generate_embeddings_batch"):
+            attempt = 0
+            backoff = self.config.retry_backoff_seconds
+            while attempt < self.config.max_retries:
+                try:
+                    embeddings = await self.provider.generate_embeddings_batch(texts)
+                    if embeddings and len(embeddings) == len(texts):
+                        return embeddings
+                    break
+                except Exception as exc:
+                    attempt += 1
+                    if attempt >= self.config.max_retries:
+                        logger.warning(
+                            f"Vertex batch embedding exhausted retries: {exc}. Falling back to single-chunk embedding."
+                        )
+                        break
+                    await asyncio.sleep(backoff)
+                    backoff *= 2.0
+
+        # Graceful fallback to single-chunk concurrent embedding
+        return await asyncio.gather(*(self._embed_single_with_retry(t) for t in texts))
+
     async def embed_texts(self, texts: list[str]) -> list[list[float]]:
         """Batch embedding generation respecting configured batch size."""
         results: list[list[float]] = []
@@ -95,7 +123,7 @@ class VertexEmbeddingService(BaseEmbeddingService):
 
         for i in range(0, len(texts), batch_size):
             batch = texts[i : i + batch_size]
-            batch_results = await asyncio.gather(*(self._embed_single_with_retry(t) for t in batch))
+            batch_results = await self._embed_batch_with_retry(batch)
             results.extend(batch_results)
 
         return results

@@ -194,6 +194,61 @@ async def test_embedding_batching(rag_config):
         assert len(vec) == rag_config.embedding_dimension
 
 
+@pytest.mark.asyncio
+async def test_vertex_embedding_service_native_batch_call(rag_config):
+    """VertexEmbeddingService utilizes native batch provider call when available."""
+    from unittest.mock import AsyncMock, MagicMock
+    from smiota.rag.embeddings.embedding_service import VertexEmbeddingService
+
+    mock_provider = MagicMock()
+    mock_provider.generate_embeddings_batch = AsyncMock(
+        return_value=[[0.1] * rag_config.embedding_dimension, [0.2] * rag_config.embedding_dimension]
+    )
+
+    service = VertexEmbeddingService(config=rag_config, provider=mock_provider)
+    texts = ["Chunk one", "Chunk two"]
+    results = await service.embed_texts(texts)
+
+    assert len(results) == 2
+    assert results[0][0] == 0.1
+    assert results[1][0] == 0.2
+    mock_provider.generate_embeddings_batch.assert_called_once_with(["Chunk one", "Chunk two"])
+
+
+@pytest.mark.asyncio
+async def test_gemini_provider_embed_content_response_parsing():
+    """Verify GeminiProvider parses Google GenAI EmbedContentResponse without attribute error."""
+    from unittest.mock import MagicMock
+    from google.genai import types
+    from smiota.llm.provider import GeminiProvider
+
+    provider = GeminiProvider()
+    mock_client = MagicMock()
+    # Simulate official Google GenAI EmbedContentResponse with .embeddings (plural)
+    mock_client.models.embed_content.return_value = types.EmbedContentResponse(
+        embeddings=[types.ContentEmbedding(values=[0.42] * 768)]
+    )
+    provider._client = mock_client
+
+    # Single text embedding
+    emb = await provider.generate_embedding("Test prompt")
+    assert len(emb) == 768
+    assert emb[0] == 0.42
+
+    # Batch embedding
+    mock_client.models.embed_content.return_value = types.EmbedContentResponse(
+        embeddings=[
+            types.ContentEmbedding(values=[0.1] * 768),
+            types.ContentEmbedding(values=[0.2] * 768),
+        ]
+    )
+    batch_emb = await provider.generate_embeddings_batch(["A", "B"])
+    assert len(batch_emb) == 2
+    assert batch_emb[0][0] == 0.1
+    assert batch_emb[1][0] == 0.2
+
+
+
 # ==============================================================================
 # 4. Vector Store & Factory Tests
 # ==============================================================================
@@ -486,3 +541,5 @@ def test_dynamic_chunk_context_prompt_injection():
     assert "https://smiota.com/library/" in prompt
     assert "Smiota lockers integrate directly with Koha" in prompt
     assert f"User: {user_query}" in prompt
+    assert "RESPONSE FORMATTING & FAST SCANNING GUIDELINES" in SMIOTA_KNOWLEDGE_ASSISTANT_SYSTEM_PROMPT
+    assert "FORMAT SELECTION" in SMIOTA_KNOWLEDGE_ASSISTANT_SYSTEM_PROMPT

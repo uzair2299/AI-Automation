@@ -300,8 +300,10 @@ class WebSocketChatHandler:
         resp_msg_id = f"msg_{uuid.uuid4().hex[:12]}"
         agent_display = result.agent_name
 
-        # Stream response tokens using Standard Envelope
-        for token in result.content.split():
+        # Stream response tokens using Standard Envelope preserving exact whitespace & newlines
+        import re
+        tokens = [t for t in re.split(r'(\s+)', result.content) if t]
+        for token in tokens:
             await self.ws.send_json(
                 {
                     "message_id": resp_msg_id,
@@ -313,13 +315,13 @@ class WebSocketChatHandler:
                         "id": f"agent-{agent_display.lower()}",
                     },
                     "content": {
-                        "token": token + " ",
+                        "token": token,
                     },
                     "metadata": {},
                     "created_at": datetime.now(UTC).isoformat(),
                 }
             )
-            await asyncio.sleep(0.02)
+            await asyncio.sleep(0.015)
 
         # Send completion envelope with dynamic card / action payload
         card_data = getattr(result, "card_payload", None) or result.metadata.get(

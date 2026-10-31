@@ -153,6 +153,7 @@ class RAGConfig:
     knowledge_dir: str = "data/knowledge/public"
     public_knowledge_dir: str = "data/knowledge/public"
     internal_knowledge_dir: str = "data/knowledge/internal"
+    auto_index_on_startup: bool = True
 
     # Supported file extensions when scanning the knowledge directory.
     supported_extensions: list[str] = field(
@@ -185,8 +186,18 @@ class RAGConfig:
             "knowledge_dir",
             getattr(settings, "RAG_KNOWLEDGE_DIR", "data/knowledge/public"),
         )
+        embedding_provider = overrides.get(
+            "embedding_provider",
+            getattr(settings, "RAG_EMBEDDING_PROVIDER", "vertex"),
+        )
+        auto_index_on_startup = overrides.get(
+            "auto_index_on_startup",
+            getattr(settings, "RAG_AUTO_INDEX_ON_STARTUP", True),
+        )
         return cls(
             vector_store_backend=backend,
             knowledge_dir=knowledge_dir,
+            embedding_provider=embedding_provider,
+            auto_index_on_startup=auto_index_on_startup,
             **overrides,
         )

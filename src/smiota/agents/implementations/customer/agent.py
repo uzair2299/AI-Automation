@@ -905,13 +905,17 @@ class CustomerAgent(BaseAgent):
                     f"IMPORTANT: NEVER ask the resident for their full name, phone number, or email address because they are already authenticated.\n"
                 )
 
+            info_tag = f"[Informational Query - Category: {info_category}, Pattern: '{info_prefix}']\n" if is_informational else ""
             prompt = (
-                f"[Informational Query - Category: {info_category}, Pattern: '{info_prefix}']\n"
+                f"{info_tag}"
                 f"{auth_instruction}"
-                f"Resident query: {query}\n"
-                f"Provide a helpful, polite, and concise instructional answer for the resident."
-                if is_informational
-                else f"{auth_instruction}Resident query: {query}\nProvide a helpful, polite, and concise answer for the resident."
+                f"Resident query: {query}\n\n"
+                "Tone & Formatting Instructions:\n"
+                "- Speak naturally and warmly like an on-site property concierge speaking directly to a resident.\n"
+                "- Do NOT use robotic AI introductions (e.g. 'Hello! I would be happy to explain...').\n"
+                "- Do NOT append repetitive boilerplate closing questions (e.g. 'Would you like me to check any packages for you?').\n"
+                "- Structure the response with clear paragraph spacing and clean bullet points for fast scanning.\n"
+                "- Get straight to the helpful answer without corporate fluff."
             )
             llm_reply = await llm.generate_completion(
                 prompt=prompt,

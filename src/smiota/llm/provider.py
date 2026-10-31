@@ -13,7 +13,7 @@ def _ensure_gcp_credentials() -> Optional[str]:
     """Ensure Google Cloud Application Credentials are validly set up.
 
     Supports:
-    1. Local Windows file path: GOOGLE_APPLICATION_CREDENTIALS=C:\path\to\key.json
+    1. Local Windows file path: GOOGLE_APPLICATION_CREDENTIALS=C:\\path\\to\\key.json
     2. Docker / Railway file path: GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp_creds.json
     3. Railway / Cloud raw JSON environment variable:
        - GOOGLE_APPLICATION_CREDENTIALS_JSON or GCP_SERVICE_ACCOUNT_KEY or GOOGLE_CREDENTIALS
@@ -21,7 +21,14 @@ def _ensure_gcp_credentials() -> Optional[str]:
        Writes the JSON to /tmp/gcp_creds.json (or OS temp dir) and sets GOOGLE_APPLICATION_CREDENTIALS.
     4. Auto-detecting gcloud Application Default Credentials on Windows if not explicitly set.
     """
-    creds_val = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+    settings = get_settings()
+    creds_val = (
+        getattr(settings, "GOOGLE_APPLICATION_CREDENTIALS", None)
+        or os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+    )
+    if creds_val:
+        creds_val = creds_val.strip().strip("'\"")
+
     raw_json_candidate = (
         os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON")
         or os.environ.get("GCP_SERVICE_ACCOUNT_KEY")
@@ -57,13 +64,25 @@ def _ensure_gcp_credentials() -> Optional[str]:
 
     # Case C: GOOGLE_APPLICATION_CREDENTIALS points to an existing file
     if creds_val and os.path.exists(creds_val):
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = creds_val
         logger.info(f"Using Google Cloud credentials file from {creds_val}")
         return creds_val
 
-    # Case D: On Windows, auto-detect gcloud CLI application default credentials if not specified or file doesn't exist
+    # Case D: On Windows, prefer matching project service account keys before generic gcloud ADC
     if not creds_val or not os.path.exists(creds_val):
         appdata = os.environ.get("APPDATA")
         if appdata:
+            import glob
+            gcloud_dir = os.path.join(appdata, "gcloud")
+            if os.path.exists(gcloud_dir):
+                project_id = getattr(settings, "GCP_PROJECT_ID", "project-smiota-psi-1")
+                proj_keys = glob.glob(os.path.join(gcloud_dir, f"{project_id}*.json"))
+                if proj_keys:
+                    sa_key = proj_keys[0]
+                    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = sa_key
+                    logger.info(f"Using project service account key from {sa_key}")
+                    return sa_key
+
             gcloud_adc = os.path.join(appdata, "gcloud", "application_default_credentials.json")
             if os.path.exists(gcloud_adc):
                 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = gcloud_adc
@@ -87,7 +106,7 @@ class GeminiProvider:
 
     @property
     def project_id(self) -> str:
-        return os.environ.get("GCP_PROJECT_ID") or getattr(self.settings, "GCP_PROJECT_ID", "vertex-ai-510710") or "vertex-ai-510710"
+        return os.environ.get("GCP_PROJECT_ID") or getattr(self.settings, "GCP_PROJECT_ID", "project-smiota-psi-1") or "project-smiota-psi-1"
 
     @property
     def location(self) -> str:
@@ -95,6 +114,9 @@ class GeminiProvider:
 
     def _get_vertex_client(self):
         """Lazy-initialize official Google GenAI Vertex AI client or Gemini API Key client."""
+        if os.environ.get("ENVIRONMENT") == "test" or getattr(self.settings, "ENVIRONMENT", "").lower() == "test":
+            return None
+
         if self._client is None:
             try:
                 from google import genai
@@ -158,6 +180,15 @@ class GeminiProvider:
             "How can I help you today?"
         )
 
+    @staticmethod
+    def _extract_embedding_values(embedding_obj: Any) -> list[float]:
+        """Extract float vector values safely across Google GenAI and legacy response shapes."""
+        if hasattr(embedding_obj, "values") and embedding_obj.values is not None:
+            return list(embedding_obj.values)
+        if isinstance(embedding_obj, (list, tuple)):
+            return list(embedding_obj)
+        return [0.0] * 768
+
     async def generate_embedding(self, text: str) -> list[float]:
         """Generate vector embedding for text using text-embedding-004 on Vertex AI."""
         client = self._get_vertex_client()
@@ -167,8 +198,33 @@ class GeminiProvider:
                     model=self.embedding_model,
                     contents=text,
                 )
-                return response.embedding.values
+                if hasattr(response, "embeddings") and response.embeddings:
+                    return self._extract_embedding_values(response.embeddings[0])
+                if hasattr(response, "embedding") and response.embedding:
+                    return self._extract_embedding_values(response.embedding)
             except Exception as e:
                 logger.warning(f"Vertex AI embedding call failed: {e}. Falling back to zero-vector.")
 
         return [0.0] * 768
+
+    async def generate_embeddings_batch(self, texts: list[str]) -> list[list[float]]:
+        """Generate vector embeddings for multiple texts in a single Vertex AI API call."""
+        if not texts:
+            return []
+
+        client = self._get_vertex_client()
+        if client:
+            try:
+                response = client.models.embed_content(
+                    model=self.embedding_model,
+                    contents=texts,
+                )
+                if hasattr(response, "embeddings") and response.embeddings:
+                    return [self._extract_embedding_values(emb) for emb in response.embeddings]
+            except Exception as e:
+                logger.warning(
+                    f"Vertex AI batch embedding call failed for {len(texts)} chunks: {e}. Falling back to single-item retry."
+                )
+
+        # Fallback to individual embeddings if batch API fails or client unavailable
+        return [await self.generate_embedding(t) for t in texts]

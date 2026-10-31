@@ -171,7 +171,7 @@ async def embed_widget(
     )
     active_subtitle = subtitle or getattr(settings, "WEBCHAT_SUBTITLE", "Smart Locker & Parcel Concierge")
     active_name = assistant_name or getattr(settings, "WEBCHAT_ASSISTANT_NAME", "Smiota Assistant")
-    html_content = """<!DOCTYPE html>
+    html_content = r"""<!DOCTYPE html>
 <html lang="en" class="h-full">
 <head>
     <meta charset="UTF-8">
@@ -198,6 +198,7 @@ async def embed_widget(
     
         /* Central Mascot Robot SVG & Micro-Animations */
         .ai-bot-svg { width: 100%; height: 100%; overflow: visible; }
+        .bot-text-body, .streaming-content { white-space: normal; word-break: break-word; }
         .mascot-svg-shadow { animation: shadowPulse 4s ease-in-out infinite; transform-box: fill-box; transform-origin: 110px 180px; }
         .mascot-svg-robot { animation: botHover 4s ease-in-out infinite; transform-box: fill-box; transform-origin: 110px 105px; }
         .mascot-eye-wink { animation: eyeWink 3.8s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 50%; }
@@ -487,18 +488,109 @@ async def embed_widget(
 
         function formatMarkdown(str) {
             if (!str) return '';
-            const parts = str.split('**');
-            let res = '';
-            for (let i = 0; i < parts.length; i++) {
-                res += (i % 2 === 1) ? ('<strong class="font-semibold text-slate-900">' + parts[i] + '</strong>') : parts[i];
+            
+            // Normalize line breaks
+            let text = str.replace(/\r\n/g, '\n');
+
+            // 1. Normalize squashed separators & headings
+            text = text.replace(/\s*(---|___|\*\*\*)\s*/g, '\n\n---\n\n');
+            text = text.replace(/\s*(#{1,4}\s+)/g, '\n\n$1');
+            text = text.replace(/(#{1,4}\s+[^?\n:]+[?:])\s+([A-Z])/g, '$1\n\n$2');
+
+            // 2. Normalize inline bullet and numbered lists that lack newlines
+            // e.g. "deliveries: * Small: ... * Medium: ..." or "works: 1. Delivery ... 2. Instant ..."
+            text = text.replace(/([.:!?])\s*([*•\-])\s+/g, '$1\n* ');
+            text = text.replace(/([.:!?])\s*(\d+\.)\s+/g, '$1\n$2 ');
+
+            // 3. Bold: **text**
+            text = text.replace(/\*\*(.+?)\*\*/g, '<strong class="font-semibold text-slate-900">$1</strong>');
+
+            // 4. Inline code: `code`
+            text = text.replace(/`([^`\n]+)`/g, '<code class="bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded font-mono text-xs border border-indigo-100 font-medium">$1</code>');
+
+            // 5. Italic: *(text)* or *text* (excluding space directly after opening *)
+            text = text.replace(/\*(?!\s)([^*\n]+?)(?<!\s)\*/g, '<em class="text-slate-600 not-italic font-medium">$1</em>');
+
+            // Process lines for headings, dividers, lists, and paragraphs
+            const rawLines = text.split('\n');
+            const processed = [];
+            let inList = false;
+            let listType = null; // 'ul' or 'ol'
+
+            for (let i = 0; i < rawLines.length; i++) {
+                const line = rawLines[i].trim();
+                if (!line) {
+                    if (inList) {
+                        processed.push(listType === 'ul' ? '</ul>' : '</ol>');
+                        inList = false;
+                        listType = null;
+                    }
+                    continue;
+                }
+
+                // Horizontal divider: --- or ***
+                if (/^[-*_]{3,}$/.test(line)) {
+                    if (inList) {
+                        processed.push(listType === 'ul' ? '</ul>' : '</ol>');
+                        inList = false;
+                        listType = null;
+                    }
+                    processed.push('<hr class="my-3 border-slate-200/80">');
+                    continue;
+                }
+
+                // Markdown headings: #, ##, ###
+                const headingMatch = line.match(/^(#{1,4})\s+(.+)$/);
+                if (headingMatch) {
+                    if (inList) {
+                        processed.push(listType === 'ul' ? '</ul>' : '</ol>');
+                        inList = false;
+                        listType = null;
+                    }
+                    processed.push(`<div class="font-semibold text-slate-900 text-sm mt-3 mb-1.5 flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-indigo-500 inline-block"></span>${headingMatch[2]}</div>`);
+                    continue;
+                }
+
+                // Unordered list items: *, -, •
+                const ulMatch = line.match(/^([*•\-])\s+(.+)$/);
+                if (ulMatch) {
+                    if (!inList || listType !== 'ul') {
+                        if (inList) processed.push(listType === 'ul' ? '</ul>' : '</ol>');
+                        processed.push('<ul class="list-disc pl-5 space-y-1.5 my-2 text-slate-700">');
+                        inList = true;
+                        listType = 'ul';
+                    }
+                    processed.push(`<li>${ulMatch[2]}</li>`);
+                    continue;
+                }
+
+                // Ordered list items: 1., 2.
+                const olMatch = line.match(/^(\d+)\.\s+(.+)$/);
+                if (olMatch) {
+                    if (!inList || listType !== 'ol') {
+                        if (inList) processed.push(listType === 'ul' ? '</ul>' : '</ol>');
+                        processed.push('<ol class="list-decimal pl-5 space-y-1.5 my-2 text-slate-700">');
+                        inList = true;
+                        listType = 'ol';
+                    }
+                    processed.push(`<li>${olMatch[2]}</li>`);
+                    continue;
+                }
+
+                // Standard paragraph text
+                if (inList) {
+                    processed.push(listType === 'ul' ? '</ul>' : '</ol>');
+                    inList = false;
+                    listType = null;
+                }
+                processed.push(`<p class="leading-relaxed mb-2 last:mb-0">${line}</p>`);
             }
-            const codeParts = res.split('`');
-            let resCode = '';
-            for (let i = 0; i < codeParts.length; i++) {
-                resCode += (i % 2 === 1) ? ('<code class="bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded font-mono text-xs border border-indigo-100 font-medium">' + codeParts[i] + '</code>') : codeParts[i];
+
+            if (inList) {
+                processed.push(listType === 'ul' ? '</ul>' : '</ol>');
             }
-            const nl = String.fromCharCode(10);
-            return resCode.split(nl).join('<br>');
+
+            return processed.join('');
         }
 
         function getUserAvatarHtml() {
@@ -732,7 +824,7 @@ async def embed_widget(
             if (msg.type === "stream_token") {
                 removeTypingIndicator();
                 const agentName = msg.sender?.name || "AI";
-                const tokenText = (typeof msg.content === 'object' && msg.content !== null) ? (msg.content.token || '') : '';
+                const tokenText = (typeof msg.content === 'object' && msg.content !== null) ? (msg.content.token || '') : (msg.content || '');
                 if (!currentStreamDiv) {
                     createStreamingBubble(agentName);
                 }
@@ -744,13 +836,28 @@ async def embed_widget(
             } else if (msg.type === "done" || msg.type === "agent_message" || msg.type === "agent_card") {
                 removeTypingIndicator();
                 markLastUserMessageDelivered();
+                const textContent = (typeof msg.content === 'object' && msg.content !== null) ? (msg.content.text || '') : (msg.content || '');
+                const agentName = msg.sender?.name || "AI";
+                const requiresApproval = Boolean(msg.metadata?.requires_approval);
                 const actions = (typeof msg.content === 'object' && msg.content !== null) ? msg.content.suggested_actions : null;
+
+                if (currentStreamBody) {
+                    if (textContent) {
+                        currentStreamBody.innerHTML = formatMarkdown(textContent);
+                    }
+                } else if (textContent) {
+                    appendMessage('bot', textContent, agentName, requiresApproval, actions);
+                }
                 if (actions) {
                     renderQuickReplies(actions);
                 }
                 currentStreamDiv = null;
                 currentStreamBody = null;
                 currentStreamText = "";
+            } else if (msg.type === "error") {
+                removeTypingIndicator();
+                const errMsg = (typeof msg.content === 'object' && msg.content !== null) ? (msg.content.text || msg.content.message || "I encountered an issue processing that. Please try again.") : (msg.content || "I encountered an issue processing that. Please try again.");
+                appendMessage('bot', errMsg, 'Support', false, ['Try again', 'Contact support']);
             }
         }
 
@@ -880,7 +987,7 @@ async def embed_widget(
 @router.get("/demo", response_class=HTMLResponse, summary="Live Iframe Host Demonstration Page")
 async def host_demo_page():
     """Renders a sample host webpage demonstrating seamless iframe embedding and postMessage integration."""
-    html_content = """<!DOCTYPE html>
+    html_content = r"""<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
