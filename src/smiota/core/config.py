@@ -87,6 +87,9 @@ class BaseAppSettings(BaseSettings):
     # Observability & Metrics
     OTEL_EXPORTER_OTLP_ENDPOINT: Optional[str] = None
     ENABLE_PROMETHEUS_METRICS: bool = True
+    PROMETHEUS_URL: str = "https://prometheus.int.smiotaapps.com"
+    OPENSEARCH_URL: Optional[str] = None
+    GRAFANA_URL: str = "https://grafana.int.smiotaapps.com"
 
 
 class DevelopmentSettings(BaseAppSettings):

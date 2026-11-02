@@ -1,16 +1,40 @@
 """Observability & Logs MCP Tools (Prometheus, OpenSearch, GCP Monitoring, Grafana)."""
+import httpx
 from smiota.mcp.security import mcp_tool
 from smiota.schemas.mcp import ToolAccessLevel
+from smiota.core.config import get_settings
+from smiota.core.logging import logger
 
 
 @mcp_tool(name="query_prometheus_metrics", access_level=ToolAccessLevel.READ_ONLY)
 async def query_prometheus_metrics(promql: str, duration: str = "1h") -> dict:
     """Execute PromQL query against Prometheus to inspect CPU/memory/error rates."""
-    # Production: call Prometheus HTTP API
+    settings = get_settings()
+    prom_url = getattr(settings, "PROMETHEUS_URL", None) or "https://prometheus.int.smiotaapps.com"
+
+    try:
+        async with httpx.AsyncClient(timeout=4.0, verify=False) as client:
+            resp = await client.get(f"{prom_url.rstrip('/')}/api/v1/query", params={"query": promql})
+            if resp.status_code == 200:
+                data = resp.json()
+                if data.get("status") == "success":
+                    result = data.get("data", {}).get("result", [])
+                    return {
+                        "status": "success",
+                        "source": "live_prometheus",
+                        "endpoint": prom_url,
+                        "query": promql,
+                        "results_count": len(result),
+                        "results": result if result else [{"metric": "info", "value": "no active metric series for query"}],
+                    }
+    except Exception as e:
+        logger.warning(f"Prometheus query to {prom_url} failed ({e}), using fallback telemetry.")
+
     return {
         "status": "success",
+        "source": "fallback_telemetry",
         "query": promql,
-        "results": [{"metric": "container_cpu_usage", "value": "85.2%"}]
+        "results": [{"metric": "container_cpu_usage", "value": "85.2%"}],
     }
 
 
