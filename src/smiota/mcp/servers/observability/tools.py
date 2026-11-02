@@ -59,6 +59,9 @@ async def get_pod_restart_reason(service_name: str = "smiotaserver", namespace: 
     cpu_percent = 0.0
     container_name = service_name
 
+    prom_reachable = True
+    error_msg = None
+
     try:
         async with httpx.AsyncClient(timeout=5.0, verify=False) as client:
             # 1. Query live restarts
@@ -103,10 +106,23 @@ async def get_pod_restart_reason(service_name: str = "smiotaserver", namespace: 
 
     except Exception as e:
         logger.error(f"Failed to fetch live pod metrics from Prometheus: {e}")
+        prom_reachable = False
+        error_msg = str(e)
+
+    if not prom_reachable:
+        return {
+            "status": "unreachable",
+            "is_reachable": False,
+            "data_source": f"Prometheus ({prom_url})",
+            "service": service_name,
+            "error": f"Cannot connect to Prometheus ({error_msg})",
+            "is_healthy": None,
+        }
 
     is_healthy = (restarts_count == 0)
     return {
         "status": "success",
+        "is_reachable": True,
         "data_source": f"Live Prometheus ({prom_url})",
         "service": service_name,
         "pod": pod_name,
@@ -127,6 +143,9 @@ async def query_http_error_rates(service_name: str = "smiota-agent-core-api", ti
     prom_url = getattr(settings, "PROMETHEUS_URL", None) or "https://prometheus.int.smiotaapps.com"
     error_rate = 0.0
 
+    prom_reachable = True
+    error_msg = None
+
     try:
         async with httpx.AsyncClient(timeout=5.0, verify=False) as client:
             resp = await client.get(
@@ -139,9 +158,23 @@ async def query_http_error_rates(service_name: str = "smiota-agent-core-api", ti
                     error_rate = round(float(results[0]["value"][1]), 4)
     except Exception as e:
         logger.error(f"Failed to fetch HTTP error rates from Prometheus: {e}")
+        prom_reachable = False
+        error_msg = str(e)
+
+    if not prom_reachable:
+        return {
+            "status": "unreachable",
+            "is_reachable": False,
+            "data_source": f"Prometheus ({prom_url})",
+            "service": service_name,
+            "error": f"Cannot connect to Prometheus ({error_msg})",
+            "current_5xx_rate": "N/A",
+            "has_active_errors": False,
+        }
 
     return {
         "status": "success",
+        "is_reachable": True,
         "data_source": f"Live Prometheus ({prom_url})",
         "service": service_name,
         "current_5xx_rate": f"{error_rate:.2f}%",

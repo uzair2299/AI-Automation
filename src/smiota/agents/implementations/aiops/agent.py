@@ -122,7 +122,21 @@ class AIOpsAgent(BaseAgent):
             is_healthy = diag.get("is_healthy", True)
             data_source = diag.get("data_source", "Live Prometheus")
 
-            if is_healthy:
+            if diag.get("status") == "unreachable" or diag.get("is_reachable") is False:
+                content = (
+                    f"### ⚠️ Live Prometheus Telemetry Notice: `{service_name}`\n\n"
+                    f"**Status:** **Prometheus Unreachable from Current Environment**\n"
+                    f"The AIOps agent attempted to query live cluster metrics, but encountered a connection/DNS failure:\n\n"
+                    f"```text\n{diag.get('error')}\n```\n\n"
+                    f"#### 🔍 Why this happened:\n"
+                    f"- `prometheus.int.smiotaapps.com` is a **private internal domain** on Smiota's internal GCP VPC network (`10.128.15.236`).\n"
+                    f"- This bot instance is running outside the internal network (e.g. on Railway or public host) without access to Smiota internal DNS.\n\n"
+                    f"#### 💡 How to resolve:\n"
+                    f"1. **Deploy inside GKE / Smiota Network:** Run this bot on your Smiota Dev VM or as a container inside GKE (`application` cluster in `us-central1`).\n"
+                    f"2. **Connect via Tailscale/VPN:** Connect the external host to the GCP VPC via a subnet router.\n"
+                    f"3. **Configure PROMETHEUS_URL:** If an external Prometheus proxy or ingress is available, set `PROMETHEUS_URL=<url>` in your environment."
+                )
+            elif is_healthy:
                 content = (
                     f"### 📊 Live AIOps Health Report: `{service_name}`\n\n"
                     f"**Current Status:** **HEALTHY / RUNNING ({restarts} Restarts in last 60 minutes)**\n"
@@ -175,7 +189,14 @@ class AIOpsAgent(BaseAgent):
             data_source = http_telemetry.get("data_source", "Live Prometheus")
             has_errors = http_telemetry.get("has_active_errors", False)
 
-            if not has_errors:
+            if http_telemetry.get("status") == "unreachable" or http_telemetry.get("is_reachable") is False:
+                content = (
+                    f"### ⚠️ Live Prometheus Telemetry Notice: Production API Error Rates\n\n"
+                    f"**Status:** **Prometheus Unreachable from Current Environment**\n"
+                    f"```text\n{http_telemetry.get('error')}\n```\n\n"
+                    f"`prometheus.int.smiotaapps.com` (10.128.15.236) is an internal private domain on the GCP VPC. Host this bot inside GKE or connect via VPN to fetch live metrics."
+                )
+            elif not has_errors:
                 content = (
                     f"### 📊 Live AIOps HTTP Metrics Report: Production API\n\n"
                     f"**Current Status:** **NOMINAL ({rate_str} 5xx Error Rate)**\n"
