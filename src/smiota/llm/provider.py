@@ -114,6 +114,9 @@ class GeminiProvider:
 
     def _get_vertex_client(self):
         """Lazy-initialize official Google GenAI Vertex AI client or Gemini API Key client."""
+        if self._client is not None:
+            return self._client
+
         if os.environ.get("ENVIRONMENT") == "test" or getattr(self.settings, "ENVIRONMENT", "").lower() == "test":
             return None
 
