@@ -8,6 +8,7 @@ from smiota.mcp.servers.observability.tools import (
     query_latency_metrics,
     correlate_deployment_with_incident,
     get_recent_system_changes,
+    get_service_logs,
 )
 
 AIOPS_BOUND_TOOLS = [
@@ -19,5 +20,6 @@ AIOPS_BOUND_TOOLS = [
     "query_latency_metrics",
     "correlate_deployment_with_incident",
     "get_recent_system_changes",
+    "get_service_logs",
 ]
 

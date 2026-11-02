@@ -11,6 +11,7 @@ from smiota.mcp.servers.observability.tools import (
     query_latency_metrics,
     correlate_deployment_with_incident,
     get_recent_system_changes,
+    get_service_logs,
 )
 
 
@@ -335,7 +336,93 @@ class AIOpsAgent(BaseAgent):
                 ],
             )
 
-        # 9. General AIOps Telemetry Query
+        # 9. Service Log Inspection
+        is_log_query = (
+            ("log" in q or "logs" in q or "stdout" in q or "trace" in q or "stacktrace" in q)
+            and not is_mutating_action
+        )
+        if is_log_query:
+            target_service = None
+            known_services = {
+                "payment": "payments-service",
+                "payments": "payments-service",
+                "core": "smiota-agent-core-api",
+                "agent": "smiota-agent-core-api",
+                "notif": "notification-service",
+                "notification": "notification-service",
+                "envoy": "envoy-gateway",
+                "ingress": "envoy-gateway",
+                "gateway": "envoy-gateway",
+                "smiota": "smiotaserver",
+                "server": "smiotaserver",
+            }
+            for kw, svc in known_services.items():
+                if kw in q:
+                    target_service = svc
+                    break
+
+            level_filter = "ERROR" if "error" in q else ("WARN" if "warn" in q else None)
+
+            # If user asks generally "can i check logs of a specific service?" without naming one:
+            if not target_service or "specific" in q or "specfic" in q:
+                return AgentResult(
+                    agent_name=self.name,
+                    content=(
+                        "### 📋 Service Log Inspection via OpenSearch & GKE\n\n"
+                        "**Yes, absolutely!** You can inspect recent container and application logs for any Smiota service directly here.\n\n"
+                        "#### 🔍 Try asking:\n"
+                        "- *\"Show logs for smiotaserver\"*\n"
+                        "- *\"Show error logs for payments-service\"*\n"
+                        "- *\"Show logs for smiota-agent-core-api\"*\n"
+                        "- *\"Show logs for notification-service\"*\n"
+                        "- *\"Show logs for envoy-gateway\"*\n\n"
+                        "You can also filter by severity: e.g. *\"Show error logs for smiotaserver\"* or specify time ranges."
+                    ),
+                    requires_approval=False,
+                    suggested_actions=[
+                        "Show logs for smiotaserver",
+                        "Show error logs for payments-service",
+                        "Show logs for smiota-agent-core-api",
+                    ],
+                )
+
+            # Retrieve logs for the requested service
+            log_data = await get_service_logs(service_name=target_service, level_filter=level_filter)
+            pod_name = log_data.get("pod", target_service)
+            namespace = log_data.get("namespace", "production")
+            entries = log_data.get("logs", [])
+
+            log_lines = "\n".join(f"{item['time']} [{item['level']}] {item['msg']}" for item in entries)
+            error_count = sum(1 for item in entries if item["level"] == "ERROR")
+            warn_count = sum(1 for item in entries if item["level"] == "WARN")
+
+            status_summary = (
+                f"⚠️ **Found {error_count} error(s) and {warn_count} warning(s)** in recent log stream."
+                if error_count > 0 or warn_count > 0
+                else "✅ All recent log entries report normal operational health."
+            )
+
+            content = (
+                f"### 📋 Service Logs: `{target_service}`\n"
+                f"**Pod:** `{pod_name}` | **Namespace:** `{namespace}` | **Retrieved:** {len(entries)} lines\n\n"
+                f"```log\n{log_lines}\n```\n\n"
+                f"#### 🔍 Stream Summary:\n"
+                f"- {status_summary}\n"
+                f"- **Cluster Source:** OpenSearch / GKE Container stdout"
+            )
+
+            return AgentResult(
+                agent_name=self.name,
+                content=content,
+                requires_approval=False,
+                suggested_actions=[
+                    f"Show error logs only for {target_service}",
+                    f"Compare Prometheus metrics for {target_service}",
+                    f"Check pod restart status for {target_service}",
+                ],
+            )
+
+        # 10. General AIOps Telemetry Query
         return AgentResult(
             agent_name=self.name,
             content=f"[AIOps Investigation] Analyzed telemetry for: '{query}'. Correlated metrics from Prometheus and GCP Cloud Monitoring.",

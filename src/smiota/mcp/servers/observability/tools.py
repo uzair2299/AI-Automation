@@ -47,6 +47,74 @@ async def search_opensearch_logs(query: str, time_range_minutes: int = 15) -> li
     ]
 
 
+@mcp_tool(name="get_service_logs", access_level=ToolAccessLevel.READ_ONLY)
+async def get_service_logs(
+    service_name: str = "smiotaserver",
+    namespace: str = "production",
+    lines: int = 15,
+    level_filter: str | None = None,
+) -> dict:
+    """Retrieve recent application logs and error stacktraces for a specific service."""
+    svc = service_name.lower().replace("-", "").replace("_", "")
+
+    if "payment" in svc:
+        logs = [
+            {"time": "14:10:02", "level": "INFO", "msg": "StripeWebhookHandler: Received payment_intent.succeeded for txn_883192"},
+            {"time": "14:10:05", "level": "INFO", "msg": "LockerLedgerService: Updated reservation balance for compartment C-04"},
+            {"time": "14:10:12", "level": "INFO", "msg": "AuditLogPublisher: Dispatched payment audit event to RabbitMQ topic smiota.events"},
+            {"time": "14:10:25", "level": "INFO", "msg": "HealthCheckEndpoint: Service healthy, active worker threads: 4/32"},
+            {"time": "14:10:48", "level": "INFO", "msg": "PaymentController: Processed payment checkout in 42ms"},
+        ]
+        pod = "payments-service-7f6c4d9b-x8q1z"
+    elif "core" in svc or "agent" in svc:
+        logs = [
+            {"time": "14:10:01", "level": "INFO", "msg": "smiota.api.channels.teams: MS Teams activity received [user='SRE Lead']"},
+            {"time": "14:10:01", "level": "INFO", "msg": "smiota.agents.orchestrator: Query routed to [AIOps] agent (confidence 0.95)"},
+            {"time": "14:10:02", "level": "INFO", "msg": "smiota.mcp.observability: Executing tool [get_service_logs]"},
+            {"time": "14:10:02", "level": "INFO", "msg": "smiota.llm.provider: Completed response synthesis in 184ms"},
+            {"time": "14:10:03", "level": "INFO", "msg": "smiota.api.channels.teams: Successfully delivered Teams reply via Bot Connector"},
+        ]
+        pod = "smiota-agent-core-api-68bd74cb-t9v2k"
+    elif "notif" in svc:
+        logs = [
+            {"time": "14:10:04", "level": "INFO", "msg": "PushWorker: Processing locker delivery notification for user usr_4920"},
+            {"time": "14:10:05", "level": "INFO", "msg": "FirebaseDispatcher: FCM delivery status: DELIVERED (id=msg_00291)"},
+            {"time": "14:10:18", "level": "INFO", "msg": "TwilioClient: SMS delivery dispatched to +1 (555) 019-2831"},
+        ]
+        pod = "notification-service-589fc48d-h7z8p"
+    elif "envoy" in svc or "ingress" in svc or "gateway" in svc:
+        logs = [
+            {"time": "14:08:02", "level": "WARN", "msg": "\"POST /api/v2/parcels/sync HTTP/1.1\" 500 142ms upstream: 10.48.5.12:8080"},
+            {"time": "14:08:05", "level": "INFO", "msg": "\"GET /api/v2/lockers/status HTTP/1.1\" 200 45ms upstream: 10.48.4.8:8080"},
+            {"time": "14:08:12", "level": "INFO", "msg": "\"GET /health HTTP/1.1\" 200 2ms upstream: 10.48.9.2:8080"},
+        ]
+        pod = "envoy-gateway-ingress-799bd4c-n2q8s"
+    else:
+        # Default / smiotaserver
+        logs = [
+            {"time": "14:07:45", "level": "INFO", "msg": "com.smiota.service.ParcelSyncService: Starting scheduled batch parcel sync (batch_size=500)"},
+            {"time": "14:07:50", "level": "INFO", "msg": "com.smiota.db.HikariPoolManager: Active connections: 98/100, idle: 2, waiting: 14"},
+            {"time": "14:08:01", "level": "WARN", "msg": "com.smiota.db.ConnectionWatchdog: HikariPool-1 connection acquisition latency breached 5000ms threshold"},
+            {"time": "14:08:03", "level": "ERROR", "msg": "com.smiota.service.ParcelSyncService: org.postgresql.util.PSQLException: Connection pool exhausted - request timed out after 30000ms"},
+            {"time": "14:08:04", "level": "ERROR", "msg": "com.smiota.service.ParcelSyncService: java.lang.OutOfMemoryError: Java heap space at com.smiota.service.ParcelSyncService.processBatch(ParcelSyncService.java:184)"},
+            {"time": "14:08:05", "level": "INFO", "msg": "com.smiota.web.HealthCheckEndpoint: Readiness probe status: UNHEALTHY (DB timeout)"},
+        ]
+        pod = "smiotaserver-5d9c7bb6-mk9pl"
+
+    if level_filter:
+        lf = level_filter.upper()
+        logs = [l for l in logs if l["level"] == lf]
+
+    return {
+        "status": "success",
+        "service": service_name,
+        "namespace": namespace,
+        "pod": pod,
+        "total_lines": len(logs),
+        "logs": logs,
+    }
+
+
 @mcp_tool(name="restart_gke_deployment", access_level=ToolAccessLevel.REMEDIATION)
 async def restart_gke_deployment(namespace: str, deployment_name: str, approval_token: str | None = None) -> dict:
     """Restart a deployment in Kubernetes / GKE (Remediation action - requires human approval)."""

@@ -152,3 +152,26 @@ async def test_aiops_investigate_what_changed_before_incident():
     assert "get_recent_system_changes" in result.content
 
 
+@pytest.mark.asyncio
+async def test_aiops_service_logs_inspection():
+    """Verify log inspection for a specific service returns pod logs."""
+    orchestrator = AgentOrchestrator()
+    context = AgentContext(
+        session_id="teams-session-logs",
+        user_id="sre-user",
+        tenant_id="default",
+        channel="teams",
+    )
+
+    # General log question
+    res_general = await orchestrator.route_and_execute("can i check the logs of a specfic servcie?", context)
+    assert res_general.agent_name == "AIOps"
+    assert "Yes, absolutely!" in res_general.content
+
+    # Specific service logs
+    res_svc = await orchestrator.route_and_execute("show logs for payments-service", context)
+    assert res_svc.agent_name == "AIOps"
+    assert "payments-service" in res_svc.content
+    assert "StripeWebhookHandler" in res_svc.content
+
+

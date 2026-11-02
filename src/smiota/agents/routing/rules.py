@@ -161,7 +161,7 @@ class RuleBasedRouter(BaseIntentRouter):
     AIOPS_KEYWORDS: ClassVar[list[str]] = [
         "cpu", "memory", "oom", "restart", "restarting", "crashloop", "smiotaserver", "metric", "prometheus", "opensearch",
         "grafana", "gke", "pod", "incident", "rca", "crash", "probe", "readiness",
-        "k8s", "kubernetes", "latency", "alert", "5xx", "500", "504", "deployment", "deploy", "rollout", "outage", "changed",
+        "k8s", "kubernetes", "latency", "alert", "5xx", "500", "504", "deployment", "deploy", "rollout", "outage", "changed", "log", "logs", "stdout", "stacktrace",
     ]
 
     DEVELOPER_KEYWORDS: ClassVar[list[str]] = [
