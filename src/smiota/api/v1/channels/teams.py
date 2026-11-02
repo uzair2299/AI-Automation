@@ -11,6 +11,7 @@ Handles incoming Microsoft Teams Bot Framework activities:
 import os
 import re
 import time
+import uuid
 from typing import Any, Dict, Optional, Tuple
 import httpx
 from fastapi import APIRouter, Depends, Request
@@ -20,7 +21,7 @@ from smiota.agents.base import AgentContext
 from smiota.agents.orchestrator import AgentOrchestrator
 from smiota.api.deps import get_orchestrator
 from smiota.core.config import get_settings
-from smiota.core.logging import logger
+from smiota.core.logging import correlation_id_ctx, logger
 
 router = APIRouter(prefix="/teams", tags=["Channels - Microsoft Teams"])
 
@@ -140,13 +141,13 @@ async def _post_reply_to_teams(
                 resp = await client.post(target_url, headers=headers, json=reply_activity)
                 if resp.status_code in (200, 201, 202):
                     logger.info(
-                        f"Successfully delivered Teams reply via Bot Connector [status={resp.status_code}, conv={conversation_id}]"
+                        f"✅ [4. TEAMS DISPATCH SUCCESS] Delivered response via Bot Connector (HTTP {resp.status_code}) | Conv: '{conversation_id}'"
                     )
                     return True
                 else:
                     corr_id = resp.headers.get("X-Correlating-OperationId", "")
                     logger.error(
-                        f"Bot Connector rejected activity [url={target_url}, status={resp.status_code}, corr={corr_id}]: {resp.text}"
+                        f"❌ [4. TEAMS DISPATCH REJECTED] Bot Connector rejected activity [url={target_url}, status={resp.status_code}, corr={corr_id}]: {resp.text}"
                     )
             return False
     except Exception as e:
@@ -185,8 +186,14 @@ async def ms_teams_webhook(
     bot_name = bot_recipient.get("name") or "Smiota_ai"
     bot_sender = {"id": bot_from_id, "name": bot_name}
 
+    corr_id = correlation_id_ctx.get()
+    if not corr_id or corr_id == "-":
+        corr_id = f"corr-{uuid.uuid4().hex[:12]}"
+        correlation_id_ctx.set(corr_id)
+
     logger.info(
-        f"MS Teams activity received [type={activity_type}, user={user_name}, conv={conversation_id}, tenant={tenant_id}, serviceUrl={service_url}, has_password={bool(app_password)}]"
+        f"👉 [1. TEAMS INGRESS] Activity received [type='{activity_type}'] from user '{user_name}' (ID: {user_id}) | "
+        f"Conv: '{conversation_id}' | ServiceUrl: {service_url} | HasPassword: {bool(app_password)}"
     )
 
     if not app_password:
@@ -229,7 +236,7 @@ async def ms_teams_webhook(
         cleaned_query = _clean_teams_text(raw_text)
 
         logger.info(
-            f"MS Teams message received [user='{user_name}', conv='{conversation_id}', query='{cleaned_query[:120]}']"
+            f"📥 [1. TEAMS QUERY] User '{user_name}' asked: '{cleaned_query}' (conv: '{conversation_id}') -> Dispatching to Agent Orchestrator"
         )
 
         if not cleaned_query:
@@ -274,7 +281,8 @@ async def ms_teams_webhook(
                 context=context,
             )
             logger.info(
-                f"MS Teams response ready [agent='{agent_result.agent_name}', conv='{conversation_id}', chars={len(agent_result.content)}]"
+                f"🎯 [3. ORCHESTRATOR RESULT] Selected Agent: [{agent_result.agent_name}] | Requires Approval: {agent_result.requires_approval} | "
+                f"Generated response: {len(agent_result.content)} chars | Conv: '{conversation_id}'"
             )
             reply_activity = {
                 "type": "message",

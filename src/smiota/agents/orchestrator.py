@@ -40,9 +40,9 @@ class AgentOrchestrator:
             }
 
         logger.info(
-            f"Routing query to agent: [{selected_agent_name}] "
+            f"🔀 [2. INTENT ROUTING] Query: '{query}' -> Routed to Agent: [{selected_agent_name}] "
             f"(Confidence: {routing_metadata.get('confidence', 1.0):.2f}, "
-            f"Method: {routing_metadata.get('routing_method')}, Session: {context.session_id})",
+            f"Method: {routing_metadata.get('routing_method')}, Matched Intent: '{routing_metadata.get('matched_intent')}', Session: {context.session_id})",
             extra={
                 "event": "routing.decision.selected",
                 "agent_name": selected_agent_name,
@@ -117,7 +117,11 @@ class AgentOrchestrator:
             logger.warning(f"Requested agent '{selected_agent_name}' not found. Falling back to '{default_fallback}'.")
             agent = AgentRegistry.get(default_fallback)
 
+        logger.info(f"⚙️ [2. AGENT EXECUTION] Dispatching query to {agent.name}Agent.process()")
         result = await agent.process(query, context)
+        logger.info(
+            f"✅ [2. AGENT FINISHED] {agent.name}Agent execution completed (Requires Approval: {result.requires_approval}, Content length: {len(result.content)} chars)"
+        )
 
         # 5. Classify message type (text vs. card vs. approval gate)
         msg_type: MessageType = "text"

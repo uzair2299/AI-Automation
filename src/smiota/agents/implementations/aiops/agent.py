@@ -39,6 +39,7 @@ class AIOpsAgent(BaseAgent):
         )
 
     async def process(self, query: str, context: AgentContext) -> AgentResult:
+        logger.info(f"🔎 [AIOPS] Evaluating SRE query: '{query}' (Session: {context.session_id})")
         q = query.lower().strip()
         clean_q = re.sub(r"[^\w\s]", "", q).strip()
 
@@ -80,6 +81,7 @@ class AIOpsAgent(BaseAgent):
 
         # 3. Mutating Remediation (Requires Human Approval)
         if is_mutating_action:
+            logger.warning(f"🛑 [AIOPS SRE GATE] Mutating action identified: '{query}' -> Halting for SRE Authorization Card")
             deployment_name = "smiota-agent-core-api"
             if "payment" in q:
                 deployment_name = "payments-service"

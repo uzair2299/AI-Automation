@@ -59,6 +59,7 @@ async def get_pod_restart_reason(service_name: str = "smiotaserver", namespace: 
     cpu_percent = 0.0
     container_name = service_name
 
+    logger.info(f"🔌 [MCP: get_pod_restart_reason] Querying Prometheus at '{prom_url}' for service '{service_name}' (Filter: '{pod_filter}')")
     prom_reachable = True
     error_msg = None
 
@@ -105,7 +106,10 @@ async def get_pod_restart_reason(service_name: str = "smiotaserver", namespace: 
                         cpu_percent = val_cpu
 
     except Exception as e:
-        logger.error(f"Failed to fetch live pod metrics from Prometheus: {e}")
+        logger.error(
+            f"❌ [MCP: get_pod_restart_reason FAILED] Cannot reach Prometheus at '{prom_url}': {e} | "
+            f"Explanation: 'prometheus.int.smiotaapps.com' (10.128.15.236) is an internal GCP VPC domain not resolvable from public clouds."
+        )
         prom_reachable = False
         error_msg = str(e)
 
@@ -119,6 +123,10 @@ async def get_pod_restart_reason(service_name: str = "smiotaserver", namespace: 
             "is_healthy": None,
         }
 
+    logger.info(
+        f"✅ [MCP: get_pod_restart_reason SUCCESS] Pod: '{pod_name}' (NS: '{namespace}') | "
+        f"Memory: {memory_mb} MB | CPU: {cpu_percent}% | Restarts: {restarts_count}"
+    )
     is_healthy = (restarts_count == 0)
     return {
         "status": "success",
@@ -143,6 +151,7 @@ async def query_http_error_rates(service_name: str = "smiota-agent-core-api", ti
     prom_url = getattr(settings, "PROMETHEUS_URL", None) or "https://prometheus.int.smiotaapps.com"
     error_rate = 0.0
 
+    logger.info(f"🔌 [MCP: query_http_error_rates] Querying Prometheus at '{prom_url}' for service '{service_name}'")
     prom_reachable = True
     error_msg = None
 
@@ -226,6 +235,7 @@ async def get_recent_system_changes(time_range_hours: int = 3, namespace: str = 
     settings = get_settings()
     sa_json_raw = os.getenv("GCP_SA_JSON") or os.getenv("GCP_SERVICE_ACCOUNT_KEY")
     sa_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS") or r"C:\Users\HP\AppData\Roaming\gcloud\project-smiota-psi-1-0b56e5923cad.json"
+    logger.info(f"🔌 [MCP: get_recent_system_changes] Querying live GCP Cloud Audit for project '{settings.GCP_PROJECT_ID}'")
     audit_changes = []
 
     creds = None
