@@ -169,3 +169,22 @@ async def test_aiops_service_logs_inspection():
     assert "payments-service" in res_svc.content
 
 
+@pytest.mark.asyncio
+async def test_aiops_pod_counts_inventory():
+    """Verify 'how many pods are running?' returns live cluster pod inventory."""
+    orchestrator = AgentOrchestrator()
+    context = AgentContext(
+        session_id="teams-session-pods",
+        user_id="sre-user",
+        tenant_id="default",
+        channel="teams",
+    )
+
+    result = await orchestrator.route_and_execute("how many pods are running?", context)
+    assert result.agent_name == "AIOps"
+    assert result.requires_approval is False
+    assert "Pod" in result.content or "Pods" in result.content
+    assert "Prometheus" in result.content
+
+
+

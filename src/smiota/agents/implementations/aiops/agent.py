@@ -7,6 +7,7 @@ from smiota.agents.implementations.aiops.prompts import AIOPS_SYSTEM_PROMPT
 from smiota.agents.implementations.aiops.tools import AIOPS_BOUND_TOOLS
 from smiota.mcp.servers.observability.tools import (
     get_pod_restart_reason,
+    get_cluster_pod_counts,
     query_http_error_rates,
     query_latency_metrics,
     correlate_deployment_with_incident,
@@ -416,6 +417,61 @@ class AIOpsAgent(BaseAgent):
                 suggested_actions=[
                     f"Open OpenSearch Dashboards for {target_service}",
                     f"Check Prometheus metrics for {target_service}",
+                ],
+            )
+
+        # 8.5 SCENARIO: GKE Pod Counts / Inventory
+        is_pod_count_query = (
+            "how many pods" in q
+            or "number of pods" in q
+            or "count pods" in q
+            or "pod count" in q
+            or ("pod" in q and ("number" in q or "count" in q or "total" in q or "how many" in q or "numbers" in q))
+        )
+        if is_pod_count_query:
+            logger.info(f"📊 [AIOPS WORKFLOW] Executing Pod Count Inventory Query: '{query}'")
+            pod_data = await get_cluster_pod_counts()
+            if pod_data.get("status") == "unreachable":
+                return AgentResult(
+                    agent_name=self.name,
+                    content=(
+                        f"### ⚠️ Live Prometheus Telemetry Notice: Pod Inventory\n\n"
+                        f"**Status:** **Prometheus Unreachable from Current Environment**\n"
+                        f"```{pod_data.get('error')}```\n\n"
+                        f"Host this bot on the Smiota Dev VM or inside GKE to query live cluster metrics."
+                    ),
+                    requires_approval=False,
+                    suggested_actions=["Check Prometheus reachability", "View GKE cluster status"],
+                )
+
+            total = pod_data.get("total_pods", 0)
+            ns_dict = pod_data.get("namespaces", {})
+            
+            # Format top namespaces table
+            lines = []
+            for ns, cnt in ns_dict.items():
+                lines.append(f"- `{ns:25}` : **{cnt} pods**")
+            ns_formatted = "\n".join(lines)
+
+            content = (
+                f"### 📊 Live GKE Cluster Pod Inventory\n\n"
+                f"**Total Running Pods:** **{total} Pods** across **{len(ns_dict)} Namespaces**\n\n"
+                f"#### 📦 Pod Breakdown by Namespace:\n"
+                f"{ns_formatted}\n\n"
+                f"#### 📍 Telemetry Provenance & Evidence Traceability:\n"
+                f"- **Data Source:** Live Prometheus (`https://prometheus.int.smiotaapps.com`)\n"
+                f"- **Queried Metric:** `count(kube_pod_info) by (namespace)`\n"
+                f"- **Live Verification:** [Open in Grafana](https://grafana.int.smiotaapps.com) | [Prometheus Graph](https://prometheus.int.smiotaapps.com/graph)"
+            )
+
+            return AgentResult(
+                agent_name=self.name,
+                content=content,
+                requires_approval=False,
+                suggested_actions=[
+                    "Check memory and CPU for smiotaserver",
+                    "Why is smiotaserver restarting?",
+                    "Check active alerts in Alertmanager",
                 ],
             )
 

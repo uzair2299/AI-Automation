@@ -346,3 +346,55 @@ async def restart_gke_deployment(namespace: str, deployment_name: str, approval_
         "namespace": namespace,
         "approved_by_token": approval_token
     }
+
+
+@mcp_tool(name="get_cluster_pod_counts", access_level=ToolAccessLevel.READ_ONLY)
+async def get_cluster_pod_counts(namespace: str | None = None) -> dict:
+    """Query live Prometheus for real pod counts across GKE namespaces."""
+    settings = get_settings()
+    prom_url = getattr(settings, "PROMETHEUS_URL", None) or "https://prometheus.int.smiotaapps.com"
+
+    logger.info(f"🔌 [MCP: get_cluster_pod_counts] Querying Prometheus at '{prom_url}' (Namespace filter: {namespace})")
+    
+    total_pods = 0
+    namespace_counts = {}
+    prom_reachable = True
+    error_msg = None
+
+    try:
+        async with httpx.AsyncClient(timeout=8.0, verify=False) as client:
+            r_by_ns = await client.get(
+                f"{prom_url.rstrip('/')}/api/v1/query",
+                params={"query": "count(kube_pod_info) by (namespace)"},
+            )
+            if r_by_ns.status_code == 200:
+                results = r_by_ns.json().get("data", {}).get("result", [])
+                for d in results:
+                    ns_name = d["metric"].get("namespace", "unknown")
+                    cnt = int(float(d["value"][1]))
+                    namespace_counts[ns_name] = cnt
+                    total_pods += cnt
+    except Exception as e:
+        logger.error(f"❌ [MCP: get_cluster_pod_counts FAILED] Cannot reach Prometheus: {e}")
+        prom_reachable = False
+        error_msg = str(e)
+
+    if not prom_reachable:
+        return {
+            "status": "unreachable",
+            "is_reachable": False,
+            "data_source": f"Prometheus ({prom_url})",
+            "error": f"Cannot connect to Prometheus at {prom_url}: {error_msg}",
+            "total_pods": 0,
+            "namespaces": {},
+        }
+
+    logger.info(f"✅ [MCP: get_cluster_pod_counts SUCCESS] Found {total_pods} total pods across {len(namespace_counts)} namespaces")
+    return {
+        "status": "success",
+        "is_reachable": True,
+        "data_source": f"Live Prometheus ({prom_url})",
+        "total_pods": total_pods,
+        "total_namespaces": len(namespace_counts),
+        "namespaces": dict(sorted(namespace_counts.items(), key=lambda x: x[1], reverse=True)),
+    }
