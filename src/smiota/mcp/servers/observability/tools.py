@@ -219,19 +219,36 @@ async def correlate_deployment_with_incident(service_name: str = "smiota-agent-c
 @mcp_tool(name="get_recent_system_changes", access_level=ToolAccessLevel.READ_ONLY)
 async def get_recent_system_changes(time_range_hours: int = 3, namespace: str = "smiota-prod") -> dict:
     """Query live GCP Cloud Audit Logs (cloudaudit.googleapis.com) for real infrastructure and cluster changes."""
+    import json
     from google.oauth2 import service_account
     from google.auth.transport.requests import Request
 
     settings = get_settings()
+    sa_json_raw = os.getenv("GCP_SA_JSON") or os.getenv("GCP_SERVICE_ACCOUNT_KEY")
     sa_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS") or r"C:\Users\HP\AppData\Roaming\gcloud\project-smiota-psi-1-0b56e5923cad.json"
     audit_changes = []
 
-    if os.path.exists(sa_path):
+    creds = None
+    if sa_json_raw:
+        try:
+            creds_data = json.loads(sa_json_raw)
+            creds = service_account.Credentials.from_service_account_info(
+                creds_data,
+                scopes=["https://www.googleapis.com/auth/logging.read", "https://www.googleapis.com/auth/cloud-platform"]
+            )
+        except Exception as e:
+            logger.error(f"Failed to parse GCP_SA_JSON: {e}")
+    elif os.path.exists(sa_path):
         try:
             creds = service_account.Credentials.from_service_account_file(
                 sa_path,
                 scopes=["https://www.googleapis.com/auth/logging.read", "https://www.googleapis.com/auth/cloud-platform"]
             )
+        except Exception as e:
+            logger.error(f"Failed to load service account file from {sa_path}: {e}")
+
+    if creds:
+        try:
             creds.refresh(Request())
             headers = {"Authorization": f"Bearer {creds.token}", "Content-Type": "application/json"}
             payload = {
