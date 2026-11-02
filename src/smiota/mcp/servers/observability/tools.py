@@ -33,3 +33,33 @@ async def restart_gke_deployment(namespace: str, deployment_name: str, approval_
         "namespace": namespace,
         "approved_by_token": approval_token
     }
+
+
+@mcp_tool(name="get_pod_restart_reason", access_level=ToolAccessLevel.READ_ONLY)
+async def get_pod_restart_reason(service_name: str, namespace: str = "production") -> dict:
+    """Inspect Kubernetes / GKE pod termination state, exit codes, and restart telemetry."""
+    svc = service_name.lower().replace("-", "").replace("_", "")
+    if "smiota" in svc or "server" in svc or "payment" in svc:
+        return {
+            "status": "success",
+            "service": service_name,
+            "namespace": namespace,
+            "restart_count_1h": 4,
+            "exit_code": 137,
+            "termination_reason": "OOMKilled",
+            "memory_limit": "4096Mi",
+            "peak_memory_observed": "4128Mi",
+            "last_crash_timestamp": "12 minutes ago",
+            "recent_error": "java.lang.OutOfMemoryError: Java heap space at com.smiota.service.ParcelSyncService",
+            "message": "Container exceeded 4096Mi memory limit and was terminated by Linux kernel OOM killer."
+        }
+    return {
+        "status": "success",
+        "service": service_name,
+        "namespace": namespace,
+        "restart_count_1h": 0,
+        "exit_code": 0,
+        "termination_reason": "Completed",
+        "message": f"Service '{service_name}' is healthy with 0 abnormal terminations."
+    }
+

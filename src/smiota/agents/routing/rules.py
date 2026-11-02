@@ -159,7 +159,7 @@ class RuleBasedRouter(BaseIntentRouter):
     ]
 
     AIOPS_KEYWORDS: ClassVar[list[str]] = [
-        "cpu", "memory", "oom", "restart", "metric", "prometheus", "opensearch",
+        "cpu", "memory", "oom", "restart", "restarting", "crashloop", "smiotaserver", "metric", "prometheus", "opensearch",
         "grafana", "gke", "pod", "incident", "rca", "crash", "probe", "readiness",
         "k8s", "kubernetes", "latency", "alert",
     ]

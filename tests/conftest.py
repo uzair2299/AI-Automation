@@ -20,6 +20,8 @@ def init_test_environment():
     settings = get_settings()
     settings.ENVIRONMENT = "test"
     settings.DEBUG = True
+    settings.CHAT_STORAGE_BACKEND = "memory"
+    settings.VECTOR_STORE_BACKEND = "memory"
     settings.SMIOTA_AUTH_DUMMY_MODE = False
     settings.REQUIRE_HUMAN_APPROVAL_FOR_REMEDIATION = True
 
