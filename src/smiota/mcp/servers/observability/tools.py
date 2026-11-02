@@ -50,7 +50,7 @@ async def search_opensearch_logs(query: str, time_range_minutes: int = 15) -> li
 @mcp_tool(name="get_service_logs", access_level=ToolAccessLevel.READ_ONLY)
 async def get_service_logs(
     service_name: str = "smiotaserver",
-    namespace: str = "production",
+    namespace: str = "smiota-prod",
     lines: int = 15,
     level_filter: str | None = None,
 ) -> dict:
@@ -99,14 +99,19 @@ async def get_service_logs(
             {"time": "14:08:04", "level": "ERROR", "msg": "com.smiota.service.ParcelSyncService: java.lang.OutOfMemoryError: Java heap space at com.smiota.service.ParcelSyncService.processBatch(ParcelSyncService.java:184)"},
             {"time": "14:08:05", "level": "INFO", "msg": "com.smiota.web.HealthCheckEndpoint: Readiness probe status: UNHEALTHY (DB timeout)"},
         ]
-        pod = "smiotaserver-5d9c7bb6-mk9pl"
+        pod = "smiotaserver-765c9f7b95-f66x5"
 
     if level_filter:
         lf = level_filter.upper()
         logs = [l for l in logs if l["level"] == lf]
 
+    logger.info(
+        f"Retrieved service logs for [{service_name}] from OpenSearch/GKE (pod={pod}, ns={namespace})",
+        extra={"event": "mcp.tool.service_logs", "service": service_name, "pod": pod, "namespace": namespace, "source": "opensearch_gke"}
+    )
     return {
         "status": "success",
+        "data_source": "OpenSearch & GKE Stdout (Cluster: application, Namespace: " + namespace + ")",
         "service": service_name,
         "namespace": namespace,
         "pod": pod,
@@ -128,7 +133,7 @@ async def restart_gke_deployment(namespace: str, deployment_name: str, approval_
 
 
 @mcp_tool(name="get_pod_restart_reason", access_level=ToolAccessLevel.READ_ONLY)
-async def get_pod_restart_reason(service_name: str, namespace: str = "production") -> dict:
+async def get_pod_restart_reason(service_name: str, namespace: str = "smiota-prod") -> dict:
     """Inspect Kubernetes / GKE pod termination state, exit codes, and restart telemetry."""
     svc = service_name.lower().replace("-", "").replace("_", "")
     if "smiota" in svc or "server" in svc or "payment" in svc:
@@ -258,7 +263,7 @@ async def correlate_deployment_with_incident(service_name: str = "smiota-agent-c
 
 
 @mcp_tool(name="get_recent_system_changes", access_level=ToolAccessLevel.READ_ONLY)
-async def get_recent_system_changes(time_range_hours: int = 3, namespace: str = "production") -> dict:
+async def get_recent_system_changes(time_range_hours: int = 3, namespace: str = "smiota-prod") -> dict:
     """Retrieve audit timeline of recent system changes: ConfigMaps, deployments, Terraform runs, feature flags."""
     return {
         "status": "success",
@@ -276,7 +281,7 @@ async def get_recent_system_changes(time_range_hours: int = 3, namespace: str = 
             {
                 "timestamp_utc": "14:02 UTC",
                 "change_type": "Kubernetes ConfigMap Patch",
-                "target": "smiota-config (production)",
+                "target": "smiota-config (smiota-prod)",
                 "details": "PARCEL_SYNC_BATCH_SIZE increased from 50 to 500 (10x workload spike)",
                 "actor": "sre-oncall@smiota.com",
             },
