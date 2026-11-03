@@ -3,10 +3,10 @@
 # Smiota AI Platform - Automated Linux VM Deployment Script
 # 
 # Deploys:
-#   1. System packages & Docker / Docker Compose engine
+#   1. System packages & Docker engine (uses host-installed PostgreSQL & Redis)
 #   2. Clones / checks out branch 'feature/mcp-client-server-architecture'
-#   3. Generates production .env with pgvector & microservice URLs
-#   4. Builds and launches all 5 microservices + pgvector + Redis
+#   3. Generates production .env pointing to host PostgreSQL (pgvector) & Redis
+#   4. Builds and launches only the 4 application microservices
 #   5. Performs automated end-to-end health & search checks
 # ==============================================================================
 
@@ -27,7 +27,7 @@ log_error() { echo -e "${RED}${BOLD}[ERROR]${RESET} $1"; }
 
 REPO_URL="${REPO_URL:-https://dev.azure.com/smiota/smiotaplatform/_git/smiota-aiops}"
 BRANCH="${BRANCH:-feature/mcp-client-server-architecture}"
-INSTALL_DIR="${HOME}/smiota-ai"
+INSTALL_DIR="${HOME}/smiota-aiops"
 
 echo -e "${BOLD}"
 echo "======================================================================"
@@ -51,7 +51,7 @@ fi
 # ------------------------------------------------------------------------------
 # 2. Package Updates & Docker Engine Installation
 # ------------------------------------------------------------------------------
-log_info "Step 1/5: Checking and installing system dependencies..."
+log_info "Step 1/5: Checking system dependencies and host services..."
 $SUDO apt-get update -y
 $SUDO apt-get install -y --no-install-recommends \
     git \
@@ -88,13 +88,25 @@ if [ "$(id -u)" -ne 0 ]; then
     fi
 fi
 
+# Check host PostgreSQL and Redis status
+if systemctl is-active --quiet postgresql 2>/dev/null; then
+    log_success "Host PostgreSQL service is ACTIVE."
+else
+    log_warn "Host PostgreSQL service is not detected as systemd active (ensure it is running on port 5432)."
+fi
+
+if systemctl is-active --quiet redis 2>/dev/null || systemctl is-active --quiet redis-server 2>/dev/null; then
+    log_success "Host Redis service is ACTIVE."
+else
+    log_warn "Host Redis service is not detected as systemd active (ensure it is running on port 6379)."
+fi
+
 # ------------------------------------------------------------------------------
 # 3. Clone Repository or Update Existing Workspace
 # ------------------------------------------------------------------------------
-log_info "Step 2/5: Synchronizing codebase from GitHub..."
+log_info "Step 2/5: Synchronizing codebase from repository..."
 
 if [ -f "./docker-compose.yml" ] && [ -d "./rag-service" ]; then
-    # Already inside repository directory
     TARGET_DIR="$(pwd)"
     log_info "Running inside existing repository at ${TARGET_DIR}."
 else
@@ -115,15 +127,14 @@ fi
 # ------------------------------------------------------------------------------
 # 4. Generate Production .env Configuration
 # ------------------------------------------------------------------------------
-log_info "Step 3/5: Configuring environment and credentials..."
+log_info "Step 3/5: Configuring environment to connect to host PostgreSQL & Redis..."
 
 ENV_FILE="${TARGET_DIR}/.env"
 
-# Generate strong random JWT secret if not present
 JWT_SECRET=$(head -c 32 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c 32 || echo "smiota-sec-key-$(date +%s)")
 
 if [ ! -f "${ENV_FILE}" ]; then
-    log_info "Creating new .env file with pgvector database credentials..."
+    log_info "Creating new .env file..."
     cat <<EOF > "${ENV_FILE}"
 # ==============================================================================
 # Smiota AI Platform - VM Production Environment
@@ -136,13 +147,13 @@ HOST=0.0.0.0
 ENABLE_SWAGGER=true
 CORS_ORIGINS=["*"]
 
-# Database, Cache & pgvector (Configured)
+# Host Database & Redis
 POSTGRES_USER=smiota_user
 POSTGRES_PASSWORD=smaiops26devdb
 POSTGRES_DB=smiota_ai_dev
 PGVECTOR_PASSWORD=smaiops26devdb
-DATABASE_URL=postgresql+asyncpg://smiota_user:smaiops26devdb@localhost:5432/smiota_ai_dev
-REDIS_URL=redis://localhost:6379/0
+DATABASE_URL=postgresql+asyncpg://smiota_user:smaiops26devdb@host.docker.internal:5432/smiota_ai_dev
+REDIS_URL=redis://host.docker.internal:6379/0
 
 # GCP & Gemini
 GCP_PROJECT_ID=project-smiota-psi-1
@@ -168,15 +179,15 @@ RAG_SERVICE_URL=http://rag-service:8001
 EOF
     log_success ".env configuration generated successfully."
 else
-    log_info "Existing .env found. Ensuring pgvector credentials are up to date..."
-    if ! grep -q "smaiops26devdb" "${ENV_FILE}"; then
-        sed -i 's/POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=smaiops26devdb/' "${ENV_FILE}" || true
-        sed -i 's/PGVECTOR_PASSWORD=.*/PGVECTOR_PASSWORD=smaiops26devdb/' "${ENV_FILE}" || true
-    fi
+    log_info "Updating existing .env to ensure host.docker.internal is used..."
+    sed -i 's|@localhost:5432|@host.docker.internal:5432|g' "${ENV_FILE}" || true
+    sed -i 's|redis://localhost:6379|redis://host.docker.internal:6379|g' "${ENV_FILE}" || true
+    sed -i 's/POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=smaiops26devdb/' "${ENV_FILE}" || true
+    sed -i 's/PGVECTOR_PASSWORD=.*/PGVECTOR_PASSWORD=smaiops26devdb/' "${ENV_FILE}" || true
 fi
 
 # ------------------------------------------------------------------------------
-# 5. Build and Launch Containers via Docker Compose
+# 5. Build and Launch Containers via Docker Compose (NO duplicate DB containers)
 # ------------------------------------------------------------------------------
 log_info "Step 4/5: Building and starting microservices mesh via Docker Compose..."
 
@@ -189,7 +200,6 @@ $SUDO $DOCKER_COMPOSE up -d --build
 log_info "Step 5/5: Awaiting container startup and health checks..."
 
 MAX_RETRIES=20
-RETRY_COUNT=0
 
 check_endpoint() {
     local url=$1
@@ -250,4 +260,3 @@ echo -e "  • Stop All Services:      ${YELLOW}docker compose down${RESET}"
 echo ""
 echo -e "${YELLOW}${BOLD}Firewall Reminder:${RESET} In GCP/Azure/AWS, allow inbound TCP port ${BOLD}8000${RESET} to your VM."
 echo "======================================================================"
-
