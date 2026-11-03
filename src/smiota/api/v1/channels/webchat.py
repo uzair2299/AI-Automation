@@ -2,123 +2,8 @@
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 
-BOT_MASCOT_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="60 40 100 148" width="100%" height="100%" class="ai-bot-svg" role="img" aria-label="AI Assistant Bot">
-  <defs>
-    <!-- Robot Head 3D Spherical Lighting Gradient -->
-    <linearGradient id="robot-head-grad" x1="20%" y1="10%" x2="85%" y2="95%">
-      <stop offset="0%" stop-color="#dbe8fd"/>
-      <stop offset="30%" stop-color="#b7d3fc"/>
-      <stop offset="75%" stop-color="#81adfa"/>
-      <stop offset="100%" stop-color="#5d94f2"/>
-    </linearGradient>
-
-    <!-- Visor Deep Navy Shield -->
-    <linearGradient id="robot-visor-grad" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#2e3d82"/>
-      <stop offset="50%" stop-color="#1e2962"/>
-      <stop offset="100%" stop-color="#131a42"/>
-    </linearGradient>
-
-    <!-- Visor Glass Glare / Sheen -->
-    <linearGradient id="visor-glare-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.35"/>
-      <stop offset="40%" stop-color="#ffffff" stop-opacity="0.1"/>
-      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
-    </linearGradient>
-
-    <!-- Torso 3D Gradient -->
-    <linearGradient id="robot-torso-grad" x1="20%" y1="0%" x2="80%" y2="100%">
-      <stop offset="0%" stop-color="#cce0fc"/>
-      <stop offset="50%" stop-color="#92bdfa"/>
-      <stop offset="100%" stop-color="#6399f3"/>
-    </linearGradient>
-
-    <!-- Arms Capsule Gradient -->
-    <linearGradient id="robot-arm-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#d0e3fc"/>
-      <stop offset="100%" stop-color="#79a9f7"/>
-    </linearGradient>
-
-    <!-- Cyan Neon Glow Filter -->
-    <filter id="cyan-neon-glow" x="-40%" y="-40%" width="180%" height="180%">
-      <feGaussianBlur stdDeviation="2" result="blur"/>
-      <feMerge>
-        <feMergeNode in="blur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
-
-    <!-- Ground Shadow Blur Filter -->
-    <filter id="ground-shadow-blur" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="2.5"/>
-    </filter>
-  </defs>
-
-  <!-- 1. Ground Shadow (Breathing Scale & Opacity) -->
-  <g class="mascot-svg-shadow">
-    <ellipse cx="110" cy="180" rx="32" ry="6" fill="#222b5e" opacity="0.55" filter="url(#ground-shadow-blur)"/>
-  </g>
-
-  <!-- 2. Central Robot Mascot -->
-  <g class="mascot-svg-robot">
-    <!-- Thruster Tail Cone & Core Glow -->
-    <path d="M 103 146 L 110 162 L 117 146 Z" fill="#6399f3"/>
-    <ellipse cx="110" cy="162.5" rx="5.5" ry="2.8" fill="#00f5d4" filter="url(#cyan-neon-glow)"/>
-
-    <!-- Torso -->
-    <rect x="92" y="120" width="36" height="30" rx="15" fill="url(#robot-torso-grad)"/>
-    <path d="M 94 130 C 94 123 99 122 106 121 C 98 123 94 128 94 135 Z" fill="#ffffff" opacity="0.4"/>
-
-    <!-- Chest Glowing Reactor Button -->
-    <circle cx="110" cy="131" r="3.5" fill="#00f5d4" filter="url(#cyan-neon-glow)"/>
-    <circle cx="110" cy="131" r="1.5" fill="#ffffff"/>
-
-    <!-- Floating Arms -->
-    <g transform="rotate(-16 76 126)">
-      <rect x="68" y="121" width="17" height="10.5" rx="5.25" fill="url(#robot-arm-grad)"/>
-      <ellipse cx="72" cy="124" rx="4" ry="2" fill="#ffffff" opacity="0.45"/>
-    </g>
-    <g transform="rotate(16 144 126)">
-      <rect x="135" y="121" width="17" height="10.5" rx="5.25" fill="url(#robot-arm-grad)"/>
-      <ellipse cx="140" cy="124" rx="4" ry="2" fill="#ffffff" opacity="0.45"/>
-    </g>
-
-    <!-- Antenna Stem & Neon Bulb -->
-    <line x1="124" y1="68" x2="134" y2="47" stroke="#00f5d4" stroke-width="3" stroke-linecap="round" filter="url(#cyan-neon-glow)"/>
-    <circle cx="134" cy="47" r="4" fill="#00f5d4" filter="url(#cyan-neon-glow)"/>
-    <circle cx="133" cy="46" r="1.8" fill="#ffffff"/>
-
-    <!-- Head Dome Shell -->
-    <rect x="72" y="60" width="76" height="58" rx="29" fill="url(#robot-head-grad)"/>
-    <ellipse cx="92" cy="70" rx="16" ry="7" fill="#ffffff" opacity="0.45" transform="rotate(-15 92 70)"/>
-
-    <!-- Headset Ear Cushions -->
-    <rect x="70" y="86" width="5.5" height="13" rx="2.75" fill="#1a2356"/>
-    <rect x="144.5" y="86" width="5.5" height="13" rx="2.75" fill="#1a2356"/>
-
-    <!-- Face Visor Screen -->
-    <rect x="81" y="70" width="58" height="38" rx="19" fill="url(#robot-visor-grad)"/>
-    <path d="M 85 86 C 85 76 92 72 101 71 L 115 71 C 99 74 92 79 89 90 Z" fill="url(#visor-glare-grad)"/>
-
-    <!-- Glowing Cyan Left Eye (Blinks when authenticated) -->
-    <g class="mascot-left-eye" filter="url(#cyan-neon-glow)">
-      <rect x="90.5" y="80.5" width="10.5" height="14.5" rx="5.25" fill="#00f5d4"/>
-      <circle cx="94" cy="84" r="1.8" fill="#ffffff"/>
-    </g>
-    <!-- Glowing Cyan Right Eye (Winks in guest mode, blinks in sync when authenticated) -->
-    <g class="mascot-right-eye mascot-eye-wink" filter="url(#cyan-neon-glow)">
-      <rect x="119" y="80.5" width="10.5" height="14.5" rx="5.25" fill="#00f5d4"/>
-      <circle cx="122.5" cy="84" r="1.8" fill="#ffffff"/>
-    </g>
-
-    <!-- Cheerful Smile -->
-    <path d="M 104 97 Q 110 102.5 116 97 Z" fill="#ffffff"/>
-
-    <!-- Headset Boom Microphone -->
-    <path d="M 147 94 C 147 107 134 110.5 124 105.5" fill="none" stroke="#00f5d4" stroke-width="2.6" stroke-linecap="round" filter="url(#cyan-neon-glow)"/>
-    <circle cx="123.5" cy="105.5" r="3.2" fill="#00f5d4" filter="url(#cyan-neon-glow)"/>
-    <circle cx="122.5" cy="104.5" r="1.2" fill="#ffffff"/>
-  </g>
+BOT_MASCOT_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-full h-full" role="img" aria-label="Smiota SI">
+  <path fill-rule="evenodd" d="M4.804 21.644A6.707 6.707 0 0 0 6 21.75a6.721 6.721 0 0 0 3.583-1.029c.774.182 1.584.279 2.417.279 5.322 0 9.75-3.97 9.75-9 0-5.03-4.428-9-9.75-9s-9.75 3.97-9.75 9c0 2.409 1.025 4.587 2.674 6.192.232.226.277.428.254.543a3.73 3.73 0 0 1-.814 1.686.75.75 0 0 0 .44 1.223ZM8.25 10.875a1.125 1.125 0 1 0 0 2.25 1.125 1.125 0 0 0 0-2.25ZM10.875 12a1.125 1.125 0 1 1 2.25 0 1.125 1.125 0 0 1-2.25 0Zm4.875-1.125a1.125 1.125 0 1 0 0 2.25 1.125 1.125 0 0 0 0-2.25Z" clip-rule="evenodd" />
 </svg>"""
 
 router = APIRouter(prefix="/webchat", tags=["Channels - Smiota Web Chat"])
@@ -130,7 +15,7 @@ async def webchat_config():
     from smiota.core.config import get_settings
     settings = get_settings()
     return {
-        "assistant_name": getattr(settings, "WEBCHAT_ASSISTANT_NAME", "Smiota Assistant"),
+        "assistant_name": getattr(settings, "WEBCHAT_ASSISTANT_NAME", "Smiota SI"),
         "subtitle": getattr(settings, "WEBCHAT_SUBTITLE", "Smart Locker & Parcel Concierge"),
         "welcome_title": getattr(settings, "WEBCHAT_WELCOME_TITLE", "Welcome to Smiota!"),
         "welcome_message": getattr(
@@ -170,7 +55,7 @@ async def embed_widget(
         "Hi there! Welcome to Smiota. How can I help you today?",
     )
     active_subtitle = subtitle or getattr(settings, "WEBCHAT_SUBTITLE", "Smart Locker & Parcel Concierge")
-    active_name = assistant_name or getattr(settings, "WEBCHAT_ASSISTANT_NAME", "Smiota Assistant")
+    active_name = assistant_name or getattr(settings, "WEBCHAT_ASSISTANT_NAME", "Smiota SI")
     html_content = r"""<!DOCTYPE html>
 <html lang="en" class="h-full">
 <head>
@@ -196,38 +81,9 @@ async def embed_widget(
             40% { transform: scale(1); opacity: 1; }
         }
     
-        /* Central Mascot Robot SVG & Micro-Animations */
+        /* Central Chat Assistant Icon & Typography */
         .ai-bot-svg { width: 100%; height: 100%; overflow: visible; }
         .bot-text-body, .streaming-content { white-space: normal; word-break: break-word; }
-        .mascot-svg-shadow { animation: shadowPulse 4s ease-in-out infinite; transform-box: fill-box; transform-origin: 110px 180px; }
-        .mascot-svg-robot { animation: botHover 4s ease-in-out infinite; transform-box: fill-box; transform-origin: 110px 105px; }
-        .mascot-eye-wink { animation: eyeWink 3.8s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 50%; }
-
-        @keyframes eyeWink {
-            0%, 42%, 58%, 100% { transform: scaleY(1); }
-            49%, 51% { transform: scaleY(0.08); }
-        }
-
-        @keyframes botHover {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-4px); }
-        }
-        @keyframes shadowPulse {
-            0%, 100% { transform: scaleX(1); opacity: 0.55; }
-            50% { transform: scaleX(0.85); opacity: 0.32; }
-        }
-        /* Authenticated Mascot State: Both Eyes Blinking in Sync */
-        .is-authenticated .mascot-left-eye,
-        .is-authenticated .mascot-right-eye {
-            animation: bothEyesBlink 2.5s ease-in-out infinite !important;
-            transform-box: fill-box;
-            transform-origin: 50% 50%;
-        }
-
-        @keyframes bothEyesBlink {
-            0%, 42%, 58%, 100% { transform: scaleY(1); }
-            48%, 52% { transform: scaleY(0.08); }
-        }
     </style>
 </head>
 <body class="h-full bg-slate-100 flex flex-col overflow-hidden font-sans antialiased m-0 p-0">
@@ -239,13 +95,13 @@ async def embed_widget(
         <div class="bg-gradient-to-r from-violet-600 to-indigo-600 px-5 py-3.5 text-white flex items-center justify-between shrink-0 shadow-sm">
             <div class="flex items-center space-x-3">
                 <div id="mascot-header-avatar" class="relative shrink-0">
-                    <div id="mascot-header-shell" class="w-11 h-11 rounded-full bg-white/20 backdrop-blur-md border border-white/40 shadow-sm flex items-center justify-center p-1 hover:scale-105 transition-transform">
+                    <div id="mascot-header-shell" class="w-11 h-11 rounded-full bg-white/20 backdrop-blur-md border border-white/40 shadow-sm flex items-center justify-center p-2.5 hover:scale-105 transition-transform text-white">
                         __BOT_SVG__
                     </div>
                     <span id="mascot-status-dot" class="absolute bottom-0 right-0 w-3 h-3 bg-emerald-400 border-2 border-indigo-600 rounded-full shadow-xs"></span>
                 </div>
                 <div>
-                    <h1 class="font-semibold text-base tracking-tight leading-tight">Smiota AI Assistant</h1>
+                    <h1 class="font-semibold text-base tracking-tight leading-tight" id="header-title">__ASSISTANT_NAME__</h1>
                     <p class="text-xs text-indigo-100 opacity-90 transition-all" id="header-subtitle">__SUBTITLE__</p>
                 </div>
             </div>
@@ -268,7 +124,7 @@ async def embed_widget(
 
             <!-- Bot Welcome Message -->
             <div id="initial-welcome-bubble" class="flex items-end space-x-2.5">
-                <div class="w-8 h-8 rounded-full bg-white border border-indigo-100 shadow-xs flex items-center justify-center p-0.5 shrink-0 select-none relative">__BOT_SVG__</div>
+                <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-violet-600 to-indigo-600 text-white shadow-xs flex items-center justify-center p-1.5 shrink-0 select-none relative">__BOT_SVG__</div>
                 <div class="bg-white text-slate-800 px-4 py-3 rounded-[18px] rounded-bl-[4px] max-w-[82%] text-sm border border-slate-200/80 shadow-[0_2px_8px_rgba(0,0,0,0.03)] leading-relaxed">
                     <div class="flex items-center justify-between space-x-3 mb-1.5 pb-1 border-b border-slate-100/90">
                         <span class="text-[11px] font-bold uppercase tracking-wider text-indigo-600" id="bot-sender-name">__ASSISTANT_NAME__</span>
@@ -345,6 +201,12 @@ async def embed_widget(
         if (urlParams.get('subtitle')) {
             const el = document.getElementById('header-subtitle');
             if (el) el.innerText = urlParams.get('subtitle');
+        }
+        if (urlParams.get('assistant_name')) {
+            const el = document.getElementById('header-title');
+            if (el) el.innerText = urlParams.get('assistant_name');
+            const botEl = document.getElementById('bot-sender-name');
+            if (botEl) botEl.innerText = urlParams.get('assistant_name');
         }
         const STORAGE_KEY = 'smiota_active_chat_session_id';
         const cachedSid = localStorage.getItem(STORAGE_KEY);
@@ -639,10 +501,10 @@ async def embed_widget(
                 }
 
                 div.innerHTML = `
-                    <div class="w-8 h-8 rounded-full bg-white border border-indigo-100 shadow-xs flex items-center justify-center p-0.5 shrink-0 select-none relative">${botAvatarSvg}</div>
+                    <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-violet-600 to-indigo-600 text-white shadow-xs flex items-center justify-center p-1.5 shrink-0 select-none relative">${botAvatarSvg}</div>
                     <div class="bg-white text-slate-800 px-4 py-3 rounded-[18px] rounded-bl-[4px] max-w-[82%] text-sm border border-slate-200/80 shadow-[0_2px_8px_rgba(0,0,0,0.03)] leading-relaxed">
                         <div class="flex items-center justify-between space-x-3 mb-1.5 pb-1 border-b border-slate-100/90">
-                            <span class="text-[11px] font-bold uppercase tracking-wider text-indigo-600">${agentName} Assistant</span>
+                            <span class="text-[11px] font-bold uppercase tracking-wider text-indigo-600">__ASSISTANT_NAME__</span>
                             <span class="text-[11px] text-slate-400 font-medium">${timeStr}</span>
                         </div>
                         <div class="bot-text-body text-slate-700 text-sm leading-relaxed space-y-1">${formatMarkdown(text)}</div>
@@ -686,10 +548,10 @@ async def embed_widget(
             const div = document.createElement('div');
             div.className = "flex items-end space-x-2.5 justify-start mb-3";
             div.innerHTML = `
-                <div class="w-8 h-8 rounded-full bg-white border border-indigo-100 shadow-xs flex items-center justify-center p-0.5 shrink-0 select-none relative">${botAvatarSvg}</div>
+                <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-violet-600 to-indigo-600 text-white shadow-xs flex items-center justify-center p-1.5 shrink-0 select-none relative">${botAvatarSvg}</div>
                 <div class="bg-white text-slate-800 px-4 py-3 rounded-[18px] rounded-bl-[4px] max-w-[82%] text-sm border border-slate-200/80 shadow-[0_2px_8px_rgba(0,0,0,0.03)] leading-relaxed">
                     <div class="flex items-center justify-between space-x-3 mb-1.5 pb-1 border-b border-slate-100/90">
-                        <span class="text-[11px] font-bold uppercase tracking-wider text-indigo-600">${agentName} Assistant</span>
+                        <span class="text-[11px] font-bold uppercase tracking-wider text-indigo-600">__ASSISTANT_NAME__</span>
                         <span class="text-[11px] text-slate-400 font-medium">${timeStr}</span>
                     </div>
                     <div class="streaming-content text-slate-700 text-sm leading-relaxed space-y-1"></div>
@@ -758,7 +620,7 @@ async def embed_widget(
                     <span class="w-2 h-2 bg-indigo-500 rounded-full typing-dot"></span>
                     <span class="w-2 h-2 bg-indigo-500 rounded-full typing-dot"></span>
                 </div>
-                <span class="text-[11px] font-medium text-slate-400">Assistant is checking...</span>
+                <span class="text-[11px] font-medium text-slate-400">__ASSISTANT_NAME__ is checking...</span>
             `;
             messagesContainer.appendChild(typingDiv);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;

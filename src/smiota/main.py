@@ -42,12 +42,13 @@ async def lifespan(app: FastAPI):
     setup_telemetry(app)
 
     # 3. Pre-load in-memory RAG knowledge base for instant query retrieval
-    try:
-        from smiota.rag.retrieval.retrieval_service import RetrievalService
-        retriever = RetrievalService()
-        await retriever._ensure_seeded()
-    except Exception as rag_err:
-        logger.warning(f"RAG knowledge startup warmup notice: {rag_err}")
+    if getattr(settings, "ENVIRONMENT", "").lower() != "test":
+        try:
+            from smiota.rag.retrieval.retrieval_service import RetrievalService
+            retriever = RetrievalService()
+            await retriever._ensure_seeded()
+        except Exception as rag_err:
+            logger.warning(f"RAG knowledge startup warmup notice: {rag_err}")
 
     logger.info("Smiota Agent Core + MCP successfully initialized and ready to serve requests.")
     yield

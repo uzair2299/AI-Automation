@@ -53,14 +53,16 @@
     fab.style.alignItems = 'center';
     fab.style.justifyContent = 'center';
     fab.style.transition = 'transform 0.2s';
-    fab.innerHTML = '💬';
+    const chatIconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="28" height="28" style="pointer-events:none;"><path fill-rule="evenodd" d="M4.804 21.644A6.707 6.707 0 0 0 6 21.75a6.721 6.721 0 0 0 3.583-1.029c.774.182 1.584.279 2.417.279 5.322 0 9.75-3.97 9.75-9 0-5.03-4.428-9-9.75-9s-9.75 3.97-9.75 9c0 2.409 1.025 4.587 2.674 6.192.232.226.277.428.254.543a3.73 3.73 0 0 1-.814 1.686.75.75 0 0 0 .44 1.223ZM8.25 10.875a1.125 1.125 0 1 0 0 2.25 1.125 1.125 0 0 0 0-2.25ZM10.875 12a1.125 1.125 0 1 1 2.25 0 1.125 1.125 0 0 1-2.25 0Zm4.875-1.125a1.125 1.125 0 1 0 0 2.25 1.125 1.125 0 0 0 0-2.25Z" clip-rule="evenodd" /></svg>`;
+    const closeIconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="24" height="24" style="pointer-events:none;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
+    fab.innerHTML = chatIconSvg;
 
     let isOpen = false;
 
     function toggleChatbot() {
         isOpen = !isOpen;
         iframeCard.style.display = isOpen ? 'block' : 'none';
-        fab.innerHTML = isOpen ? '✕' : '💬';
+        fab.innerHTML = isOpen ? closeIconSvg : chatIconSvg;
     }
 
     fab.addEventListener('click', toggleChatbot);
