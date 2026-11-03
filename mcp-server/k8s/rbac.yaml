@@ -1,0 +1,113 @@
+---
+# Service Account for SRE Kubernetes MCP Server
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: k8s-sre-mcp-sa
+  namespace: default
+  labels:
+    app.kubernetes.io/name: k8s-sre-mcp
+    app.kubernetes.io/component: sre-agent-backend
+
+---
+# ClusterRole granting STRICTLY READ-ONLY permissions across observability & inventory resources
+#
+# NOTE ON SECRETS:
+# Kubernetes RBAC does not allow separating Secret metadata from Secret data at the RBAC layer.
+# To allow list_secrets_metadata to inspect secret existence and key names without exposing values,
+# the ClusterRole grants "get" and "list" on "secrets".
+# The MCP server application strictly filters, strips, and never returns `data`, `stringData`,
+# or `last-applied-configuration` annotations to callers.
+# For high-security environments, replace this ClusterRole with a namespace-scoped Role or remove 'secrets'.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: k8s-sre-mcp-readonly
+  labels:
+    app.kubernetes.io/name: k8s-sre-mcp
+rules:
+  # Core workloads & cluster inventory
+  - apiGroups: [""]
+    resources:
+      - pods
+      - pods/log
+      - pods/status
+      - events
+      - nodes
+      - nodes/status
+      - namespaces
+      - namespaces/status
+      - services
+      - services/status
+      - endpoints
+      - configmaps
+      - secrets          # Read-only metadata inspected; data stripped in app layer
+      - persistentvolumeclaims
+      - persistentvolumes
+      - resourcequotas
+      - limitranges
+    verbs: ["get", "list", "watch"]
+
+  # Apps & controllers
+  - apiGroups: ["apps"]
+    resources:
+      - deployments
+      - deployments/status
+      - replicasets
+      - replicasets/status
+      - statefulsets
+      - statefulsets/status
+      - daemonsets
+      - daemonsets/status
+    verbs: ["get", "list", "watch"]
+
+  # Networking & Ingress
+  - apiGroups: ["networking.k8s.io"]
+    resources:
+      - ingresses
+      - ingresses/status
+      - ingressclasses
+      - networkpolicies
+    verbs: ["get", "list", "watch"]
+
+  - apiGroups: ["discovery.k8s.io"]
+    resources:
+      - endpointslices
+    verbs: ["get", "list", "watch"]
+
+  # Storage classes
+  - apiGroups: ["storage.k8s.io"]
+    resources:
+      - storageclasses
+    verbs: ["get", "list", "watch"]
+
+  # Autoscaling
+  - apiGroups: ["autoscaling"]
+    resources:
+      - horizontalpodautoscalers
+      - horizontalpodautoscalers/status
+    verbs: ["get", "list", "watch"]
+
+  # Metrics Server API
+  - apiGroups: ["metrics.k8s.io"]
+    resources:
+      - pods
+      - nodes
+    verbs: ["get", "list"]
+
+---
+# Bind Read-Only ClusterRole to ServiceAccount
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: k8s-sre-mcp-binding
+  labels:
+    app.kubernetes.io/name: k8s-sre-mcp
+subjects:
+  - kind: ServiceAccount
+    name: k8s-sre-mcp-sa
+    namespace: default
+roleRef:
+  kind: ClusterRole
+  name: k8s-sre-mcp-readonly
+  apiGroup: rbac.authorization.k8s.io

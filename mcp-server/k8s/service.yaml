@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: k8s-sre-mcp-service
+  namespace: default
+  labels:
+    app.kubernetes.io/name: k8s-sre-mcp
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: k8s-sre-mcp
+  ports:
+    - name: http-mcp
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
