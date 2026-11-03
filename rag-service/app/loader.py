@@ -146,3 +146,4 @@ async def load_real_knowledge_base(
         "pages_processed": pages_processed,
         "chunks_indexed": total_chunks,
     }
+

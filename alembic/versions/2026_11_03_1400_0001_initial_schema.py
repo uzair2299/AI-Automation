@@ -128,3 +128,4 @@ def downgrade() -> None:
     op.drop_table('remediation_approvals')
     op.drop_table('chat_messages')
     op.drop_table('chat_sessions')
+

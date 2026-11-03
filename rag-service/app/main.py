@@ -4,6 +4,8 @@ from typing import Any, Dict
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
+import logging
+
 from app.chunking import DocumentChunker
 from app.config import settings
 from app.embeddings import EmbeddingService
@@ -19,6 +21,8 @@ from app.pgvector_store import PgVectorStoreClient
 from app.retriever import KnowledgeRetriever
 from app.vector_store import VectorStoreClient
 
+logger = logging.getLogger("rag-service")
+
 # Shared service singletons with pgvector support
 if getattr(settings, "VECTOR_STORE_BACKEND", "memory").lower() == "pgvector":
     vector_store = PgVectorStoreClient()
@@ -32,17 +36,29 @@ retriever = KnowledgeRetriever(vector_store=vector_store, embedding_service=embe
 
 async def seed_initial_documents():
     """Seed knowledge base using real website content JSONL, with graceful bootstrap fallback."""
-    if await vector_store.count() > 0:
-        return
+    global vector_store, retriever
+    try:
+        if await vector_store.count() > 0:
+            return
+    except Exception as exc:
+        logger.warning(
+            f"Could not connect to PostgreSQL pgvector ({exc}). "
+            "Falling back to high-speed in-memory vector storage so RAG service remains online."
+        )
+        vector_store = VectorStoreClient()
+        retriever = KnowledgeRetriever(vector_store=vector_store, embedding_service=embedding_service)
 
-    # 1. Attempt to index real scraped knowledge base (506 pages from website_content.jsonl)
-    stats = await load_real_knowledge_base(
-        vector_store=vector_store,
-        embedding_service=embedding_service,
-        chunker=chunker,
-    )
-    if stats.get("chunks_indexed", 0) > 0:
-        return
+    try:
+        # 1. Attempt to index real scraped knowledge base (506 pages from website_content.jsonl)
+        stats = await load_real_knowledge_base(
+            vector_store=vector_store,
+            embedding_service=embedding_service,
+            chunker=chunker,
+        )
+        if stats.get("chunks_indexed", 0) > 0:
+            return
+    except Exception as exc:
+        logger.warning(f"Error loading knowledge base: {exc}")
 
     # 2. Minimal fallback only if knowledge file is missing
     sample_docs = [
@@ -69,7 +85,10 @@ async def seed_initial_documents():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await seed_initial_documents()
+    try:
+        await seed_initial_documents()
+    except Exception as exc:
+        logger.error(f"Error during RAG service startup lifespan: {exc}")
     yield
 
 

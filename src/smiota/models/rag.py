@@ -29,3 +29,4 @@ class RAGDocument(Base):
     doc_metadata: Mapped[Optional[dict[str, Any]]] = mapped_column("metadata", JSON, nullable=True)
     tags: Mapped[Optional[list[str]]] = mapped_column(ARRAY(String), nullable=True)
     embedding: Mapped[Optional[Any]] = mapped_column(PGVectorType(768), nullable=True)
+

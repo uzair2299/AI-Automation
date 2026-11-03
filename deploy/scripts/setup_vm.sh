@@ -91,6 +91,21 @@ fi
 # Check host PostgreSQL and Redis status
 if systemctl is-active --quiet postgresql 2>/dev/null; then
     log_success "Host PostgreSQL service is ACTIVE."
+    
+    # Configure host PostgreSQL to listen on all interfaces and allow Docker bridge network (172.17.0.0/16)
+    PG_CONF=$(find /etc/postgresql/ -name "postgresql.conf" 2>/dev/null | head -n 1)
+    PG_HBA=$(find /etc/postgresql/ -name "pg_hba.conf" 2>/dev/null | head -n 1)
+    if [ -n "$PG_CONF" ] && [ -n "$PG_HBA" ]; then
+        log_info "Configuring host PostgreSQL to accept connections from Docker containers..."
+        $SUDO sed -i "s/#listen_addresses = 'localhost'/listen_addresses = '*'/g" "$PG_CONF"
+        $SUDO sed -i "s/listen_addresses = 'localhost'/listen_addresses = '*'/g" "$PG_CONF"
+        if ! grep -q "172.17.0.0/16" "$PG_HBA"; then
+            echo "host all all 172.16.0.0/12 md5" | $SUDO tee -a "$PG_HBA" >/dev/null
+            echo "host all all 172.17.0.0/16 md5" | $SUDO tee -a "$PG_HBA" >/dev/null
+        fi
+        $SUDO systemctl restart postgresql
+        log_success "Host PostgreSQL configured (listen_addresses = '*', pg_hba updated)."
+    fi
 else
     log_warn "Host PostgreSQL service is not detected as systemd active (ensure it is running on port 5432)."
 fi
