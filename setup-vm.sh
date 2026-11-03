@@ -25,8 +25,8 @@ log_success() { echo -e "${GREEN}${BOLD}[SUCCESS]${RESET} $1"; }
 log_warn() { echo -e "${YELLOW}${BOLD}[WARNING]${RESET} $1"; }
 log_error() { echo -e "${RED}${BOLD}[ERROR]${RESET} $1"; }
 
-REPO_URL="https://github.com/uzair2299/AI-Automation.git"
-BRANCH="feature/mcp-client-server-architecture"
+REPO_URL="${REPO_URL:-https://dev.azure.com/smiota/smiotaplatform/_git/smiota-aiops}"
+BRANCH="${BRANCH:-feature/mcp-client-server-architecture}"
 INSTALL_DIR="${HOME}/smiota-ai"
 
 echo -e "${BOLD}"
