@@ -138,7 +138,7 @@ class StagingSettings(BaseAppSettings):
         "http://localhost:3000",
         "http://localhost:4200",
     ]
-    GCP_PROJECT_ID: str = "smiota-cloud-staging"
+    GCP_PROJECT_ID: str = os.getenv("GCP_PROJECT_ID", "project-smiota-psi-1")
 
 
 class ProductionSettings(BaseAppSettings):
@@ -153,7 +153,7 @@ class ProductionSettings(BaseAppSettings):
         "https://portal.smiota.com",
         "https://smiota.com",
     ]
-    GCP_PROJECT_ID: str = "smiota-cloud-prod"
+    GCP_PROJECT_ID: str = os.getenv("GCP_PROJECT_ID", "project-smiota-psi-1")
     REQUIRE_HUMAN_APPROVAL_FOR_REMEDIATION: bool = True
 
 

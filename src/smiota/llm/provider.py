@@ -106,7 +106,29 @@ class GeminiProvider:
 
     @property
     def project_id(self) -> str:
-        return os.environ.get("GCP_PROJECT_ID") or getattr(self.settings, "GCP_PROJECT_ID", "project-smiota-psi-1") or "project-smiota-psi-1"
+        env_proj = os.environ.get("GCP_PROJECT_ID") or os.environ.get("GOOGLE_CLOUD_PROJECT")
+        if env_proj and env_proj != "smiota-cloud-prod":
+            return env_proj
+
+        # GCE metadata auto-detection
+        try:
+            import urllib.request
+            req = urllib.request.Request(
+                "http://metadata.google.internal/computeMetadata/v1/project/project-id",
+                headers={"Metadata-Flavor": "Google"},
+            )
+            with urllib.request.urlopen(req, timeout=0.8) as resp:
+                if resp.status == 200:
+                    detected = resp.read().decode("utf-8").strip()
+                    if detected:
+                        return detected
+        except Exception:
+            pass
+
+        cfg_proj = getattr(self.settings, "GCP_PROJECT_ID", None)
+        if cfg_proj and cfg_proj != "smiota-cloud-prod":
+            return cfg_proj
+        return "project-smiota-psi-1"
 
     @property
     def location(self) -> str:

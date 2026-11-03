@@ -17,10 +17,20 @@ services:
       - "8000:8000"
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    env_file:
+      - .env
     environment:
-      - APP_ENV=production
+      - APP_ENV=${APP_ENV:-development}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
       - HOST=0.0.0.0
       - PORT=8000
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID:-project-smiota-psi-1}
+      - GCP_REGION=${GCP_REGION:-global}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-3.7-flash}
+      - GEMINI_EMBEDDING_MODEL=${GEMINI_EMBEDDING_MODEL:-text-embedding-004}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - RAG_EMBEDDING_PROVIDER=${RAG_EMBEDDING_PROVIDER:-deterministic}
       - MCP_REMOTE_ENABLED=true
       - MCP_REMOTE_FALLBACK=true
       - MCP_CLIENT_TIMEOUT_SECONDS=15.0

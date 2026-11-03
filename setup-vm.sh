@@ -5,7 +5,7 @@
 # Deploys:
 #   1. System packages & Docker engine (uses host-installed PostgreSQL & Redis)
 #   2. Clones / checks out branch 'feature/mcp-client-server-architecture'
-#   3. Generates production .env pointing to host PostgreSQL (pgvector) & Redis
+#   3. Generates production .env with auto-detected GCP Project & pgvector
 #   4. Builds and launches only the 4 application microservices
 #   5. Performs automated end-to-end health & search checks
 # ==============================================================================
@@ -125,9 +125,19 @@ else
 fi
 
 # ------------------------------------------------------------------------------
-# 4. Generate Production .env Configuration
+# 4. Generate Production .env Configuration & Auto-Detect GCP Project
 # ------------------------------------------------------------------------------
-log_info "Step 3/5: Configuring environment to connect to host PostgreSQL & Redis..."
+log_info "Step 3/5: Configuring environment and auto-detecting GCP project..."
+
+# Auto-detect GCP project from GCE VM metadata if available
+GCE_PROJECT=$(curl -s -m 1 -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/project/project-id 2>/dev/null || true)
+if [ -n "$GCE_PROJECT" ]; then
+    log_success "Detected active GCP Project from VM: ${GCE_PROJECT}"
+    TARGET_PROJECT="${GCE_PROJECT}"
+else
+    TARGET_PROJECT="project-smiota-psi-1"
+    log_info "Using default GCP Project: ${TARGET_PROJECT}"
+fi
 
 ENV_FILE="${TARGET_DIR}/.env"
 
@@ -139,8 +149,8 @@ if [ ! -f "${ENV_FILE}" ]; then
 # ==============================================================================
 # Smiota AI Platform - VM Production Environment
 # ==============================================================================
-ENVIRONMENT=production
-DEBUG=false
+ENVIRONMENT=development
+DEBUG=true
 LOG_LEVEL=INFO
 PORT=8000
 HOST=0.0.0.0
@@ -156,10 +166,11 @@ DATABASE_URL=postgresql+asyncpg://smiota_user:smaiops26devdb@host.docker.interna
 REDIS_URL=redis://host.docker.internal:6379/0
 
 # GCP & Gemini
-GCP_PROJECT_ID=project-smiota-psi-1
+GCP_PROJECT_ID=${TARGET_PROJECT}
 GCP_REGION=global
 GEMINI_MODEL=gemini-3.7-flash
 GEMINI_EMBEDDING_MODEL=text-embedding-004
+RAG_EMBEDDING_PROVIDER=deterministic
 
 # Security & JWT
 JWT_SECRET_KEY=${JWT_SECRET}
@@ -179,11 +190,16 @@ RAG_SERVICE_URL=http://rag-service:8001
 EOF
     log_success ".env configuration generated successfully."
 else
-    log_info "Updating existing .env to ensure host.docker.internal is used..."
+    log_info "Updating existing .env with active project and host.docker.internal..."
+    sed -i "s/smiota-cloud-prod/${TARGET_PROJECT}/g" "${ENV_FILE}" || true
+    sed -i "s|GCP_PROJECT_ID=.*|GCP_PROJECT_ID=${TARGET_PROJECT}|g" "${ENV_FILE}" || true
     sed -i 's|@localhost:5432|@host.docker.internal:5432|g' "${ENV_FILE}" || true
     sed -i 's|redis://localhost:6379|redis://host.docker.internal:6379|g' "${ENV_FILE}" || true
     sed -i 's/POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=smaiops26devdb/' "${ENV_FILE}" || true
     sed -i 's/PGVECTOR_PASSWORD=.*/PGVECTOR_PASSWORD=smaiops26devdb/' "${ENV_FILE}" || true
+    if ! grep -q "RAG_EMBEDDING_PROVIDER" "${ENV_FILE}"; then
+        echo "RAG_EMBEDDING_PROVIDER=deterministic" >> "${ENV_FILE}"
+    fi
 fi
 
 # ------------------------------------------------------------------------------
