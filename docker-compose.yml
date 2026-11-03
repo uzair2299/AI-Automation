@@ -1,11 +1,11 @@
-version: "3.8"
+version: '3.8'
 
 services:
   # ============================================================================
-  # Service 1: Client Gateway (Port 8000)
-  # Owns all 4 ingress channels (Teams, WebChat embed/WS, Mobile, IDE),
-  # intent routing, session state, and delegates to remote MCP servers & RAG.
-  # Connects directly to host-installed PostgreSQL (pgvector) and Redis.
+  # Service 1: Smiota Agent Core Gateway (Port 8000)
+  # Multi-agent orchestrator, Teams/WebChat channels, HITL approval engine.
+  # Connects as MCP Client to Ports 8080, 8081, 8082 and RAG Client to Port 8001.
+  # Connects directly to host-installed PostgreSQL and Redis.
   # ============================================================================
   smiota-agent-gateway:
     build:
@@ -20,12 +20,12 @@ services:
     env_file:
       - .env
     environment:
-      - APP_ENV=${APP_ENV:-development}
-      - ENVIRONMENT=${ENVIRONMENT:-development}
       - HOST=0.0.0.0
       - PORT=8000
-      - GCP_PROJECT_ID=${GCP_PROJECT_ID:-project-smiota-psi-1}
-      - GCP_REGION=${GCP_REGION:-global}
+      - ENVIRONMENT=development
+      - DEBUG=true
+      - LOG_LEVEL=INFO
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID:-}
       - GEMINI_MODEL=${GEMINI_MODEL:-gemini-3.7-flash}
       - GEMINI_EMBEDDING_MODEL=${GEMINI_EMBEDDING_MODEL:-text-embedding-004}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
@@ -129,6 +129,8 @@ services:
       - "8001:8001"
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    volumes:
+      - ./data/knowledge:/app/data/knowledge:ro
     environment:
       - HOST=0.0.0.0
       - PORT=8001

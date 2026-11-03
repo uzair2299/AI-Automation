@@ -47,6 +47,30 @@ class VectorStoreClient:
         }
         return doc_id
 
+    async def insert_documents_batch(
+        self,
+        docs: List[Dict[str, Any]],
+    ) -> List[str]:
+        """Bulk insert multiple document chunks into in-memory store."""
+        inserted_ids = []
+        for d in docs:
+            doc_id = str(d.get("document_id") or uuid.uuid4())
+            meta = d.get("metadata") or {}
+            tags = d.get("tags") or meta.get("tags", [])
+            doc_meta = DocumentMetadata(
+                title=d.get("title", "Untitled"),
+                category=d.get("category", "general"),
+                content=d.get("content", ""),
+                metadata=meta,
+                tags=tags,
+            )
+            self._storage[doc_id] = {
+                "metadata": doc_meta,
+                "embedding": d.get("embedding", []),
+            }
+            inserted_ids.append(doc_id)
+        return inserted_ids
+
     async def search(
         self,
         query_embedding: List[float],
@@ -77,4 +101,3 @@ class VectorStoreClient:
     async def count(self) -> int:
         """Return total indexed chunks."""
         return len(self._storage)
-

@@ -238,12 +238,17 @@ check_endpoint "http://localhost:8001/health" "RAG REST Service (Port 8001)" || 
 check_endpoint "http://localhost:8080/health" "K8s SRE MCP Server (Port 8080)" || true
 check_endpoint "http://localhost:8081/health" "Observability MCP Server (Port 8081)" || true
 
+# Run Alembic Database Migrations
+echo ""
+log_info "Applying database migrations and pgvector schema via Alembic..."
+$SUDO $DOCKER_COMPOSE exec -T smiota-agent-gateway alembic upgrade head || true
+
 # Test pgvector Semantic Search
 echo ""
 log_info "Testing RAG pgvector Semantic Search..."
 SEARCH_RESULT=$(curl -s -X POST "http://localhost:8001/api/v1/rag/search" \
     -H "Content-Type: application/json" \
-    -d '{"query": "refrigerated cold storage", "top_k": 1}' || echo "{}")
+    -d '{"query": "refrigerated cold storage smart lockers", "top_k": 2}' || echo "{}")
 
 if echo "$SEARCH_RESULT" | grep -q "status"; then
     log_success "RAG pgvector search test passed!"

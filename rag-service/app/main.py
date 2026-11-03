@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.chunking import DocumentChunker
 from app.config import settings
 from app.embeddings import EmbeddingService
+from app.loader import load_real_knowledge_base
 from app.models import (
     APIResponse,
     DocumentIngestionRequest,
@@ -30,9 +31,20 @@ retriever = KnowledgeRetriever(vector_store=vector_store, embedding_service=embe
 
 
 async def seed_initial_documents():
-    """Pre-seed essential knowledge chunks."""
+    """Seed knowledge base using real website content JSONL, with graceful bootstrap fallback."""
     if await vector_store.count() > 0:
         return
+
+    # 1. Attempt to index real scraped knowledge base (506 pages from website_content.jsonl)
+    stats = await load_real_knowledge_base(
+        vector_store=vector_store,
+        embedding_service=embedding_service,
+        chunker=chunker,
+    )
+    if stats.get("chunks_indexed", 0) > 0:
+        return
+
+    # 2. Minimal fallback only if knowledge file is missing
     sample_docs = [
         (
             "Smiota Smart Locker Hardware Specs",
@@ -141,5 +153,26 @@ async def ingest_document(payload: DocumentIngestionRequest):
             status="indexed",
         )
         return APIResponse(data=data, message="Document indexed successfully.")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post(
+    "/api/v1/rag/sync",
+    summary="Synchronize and ingest real website knowledge",
+)
+async def sync_knowledge():
+    """Trigger on-demand ingestion of real website_content.jsonl knowledge."""
+    try:
+        stats = await load_real_knowledge_base(
+            vector_store=vector_store,
+            embedding_service=embedding_service,
+            chunker=chunker,
+        )
+        count = await vector_store.count()
+        return APIResponse(
+            data={"stats": stats, "total_chunks": count},
+            message="Knowledge synchronization completed.",
+        )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))

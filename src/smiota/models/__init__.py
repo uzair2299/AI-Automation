@@ -3,6 +3,7 @@ from smiota.models.base import Base, UUIDMixin, TimestampMixin
 from smiota.models.audit import AuditLog
 from smiota.models.approval import RemediationApproval
 from smiota.models.session import ChatSession, ChatMessage
+from smiota.models.rag import RAGDocument, PGVectorType
 
 __all__ = [
     "Base",
@@ -12,4 +13,6 @@ __all__ = [
     "RemediationApproval",
     "ChatSession",
     "ChatMessage",
+    "RAGDocument",
+    "PGVectorType",
 ]

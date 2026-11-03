@@ -90,6 +90,43 @@ class PgVectorStoreClient:
             )
         return doc_id
 
+    async def insert_documents_batch(
+        self,
+        docs: List[Dict[str, Any]],
+    ) -> List[str]:
+        """Bulk insert multiple document chunks into PostgreSQL with pgvector."""
+        if not docs:
+            return []
+        pool = await self.get_pool()
+        records = []
+        doc_ids = []
+        for d in docs:
+            doc_id = str(d.get("document_id") or uuid.uuid4())
+            doc_ids.append(doc_id)
+            meta = d.get("metadata") or {}
+            tags = d.get("tags") or meta.get("tags", [])
+            emb = d.get("embedding", [])
+            vector_str = f"[{','.join(str(x) for x in emb)}]"
+            records.append((
+                doc_id,
+                d.get("title", "Untitled"),
+                d.get("category", "general"),
+                d.get("content", ""),
+                json.dumps(meta),
+                tags,
+                vector_str,
+            ))
+        async with pool.acquire() as conn:
+            await conn.executemany(
+                """
+                INSERT INTO rag_documents (document_id, title, category, content, metadata, tags, embedding)
+                VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7::vector)
+                ON CONFLICT (document_id) DO NOTHING;
+                """,
+                records,
+            )
+        return doc_ids
+
     async def search(
         self,
         query_embedding: List[float],
@@ -153,4 +190,3 @@ class PgVectorStoreClient:
         async with pool.acquire() as conn:
             val = await conn.fetchval("SELECT COUNT(*) FROM rag_documents;")
             return int(val or 0)
-
