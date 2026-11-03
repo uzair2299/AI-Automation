@@ -14,11 +14,16 @@ from app.models import (
     VectorSearchRequest,
     VectorSearchResponse,
 )
+from app.pgvector_store import PgVectorStoreClient
 from app.retriever import KnowledgeRetriever
 from app.vector_store import VectorStoreClient
 
-# Shared service singletons
-vector_store = VectorStoreClient()
+# Shared service singletons with pgvector support
+if getattr(settings, "VECTOR_STORE_BACKEND", "memory").lower() == "pgvector":
+    vector_store = PgVectorStoreClient()
+else:
+    vector_store = VectorStoreClient()
+
 embedding_service = EmbeddingService(dimension=settings.EMBEDDING_DIMENSION)
 chunker = DocumentChunker(target_chunk_size=settings.TARGET_CHUNK_SIZE, overlap=settings.CHUNK_OVERLAP)
 retriever = KnowledgeRetriever(vector_store=vector_store, embedding_service=embedding_service)

@@ -22,7 +22,13 @@ class RAGServiceSettings(BaseSettings):
     CHUNK_OVERLAP: int = 40
 
     # Vector store settings
-    VECTOR_STORE_BACKEND: str = "memory"  # "memory" or "qdrant"
+    VECTOR_STORE_BACKEND: str = "memory"  # "memory", "pgvector", or "qdrant"
+    DATABASE_URL: str = "postgresql+asyncpg://smiota_user:smaiops26devdb@localhost:5432/smiota_ai_dev"
+    POSTGRES_HOST: str = "localhost"
+    POSTGRES_PORT: int = 5432
+    POSTGRES_USER: str = "smiota_user"
+    POSTGRES_PASSWORD: str = "smaiops26devdb"
+    POSTGRES_DB: str = "smiota_ai_dev"
     QDRANT_URL: str = ""
     QDRANT_API_KEY: str = ""
 

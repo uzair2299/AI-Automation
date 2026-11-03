@@ -26,7 +26,7 @@ services:
       - MCP_LOCKER_SERVER_URL=http://smart-locker-mcp:8082
       - RAG_SERVICE_URL=http://rag-service:8001
       - REDIS_URL=redis://redis:6379/0
-      - DATABASE_URL=postgresql://smiota:smiota_password@postgres:5432/smiota_db
+      - DATABASE_URL=postgresql://smiota:smaiops26devdb@postgres:5432/smiota_db
     depends_on:
       - rag-service
       - k8s-sre-mcp
@@ -139,14 +139,14 @@ services:
       - smiota-mesh
 
   postgres:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     container_name: smiota-postgres
     restart: unless-stopped
     ports:
       - "5432:5432"
     environment:
       - POSTGRES_USER=smiota
-      - POSTGRES_PASSWORD=smiota_password
+      - POSTGRES_PASSWORD=smaiops26devdb
       - POSTGRES_DB=smiota_db
     volumes:
       - postgres_data:/var/lib/postgresql/data
