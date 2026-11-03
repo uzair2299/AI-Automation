@@ -234,6 +234,11 @@ class WebSocketChatHandler:
                 },
             )
             await self._stream_response(result)
+        except (WebSocketDisconnect, RuntimeError) as ws_disc:
+            logger.info(
+                f"WebSocket client disconnected during response delivery for session {self.session_id}",
+                extra={"event": "websocket.streaming.disconnected", "session_id": self.session_id},
+            )
         except Exception as agent_err:
             logger.error(
                 f"Agent execution failed for session {self.session_id}: {type(agent_err).__name__}",
@@ -244,7 +249,10 @@ class WebSocketChatHandler:
                     "error_type": type(agent_err).__name__,
                 },
             )
-            await self._send_error_fallback()
+            try:
+                await self._send_error_fallback()
+            except Exception:
+                pass
         finally:
             if frame_token is not None:
                 correlation_id_ctx.reset(frame_token)

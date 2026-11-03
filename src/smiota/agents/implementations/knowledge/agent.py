@@ -167,17 +167,12 @@ class KnowledgeAssistantAgent(BaseAgent):
                 metadata={"refusal_type": "carrier_tracking"},
             )
 
-        # 3. Retrieve relevant public knowledge context via RAG Service
-        scored_chunks = await self.rag_client.search(
+        # 3. Retrieve relevant public knowledge context via in-memory RAG
+        scored_chunks = await self.retrieval_service.retrieve(
             query=query,
             top_k=5,
+            enable_mmr=True,
         )
-        if not scored_chunks and self.retrieval_service:
-            scored_chunks = await self.retrieval_service.retrieve(
-                query=query,
-                top_k=5,
-                enable_mmr=True,
-            )
 
         # 4. Construct prompt with dynamic retrieved chunks
         full_prompt = build_rag_prompt(

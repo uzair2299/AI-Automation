@@ -21,7 +21,9 @@ class RetrievalService:
         reranker: BaseReranker | None = None,
         config: RAGConfig | None = None,
     ):
-        self.config = config or RAGConfig()
+        import asyncio
+        self.config = config or RAGConfig.from_settings()
+        self._seed_lock = asyncio.Lock()
         if vector_store is None:
             from smiota.rag.vector_store.factory import VectorStoreFactory
 
@@ -30,6 +32,29 @@ class RetrievalService:
             self.vector_store = vector_store
         self.embedding_service = embedding_service or EmbeddingService(config=self.config)
         self.reranker = reranker or NoOpReranker()
+
+    async def _ensure_seeded(self) -> None:
+        """Auto-seed in-memory vector store from public knowledge base if empty."""
+        try:
+            count = await self.vector_store.count()
+            if count == 0 and getattr(self.config, "auto_index_on_startup", True):
+                async with self._seed_lock:
+                    if await self.vector_store.count() == 0:
+                        logger.info("RAG in-memory vector store is empty. Auto-seeding from public knowledge base...")
+                        from smiota.rag.ingestion.ingestion_service import IngestionService
+
+                        ingestor = IngestionService(
+                            vector_store=self.vector_store,
+                            embedding_service=self.embedding_service,
+                            config=self.config,
+                        )
+                        stats = await ingestor.ingest_directory(self.config.knowledge_dir)
+                        logger.info(
+                            f"RAG knowledge base seeded successfully: {stats.valid_records} records, "
+                            f"{stats.chunks_upserted} chunks indexed into memory ({stats.duration_seconds}s)."
+                        )
+        except Exception as exc:
+            logger.warning(f"Could not auto-seed in-memory vector store: {exc}", exc_info=True)
 
     async def retrieve(
         self,
@@ -41,6 +66,7 @@ class RetrievalService:
         similarity_threshold: float | None = None,
     ) -> list[ScoredChunk]:
         """Execute semantic or hybrid retrieval for user query."""
+        await self._ensure_seeded()
         if isinstance(query, str):
             effective_query = RetrievalQuery(
                 text=query,

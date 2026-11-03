@@ -17,7 +17,7 @@ class RAGServiceClient:
     def __init__(
         self,
         service_url: Optional[str] = None,
-        timeout: float = 10.0,
+        timeout: float = 2.0,
         enable_fallback: bool = True,
     ):
         settings = get_settings()
