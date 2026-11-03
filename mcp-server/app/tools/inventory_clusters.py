@@ -114,3 +114,4 @@ async def get_node_details(name: str, cluster: Optional[str] = None) -> Dict[str
         return details.model_dump()
     except Exception as exc:
         return map_k8s_exception(exc, resource="node", name=name)
+

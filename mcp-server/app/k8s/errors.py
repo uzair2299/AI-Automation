@@ -43,3 +43,4 @@ def map_k8s_exception(exc: Exception, resource: str, name: str | None = None) ->
         "message": f"An error occurred while inspecting {resource} {res_id}.",
         "status_code": 500,
     }
+

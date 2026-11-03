@@ -95,3 +95,4 @@ async def run_k8s_call(func: Callable[..., Any], *args: Any, **kwargs: Any) -> A
         asyncio.to_thread(func, *args, **kwargs),
         timeout=timeout,
     )
+

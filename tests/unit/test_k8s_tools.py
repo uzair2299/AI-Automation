@@ -46,6 +46,7 @@ from smiota.mcp.servers.devops.k8s_tools import (
     list_services,
     list_statefulsets,
 )
+from smiota.mcp.servers.observability.tools import get_service_logs, search_opensearch_logs
 from smiota.schemas.mcp import ToolAccessLevel
 
 
@@ -405,3 +406,31 @@ def test_teams_channel_routing_for_k8s_queries():
         assert decision.confidence >= 0.88, (
             f"Query '{query}' confidence {decision.confidence} fell below 0.88"
         )
+
+
+def test_opensearch_and_log_fallback():
+    """Verify OpenSearch log tools handle DSL queries and resilient K8s fallback."""
+    # 1. search_opensearch_logs
+    search_res = run_coro(search_opensearch_logs(query="error", time_range_minutes=15))
+    assert isinstance(search_res, list)
+    assert len(search_res) >= 1
+    first_result = search_res[0]
+    assert "source" in first_result or "status" in first_result
+
+    # 2. get_service_logs with fallback to K8s container logs
+    logs_res = run_coro(
+        get_service_logs(
+            service_name="smiotaserver",
+            namespace="smiota-prod",
+            lines=5,
+            level_filter="INFO",
+        )
+    )
+    assert logs_res["status"] == "success"
+    assert logs_res["service"] == "smiotaserver"
+    assert logs_res["namespace"] == "smiota-prod"
+    assert isinstance(logs_res["logs"], list)
+    assert len(logs_res["logs"]) > 0
+    # Every returned log line matches the level filter
+    for log_line in logs_res["logs"]:
+        assert "INFO" in log_line.upper()

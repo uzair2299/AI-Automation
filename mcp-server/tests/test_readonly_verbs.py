@@ -37,3 +37,4 @@ def test_ast_scans_and_forbids_non_read_verbs():
                         violations.append(f"{py_file.name}:{node.lineno} calls forbidden API verb '{func_name}'")
 
     assert not violations, f"STRICT READ-ONLY SAFETY VIOLATIONS DETECTED:\n" + "\n".join(violations)
+

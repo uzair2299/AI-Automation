@@ -125,3 +125,4 @@ async def check_pvc_status(name: str, namespace: str, cluster: Optional[str] = N
         return DiagnosisReport(target=target, status=status, findings=findings, checked=checked).model_dump()
     except Exception as exc:
         return DiagnosisReport(target=target, status="unknown", checked=checked).model_dump()
+

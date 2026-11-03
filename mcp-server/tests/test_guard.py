@@ -57,3 +57,4 @@ def test_validate_bounded_int():
 
     with pytest.raises(SecurityValidationError):
         validate_bounded_int(-5, default=100, min_val=1, max_val=5000)
+

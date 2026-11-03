@@ -18,3 +18,4 @@ services:
       - KUBECONFIG=/root/.kube/config
     volumes:
       - ~/.kube:/root/.kube:ro
+

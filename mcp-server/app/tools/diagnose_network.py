@@ -195,3 +195,4 @@ async def check_network_connectivity(
         return DiagnosisReport(target=target, status=status, findings=findings, checked=checked).model_dump()
     except Exception as exc:
         return DiagnosisReport(target=target, status="unknown", checked=checked).model_dump()
+

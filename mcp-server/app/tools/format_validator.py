@@ -39,3 +39,4 @@ def build_retry_instruction(issues: List[str]) -> str:
         f"CRITICAL FORMATTING CORRECTION REQUIRED: Your previous response violated the following rules: {joined_issues}. "
         "Rewrite your response immediately ensuring paragraphs are strictly under 600 characters and no triple-backtick blocks are used."
     )
+

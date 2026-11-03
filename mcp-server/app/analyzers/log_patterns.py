@@ -51,3 +51,4 @@ def analyze_log_content(lines: List[str]) -> Dict[str, Any]:
         "error_rate": round(error_rate, 4),
         "top_patterns": top_patterns,
     }
+

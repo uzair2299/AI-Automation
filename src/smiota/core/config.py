@@ -1,8 +1,10 @@
 """Application settings and environment profiling (Development, Staging, Production, Test)."""
+
 import os
 from functools import lru_cache
-from typing import Optional
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
 from smiota.core.constants import Environment
 
 
@@ -10,7 +12,10 @@ class BaseAppSettings(BaseSettings):
     """Common baseline settings shared across all execution profiles."""
 
     model_config = SettingsConfigDict(
-        env_file=(".env", f".env.{os.getenv('ENVIRONMENT', os.getenv('APP_ENV', 'development')).lower()}"),
+        env_file=(
+            ".env",
+            f".env.{os.getenv('ENVIRONMENT', os.getenv('APP_ENV', 'development')).lower()}",
+        ),
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
@@ -30,11 +35,11 @@ class BaseAppSettings(BaseSettings):
     CORS_ORIGINS: list[str] = ["*"]
 
     # GCP & Vertex AI Configuration
-    GCP_PROJECT_ID: str = "project-smiota-psi-1" 
+    GCP_PROJECT_ID: str = "project-smiota-psi-1"
     GCP_REGION: str = "global"
     GEMINI_MODEL: str = "gemini-3.7-flash"
     GEMINI_EMBEDDING_MODEL: str = "text-embedding-004"
-    GOOGLE_APPLICATION_CREDENTIALS: Optional[str] = None
+    GOOGLE_APPLICATION_CREDENTIALS: str | None = None
 
     # Database, Cache & Message Broker
     DATABASE_URL: str = "postgresql+asyncpg://smiota_user:password@localhost:5432/smiota_ai"
@@ -57,15 +62,17 @@ class BaseAppSettings(BaseSettings):
     SMIOTA_SERVER_BASE_URL: str = "https://dev.smiotaapps.com/smiota"
     SMIOTA_BACKEND_URL: str = "https://dev.smiotaapps.com/smiota"
     SMIOTA_INTERNAL_EXCHANGE_ENDPOINT: str = "/internal/ai/auth/exchange"
-    SMIOTA_SERVICE_TOKEN: str = "smsec_fc7308bef9f566733226ff8db7601fe7dc138e6f12831b9978bb307973604f3e"
+    SMIOTA_SERVICE_TOKEN: str = (
+        "smsec_fc7308bef9f566733226ff8db7601fe7dc138e6f12831b9978bb307973604f3e"
+    )
     SMIOTA_BACKEND_TIMEOUT_SECONDS: float = 10.0
     SMIOTA_AUTH_DUMMY_MODE: bool = False
 
     # Microsoft Teams & Bot Framework Connector
-    MICROSOFT_APP_ID: Optional[str] = "c93bfc04-2bf6-4c89-b04f-5d4ef6aa734a"
-    MICROSOFT_APP_PASSWORD: Optional[str] = None
-    MICROSOFT_APP_TENANT_ID: Optional[str] = "a0bd7ccc-cdd6-4e8a-be39-63dc7bbf315a"
-    TEAMS_APP_ID: Optional[str] = "d6c463d0-d6a3-4704-bd53-f5fcb06256a2"
+    MICROSOFT_APP_ID: str | None = "c93bfc04-2bf6-4c89-b04f-5d4ef6aa734a"
+    MICROSOFT_APP_PASSWORD: str | None = None
+    MICROSOFT_APP_TENANT_ID: str | None = "a0bd7ccc-cdd6-4e8a-be39-63dc7bbf315a"
+    TEAMS_APP_ID: str | None = "d6c463d0-d6a3-4704-bd53-f5fcb06256a2"
     TEAMS_VALIDATE_INBOUND_JWT: bool = True
     TEAMS_ENFORCE_TENANT_ID: bool = True
 
@@ -81,21 +88,26 @@ class BaseAppSettings(BaseSettings):
     RAG_KNOWLEDGE_DIR: str = "data/knowledge/public"
     RAG_INPUT_JSONL_PATH: str = "data/knowledge/public/website_content.jsonl"
 
-
     # Model Context Protocol & Safety Gates
     MCP_READ_ONLY_DEFAULT: bool = True
     REQUIRE_HUMAN_APPROVAL_FOR_REMEDIATION: bool = True
 
     # Observability & Metrics
-    OTEL_EXPORTER_OTLP_ENDPOINT: Optional[str] = None
+    OTEL_EXPORTER_OTLP_ENDPOINT: str | None = None
     ENABLE_PROMETHEUS_METRICS: bool = True
     PROMETHEUS_URL: str = "https://prometheus.int.smiotaapps.com"
-    OPENSEARCH_URL: Optional[str] = None
+    OPENSEARCH_URL: str | None = None
+    OPENSEARCH_USER: str | None = None
+    OPENSEARCH_PASSWORD: str | None = None
+    OPENSEARCH_INDEX: str = "smiota-logs-*"
+    OPENSEARCH_VERIFY_CERTS: bool = False
+    OPENSEARCH_TIMEOUT_SECONDS: float = 8.0
     GRAFANA_URL: str = "https://grafana.int.smiotaapps.com"
 
 
 class DevelopmentSettings(BaseAppSettings):
     """Profile: Local Development environment."""
+
     ENVIRONMENT: str = Environment.DEVELOPMENT
     DEBUG: bool = True
     LOG_LEVEL: str = "DEBUG"
@@ -108,6 +120,7 @@ class DevelopmentSettings(BaseAppSettings):
 
 class StagingSettings(BaseAppSettings):
     """Profile: Staging / Pre-Production environment."""
+
     ENVIRONMENT: str = Environment.STAGING
     DEBUG: bool = False
     LOG_LEVEL: str = "INFO"
@@ -123,6 +136,7 @@ class StagingSettings(BaseAppSettings):
 
 class ProductionSettings(BaseAppSettings):
     """Profile: Production environment (Hardened security, strict CORS)."""
+
     ENVIRONMENT: str = Environment.PRODUCTION
     DEBUG: bool = False
     LOG_LEVEL: str = "INFO"
@@ -138,6 +152,7 @@ class ProductionSettings(BaseAppSettings):
 
 class TestSettings(BaseAppSettings):
     """Profile: Automated Test suite (Fast in-memory fallbacks)."""
+
     ENVIRONMENT: str = Environment.TEST
     DEBUG: bool = True
     LOG_LEVEL: str = "WARNING"
@@ -150,7 +165,6 @@ class TestSettings(BaseAppSettings):
     REQUIRE_HUMAN_APPROVAL_FOR_REMEDIATION: bool = True
     RAG_EMBEDDING_PROVIDER: str = "deterministic"
     RAG_AUTO_INDEX_ON_STARTUP: bool = False
-
 
 
 # Type alias for backward compatibility across the codebase
@@ -174,4 +188,3 @@ def get_settings() -> BaseAppSettings:
 
 # Export default global settings instance
 settings = get_settings()
-

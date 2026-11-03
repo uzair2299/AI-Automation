@@ -65,3 +65,4 @@ async def list_ingresses(namespace: Optional[str] = None, cluster: Optional[str]
         return {"ingresses": items, "total": len(items)}
     except Exception as exc:
         return map_k8s_exception(exc, resource="ingresses", name=namespace)
+

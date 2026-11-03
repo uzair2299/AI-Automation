@@ -29,3 +29,4 @@ class DiagnosisReport(BaseModel):
     findings: List[Finding] = Field(default_factory=list)
     checked: List[str] = Field(default_factory=list)
     truncated: bool = False
+

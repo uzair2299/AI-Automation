@@ -115,3 +115,4 @@ async def get_hpa_status(namespace: Optional[str] = None, cluster: Optional[str]
         return {"hpa": items, "total": len(items)}
     except Exception as exc:
         return map_k8s_exception(exc, resource="hpa", name=namespace)
+

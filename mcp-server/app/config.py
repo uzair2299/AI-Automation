@@ -42,3 +42,4 @@ class MCPSettings(BaseSettings):
 
 
 settings = MCPSettings()
+

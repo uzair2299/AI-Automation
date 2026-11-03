@@ -55,3 +55,4 @@ class PaginatedList(BaseModel):
     total: int
     items: List[Any]
     truncated: bool = False
+

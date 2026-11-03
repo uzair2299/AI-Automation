@@ -401,3 +401,4 @@ async def check_pod_restarts(namespace: Optional[str] = None, cluster: Optional[
         return DiagnosisReport(target=target, status=status, findings=findings, checked=checked).model_dump()
     except Exception as exc:
         return DiagnosisReport(target=target, status="unknown", checked=checked).model_dump()
+

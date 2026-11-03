@@ -69,3 +69,4 @@ def redact_data(obj: Any) -> Any:
     elif isinstance(obj, str):
         return redact_text(obj)
     return obj
+

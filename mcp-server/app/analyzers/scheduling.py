@@ -52,3 +52,4 @@ def parse_scheduling_failure(message: str) -> Dict[str, Any]:
         "probable_cause": probable_cause,
         "suggested_steps": suggested_steps,
     }
+

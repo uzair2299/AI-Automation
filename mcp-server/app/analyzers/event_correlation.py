@@ -53,3 +53,4 @@ def correlate_events(raw_events: List[Dict[str, Any]]) -> Dict[str, Any]:
         "grouped_by_reason": grouped_by_reason,
         "unique_event_types": len(deduped),
     }
+

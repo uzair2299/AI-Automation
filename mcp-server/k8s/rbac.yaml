@@ -111,3 +111,4 @@ roleRef:
   kind: ClusterRole
   name: k8s-sre-mcp-readonly
   apiGroup: rbac.authorization.k8s.io
+

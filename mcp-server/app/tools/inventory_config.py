@@ -132,3 +132,4 @@ async def list_events(
         return {"events": items, "total": len(items)}
     except Exception as exc:
         return map_k8s_exception(exc, resource="events", name=namespace)
+

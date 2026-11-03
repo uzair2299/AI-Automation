@@ -67,3 +67,4 @@ def test_evaluate_dns_and_network_policy():
         port=80,
     )
     assert pol_res["allowed"] is True
+

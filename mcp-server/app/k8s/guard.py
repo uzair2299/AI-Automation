@@ -82,3 +82,4 @@ def validate_bounded_int(
     if val < min_val or val > max_val:
         raise SecurityValidationError(f"{field_name} must be between {min_val} and {max_val}, got {val}")
     return val
+
