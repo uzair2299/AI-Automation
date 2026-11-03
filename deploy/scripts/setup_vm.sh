@@ -250,3 +250,4 @@ echo -e "  • Stop All Services:      ${YELLOW}docker compose down${RESET}"
 echo ""
 echo -e "${YELLOW}${BOLD}Firewall Reminder:${RESET} In GCP/Azure/AWS, allow inbound TCP port ${BOLD}8000${RESET} to your VM."
 echo "======================================================================"
+
