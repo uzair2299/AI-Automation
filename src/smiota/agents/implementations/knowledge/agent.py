@@ -98,11 +98,16 @@ class KnowledgeAssistantAgent(BaseAgent):
                     "If you require property-level assistance, please contact your building management or mailroom staff."
                 ),
                 requires_approval=False,
-                suggested_actions=[
-                    "Check SMS or email for PIN code",
-                    "Open Smiota Mobile App",
-                    "Contact building management",
-                ],
+                # Suggested action pills (commented out for webchat channel)
+                suggested_actions=(
+                    []
+                    if context.channel == "webchat"
+                    else [
+                        "Check SMS or email for PIN code",
+                        "Open Smiota Mobile App",
+                        "Contact building management",
+                    ]
+                ),
                 metadata={"refusal_type": "private_resident_data"},
             )
 
@@ -120,11 +125,16 @@ class KnowledgeAssistantAgent(BaseAgent):
                     "real-time package transit must be checked directly through the shipping carrier's website."
                 ),
                 requires_approval=False,
-                suggested_actions=[
-                    "Track package on USPS.com",
-                    "Track package on UPS.com",
-                    "Track package on FedEx.com",
-                ],
+                # Suggested action pills (commented out for webchat channel)
+                suggested_actions=(
+                    []
+                    if context.channel == "webchat"
+                    else [
+                        "Track package on USPS.com",
+                        "Track package on UPS.com",
+                        "Track package on FedEx.com",
+                    ]
+                ),
                 metadata={"refusal_type": "carrier_tracking"},
             )
 

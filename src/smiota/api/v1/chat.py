@@ -66,12 +66,20 @@ async def send_message(
         preferred_agent=payload.target_agent,
     )
 
+    # For webchat channel, action pills and suggestions are commented out for now
+    # suggested_actions = result.suggested_actions
+    suggested_actions = (
+        []
+        if (payload.channel == "webchat" or context.channel == "webchat")
+        else result.suggested_actions
+    )
+
     return ChatMessageResponse(
         session_id=session_id,
         response=result.content,
         agent_used=result.agent_name,
         requires_approval=result.requires_approval,
-        suggested_actions=result.suggested_actions,
+        suggested_actions=suggested_actions,
         user=user_info,
         metadata=result.metadata,
     )

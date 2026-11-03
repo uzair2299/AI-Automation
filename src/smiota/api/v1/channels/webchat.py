@@ -281,13 +281,15 @@ async def embed_widget(
                 </div>
             </div>
 
-            <!-- Interactive Quick Reply Pill Buttons -->
+            <!-- Interactive Quick Reply Pill Buttons (Commented out for now for webchat channel)
             <div id="quick-replies-container" class="grid grid-cols-2 gap-2 pt-1 px-8">
                 <button type="button" onclick="sendQuickReply('Where is my package?')" class="text-xs text-indigo-600 bg-white hover:bg-indigo-50/80 border border-indigo-200/80 hover:border-indigo-300 font-medium py-2 px-3 rounded-xl transition text-center shadow-xs truncate">📦 Track package</button>
                 <button type="button" onclick="sendQuickReply('Resend pickup PIN')" class="text-xs text-indigo-600 bg-white hover:bg-indigo-50/80 border border-indigo-200/80 hover:border-indigo-300 font-medium py-2 px-3 rounded-xl transition text-center shadow-xs truncate">🔑 Get pickup PIN</button>
                 <button type="button" onclick="sendQuickReply('What does Smiota offer?')" class="text-xs text-indigo-600 bg-white hover:bg-indigo-50/80 border border-indigo-200/80 hover:border-indigo-300 font-medium py-2 px-3 rounded-xl transition text-center shadow-xs truncate">🏢 Smiota smart lockers</button>
                 <button type="button" onclick="sendQuickReply('Locker door did not open')" class="text-xs text-indigo-600 bg-white hover:bg-indigo-50/80 border border-indigo-200/80 hover:border-indigo-300 font-medium py-2 px-3 rounded-xl transition text-center shadow-xs truncate">🚪 Locker door help</button>
             </div>
+            -->
+            <div id="quick-replies-container" style="display: none;"></div>
         </div>
 
         <!-- Input Bar Toolbar -->
@@ -375,13 +377,14 @@ async def embed_widget(
                             const senderRole = msg.sender?.role || msg.role || 'user';
                             const senderName = msg.sender?.name || msg.sender_name || msg.agent_name || 'AI';
                             const isApproval = msg.type === 'approval_gate' || msg.message_type === 'approval_gate';
-                            const actions = (typeof msg.content === 'object' && msg.content !== null && msg.content.suggested_actions) ? msg.content.suggested_actions : (msg.suggested_actions || []);
+                            // Action and suggestion pills commented out for now for webchat channel
+                            // const actions = (typeof msg.content === 'object' && msg.content !== null && msg.content.suggested_actions) ? msg.content.suggested_actions : (msg.suggested_actions || []);
                             appendMessage(
                                 senderRole === 'user' ? 'user' : 'bot',
                                 textContent,
                                 senderName,
                                 isApproval,
-                                actions
+                                []
                             );
                         }
                     }
@@ -663,10 +666,12 @@ async def embed_widget(
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
             notifyParentHeight();
 
-            // Render dynamic suggested actions if returned
+            // Render dynamic suggested actions if returned (Commented out for now for webchat channel)
+            /*
             if (suggestedActions && suggestedActions.length > 0) {
                 renderQuickReplies(suggestedActions);
             }
+            */
             return div;
         }
 
@@ -707,6 +712,8 @@ async def embed_widget(
         }
 
         function renderQuickReplies(actions) {
+            // Action pills and suggestions commented out for now for webchat channel
+            /*
             quickRepliesContainer.innerHTML = '';
             if (!actions || actions.length === 0) {
                 quickRepliesContainer.style.display = 'none';
@@ -731,6 +738,11 @@ async def embed_widget(
             messagesContainer.appendChild(quickRepliesContainer);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
             notifyParentHeight();
+            */
+            if (quickRepliesContainer) {
+                quickRepliesContainer.innerHTML = '';
+                quickRepliesContainer.style.display = 'none';
+            }
         }
 
         let typingTimeout = null;
@@ -846,18 +858,21 @@ async def embed_widget(
                         currentStreamBody.innerHTML = formatMarkdown(textContent);
                     }
                 } else if (textContent) {
-                    appendMessage('bot', textContent, agentName, requiresApproval, actions);
+                    appendMessage('bot', textContent, agentName, requiresApproval, []);
                 }
+                // Dynamic suggested action pills (Commented out for now for webchat channel)
+                /*
                 if (actions) {
                     renderQuickReplies(actions);
                 }
+                */
                 currentStreamDiv = null;
                 currentStreamBody = null;
                 currentStreamText = "";
             } else if (msg.type === "error") {
                 removeTypingIndicator();
                 const errMsg = (typeof msg.content === 'object' && msg.content !== null) ? (msg.content.text || msg.content.message || "I encountered an issue processing that. Please try again.") : (msg.content || "I encountered an issue processing that. Please try again.");
-                appendMessage('bot', errMsg, 'Support', false, ['Try again', 'Contact support']);
+                appendMessage('bot', errMsg, 'Support', false, []);
             }
         }
 
@@ -913,10 +928,10 @@ async def embed_widget(
                     const data = await response.json();
                     removeTypingIndicator();
                     markLastUserMessageDelivered();
-                    appendMessage('bot', data.response, data.agent_used, data.requires_approval, data.suggested_actions);
+                    appendMessage('bot', data.response, data.agent_used, data.requires_approval, []);
                 } catch (err) {
                     removeTypingIndicator();
-                    appendMessage('bot', "I apologize, I'm taking a bit longer than expected to look that up. Please try again.", 'Concierge', false, ['Try again', 'Contact support']);
+                    appendMessage('bot', "I apologize, I'm taking a bit longer than expected to look that up. Please try again.", 'Concierge', false, []);
                 }
             }
         }

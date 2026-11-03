@@ -424,3 +424,20 @@ async def test_knowledge_assistant_security_isolation_and_refusals():
 
 
 
+
+
+@pytest.mark.asyncio
+async def test_why_choose_smiota_package_management_system_routes_to_knowledge():
+    """Verify that 'why choose smiota package management system?' routes to KnowledgeAssistant."""
+    from smiota.agents.routing.rules import RuleBasedRouter
+
+    router = RuleBasedRouter()
+    ctx = AgentContext(
+        session_id="webchat-igzkcd4",
+        user_id="anonymous",
+        tenant_id="default",
+        channel="webchat",
+    )
+    decision = await router.classify("why choose smiota package management system?", ctx)
+    assert decision.agent_name == "knowledge_assistant"
+    assert decision.confidence >= 0.95

@@ -328,9 +328,11 @@ class WebSocketChatHandler:
             "card_payload"
         )
         event_type = "agent_card" if card_data else "agent_message"
+        # For webchat channel, action pills and suggestions are commented out for now
+        # "suggested_actions": result.suggested_actions,
         content_payload: dict[str, Any] = {
             "text": result.content,
-            "suggested_actions": result.suggested_actions,
+            "suggested_actions": [],
         }
         if card_data:
             content_payload["card_data"] = card_data
@@ -403,11 +405,13 @@ class WebSocketChatHandler:
                 },
                 "content": {
                     "text": err_text,
-                    "suggested_actions": [
-                        "Where is my package?",
-                        "Resend pickup PIN",
-                        "Locker location and hours",
-                    ],
+                    # For webchat channel, action pills and suggestions are commented out for now
+                    # "suggested_actions": [
+                    #     "Where is my package?",
+                    #     "Resend pickup PIN",
+                    #     "Locker location and hours",
+                    # ],
+                    "suggested_actions": [],
                 },
                 "metadata": {"error": True},
                 "created_at": datetime.now(UTC).isoformat(),
