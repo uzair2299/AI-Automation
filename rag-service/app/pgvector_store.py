@@ -153,3 +153,4 @@ class PgVectorStoreClient:
         async with pool.acquire() as conn:
             val = await conn.fetchval("SELECT COUNT(*) FROM rag_documents;")
             return int(val or 0)
+
