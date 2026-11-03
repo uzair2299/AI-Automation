@@ -10,10 +10,32 @@ from smiota.rag.client import RAGServiceClient
 from smiota.rag.config import RAGConfig
 from smiota.rag.prompts import (
     SMIOTA_KNOWLEDGE_ASSISTANT_SYSTEM_PROMPT,
+    STANDARD_BOOK_DEMO_URL,
+    STANDARD_CTA_CLOSING,
+    STANDARD_GET_QUOTE_URL,
     build_rag_prompt,
 )
 from smiota.rag.retrieval.retrieval_service import RetrievalService
 from smiota.schemas.agents import AgentCapability
+
+
+def normalize_cta_links(text: str) -> str:
+    """Standardize next-step demo and quote links to exact official Smiota URLs."""
+    # Normalize Request a Quote variations to [Get a Quote](https://smiota.com/get-quote/)
+    text = re.sub(
+        r"\[(?:Request a Quote|Get a Quote|Get Quote|Quote)\]\(https?://(?:www\.)?smiota\.com/(?:get-quote|quote)/?\)",
+        f"[Get a Quote]({STANDARD_GET_QUOTE_URL})",
+        text,
+        flags=re.IGNORECASE,
+    )
+    # Normalize Book a Demo variations to [Book a Demo](https://smiota.com/contact/)
+    text = re.sub(
+        r"\[(?:Book a Demo|Schedule a Demo|Book Demo|Demo|Contact Us)\]\(https?://(?:www\.)?smiota\.com/(?:contact|contact-us|smiota-platform-demo)/?\)",
+        f"[Book a Demo]({STANDARD_BOOK_DEMO_URL})",
+        text,
+        flags=re.IGNORECASE,
+    )
+    return text
 
 
 class KnowledgeAssistantAgent(BaseAgent):
@@ -169,6 +191,7 @@ class KnowledgeAssistantAgent(BaseAgent):
             prompt=full_prompt,
             temperature=0.2,
         )
+        response_text = normalize_cta_links(response_text)
 
         logger.info(
             f"KnowledgeAssistant generated answer (chunks: {len(scored_chunks)})",
