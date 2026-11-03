@@ -5,6 +5,7 @@ from typing import ClassVar
 from smiota.agents.base import AgentContext, AgentResult, BaseAgent
 from smiota.core.logging import logger
 from smiota.llm.provider import GeminiProvider
+from smiota.rag.client import RAGServiceClient
 from smiota.rag.config import RAGConfig
 from smiota.rag.prompts import (
     SMIOTA_KNOWLEDGE_ASSISTANT_SYSTEM_PROMPT,
@@ -39,6 +40,7 @@ class KnowledgeAssistantAgent(BaseAgent):
         retrieval_service: RetrievalService | None = None,
         llm_provider: GeminiProvider | None = None,
         config: RAGConfig | None = None,
+        rag_client: RAGServiceClient | None = None,
     ):
         super().__init__(
             name="KnowledgeAssistant",
@@ -58,6 +60,7 @@ class KnowledgeAssistantAgent(BaseAgent):
         )
         self.config = config or RAGConfig()
         self.retrieval_service = retrieval_service or RetrievalService(config=self.config)
+        self.rag_client = rag_client or RAGServiceClient()
         self.llm_provider = llm_provider or GeminiProvider()
 
     def _is_private_data_query(self, query: str) -> bool:
@@ -125,12 +128,17 @@ class KnowledgeAssistantAgent(BaseAgent):
                 metadata={"refusal_type": "carrier_tracking"},
             )
 
-        # 3. Retrieve relevant public knowledge context
-        scored_chunks = await self.retrieval_service.retrieve(
+        # 3. Retrieve relevant public knowledge context via RAG Service
+        scored_chunks = await self.rag_client.search(
             query=query,
             top_k=5,
-            enable_mmr=True,
         )
+        if not scored_chunks and self.retrieval_service:
+            scored_chunks = await self.retrieval_service.retrieve(
+                query=query,
+                top_k=5,
+                enable_mmr=True,
+            )
 
         # 4. Construct prompt with dynamic retrieved chunks
         full_prompt = build_rag_prompt(

@@ -1,0 +1,163 @@
+version: "3.8"
+
+services:
+  # ============================================================================
+  # Service 1: Client Gateway (Port 8000)
+  # Owns all 4 ingress channels (Teams, WebChat embed/WS, Mobile, IDE),
+  # intent routing, session state, and delegates to remote MCP servers & RAG.
+  # ============================================================================
+  smiota-agent-gateway:
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile.api
+    container_name: smiota-agent-gateway
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - APP_ENV=production
+      - HOST=0.0.0.0
+      - PORT=8000
+      - MCP_REMOTE_ENABLED=true
+      - MCP_REMOTE_FALLBACK=true
+      - MCP_CLIENT_TIMEOUT_SECONDS=15.0
+      - MCP_K8S_SERVER_URL=http://k8s-sre-mcp:8080
+      - MCP_OBSERVABILITY_SERVER_URL=http://observability-mcp:8081
+      - MCP_LOCKER_SERVER_URL=http://smart-locker-mcp:8082
+      - RAG_SERVICE_URL=http://rag-service:8001
+      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=postgresql://smiota:smiota_password@postgres:5432/smiota_db
+    depends_on:
+      - rag-service
+      - k8s-sre-mcp
+      - observability-mcp
+      - redis
+      - postgres
+    networks:
+      - smiota-mesh
+
+  # ============================================================================
+  # Service 2: Kubernetes SRE MCP Server (Port 8080)
+  # 37 Read-Only K8s inventory and troubleshooting tools with cluster RBAC.
+  # ============================================================================
+  k8s-sre-mcp:
+    build:
+      context: ./mcp-server
+      dockerfile: Dockerfile
+    container_name: k8s-sre-mcp
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - MCP_HOST=0.0.0.0
+      - MCP_PORT=8080
+      - MCP_TRANSPORT=streamable-http
+      - LOG_LEVEL=INFO
+    networks:
+      - smiota-mesh
+
+  # ============================================================================
+  # Service 3: Observability MCP Server (Port 8081)
+  # FastMCP server for Prometheus PromQL metrics & OpenSearch logs.
+  # ============================================================================
+  observability-mcp:
+    build:
+      context: ./mcp-observability
+      dockerfile: Dockerfile
+    container_name: observability-mcp
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      - MCP_HOST=0.0.0.0
+      - MCP_PORT=8081
+      - MCP_TRANSPORT=streamable-http
+      - PROMETHEUS_URL=https://prometheus.int.smiotaapps.com
+      - OPENSEARCH_URL=https://opensearch.int.smiotaapps.com:9200
+    networks:
+      - smiota-mesh
+
+  # ============================================================================
+  # Service 4: Smart Locker MCP Server (Port 8082)
+  # Hardware solenoid actuation, compartment sensors, and internal AI APIs.
+  # ============================================================================
+  smart-locker-mcp:
+    image: python:3.11-slim
+    container_name: smart-locker-mcp
+    restart: unless-stopped
+    ports:
+      - "8082:8082"
+    environment:
+      - MCP_HOST=0.0.0.0
+      - MCP_PORT=8082
+    command: >
+      sh -c "pip install mcp httpx uvicorn && python -c '
+      from mcp.server.mcpserver import MCPServer
+      mcp = MCPServer(\"smart-locker-mcp\")
+      @mcp.tool()
+      def get_locker_status(locker_id: str = \"LOCKER-01\"): return {\"status\": \"ONLINE\", \"compartments_free\": 12}
+      mcp.settings.host=\"0.0.0.0\"
+      mcp.settings.port=8082
+      mcp.run(transport=\"streamable-http\")
+      '"
+    networks:
+      - smiota-mesh
+
+  # ============================================================================
+  # Service 5: Standalone RAG Service (Port 8001)
+  # Simple, high-speed REST microservice for knowledge search and ingestion.
+  # NOT an MCP server.
+  # ============================================================================
+  rag-service:
+    build:
+      context: ./rag-service
+      dockerfile: Dockerfile
+    container_name: rag-service
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8001
+      - EMBEDDING_PROVIDER=deterministic
+      - EMBEDDING_DIMENSION=768
+    networks:
+      - smiota-mesh
+
+  # ============================================================================
+  # Shared Storage & Caching
+  # ============================================================================
+  redis:
+    image: redis:7.2-alpine
+    container_name: smiota-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - smiota-mesh
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: smiota-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=smiota
+      - POSTGRES_PASSWORD=smiota_password
+      - POSTGRES_DB=smiota_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - smiota-mesh
+
+networks:
+  smiota-mesh:
+    driver: bridge
+
+volumes:
+  redis_data:
+  postgres_data:
+

@@ -88,9 +88,16 @@ class BaseAppSettings(BaseSettings):
     RAG_KNOWLEDGE_DIR: str = "data/knowledge/public"
     RAG_INPUT_JSONL_PATH: str = "data/knowledge/public/website_content.jsonl"
 
-    # Model Context Protocol & Safety Gates
+    # Model Context Protocol & Remote Services
     MCP_READ_ONLY_DEFAULT: bool = True
     REQUIRE_HUMAN_APPROVAL_FOR_REMEDIATION: bool = True
+    MCP_REMOTE_ENABLED: bool = True
+    MCP_REMOTE_FALLBACK: bool = True
+    MCP_CLIENT_TIMEOUT_SECONDS: float = 12.0
+    MCP_K8S_SERVER_URL: str = "http://localhost:8080"
+    MCP_OBSERVABILITY_SERVER_URL: str = "http://localhost:8081"
+    MCP_LOCKER_SERVER_URL: str = "http://localhost:8082"
+    RAG_SERVICE_URL: str = "http://localhost:8001"
 
     # Observability & Metrics
     OTEL_EXPORTER_OTLP_ENDPOINT: str | None = None

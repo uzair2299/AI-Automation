@@ -1,0 +1,140 @@
+"""Standalone RAG Knowledge Microservice FastAPI Application."""
+from contextlib import asynccontextmanager
+from typing import Any, Dict
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.chunking import DocumentChunker
+from app.config import settings
+from app.embeddings import EmbeddingService
+from app.models import (
+    APIResponse,
+    DocumentIngestionRequest,
+    DocumentIngestionResponse,
+    VectorSearchRequest,
+    VectorSearchResponse,
+)
+from app.retriever import KnowledgeRetriever
+from app.vector_store import VectorStoreClient
+
+# Shared service singletons
+vector_store = VectorStoreClient()
+embedding_service = EmbeddingService(dimension=settings.EMBEDDING_DIMENSION)
+chunker = DocumentChunker(target_chunk_size=settings.TARGET_CHUNK_SIZE, overlap=settings.CHUNK_OVERLAP)
+retriever = KnowledgeRetriever(vector_store=vector_store, embedding_service=embedding_service)
+
+
+async def seed_initial_documents():
+    """Pre-seed essential knowledge chunks."""
+    if await vector_store.count() > 0:
+        return
+    sample_docs = [
+        (
+            "Smiota Smart Locker Hardware Specs",
+            "Smiota smart lockers feature NEMA 4 rated steel enclosures, dual-locking motorized solenoids, internal infrared parcel sensors, and high-resolution touchscreen control terminals.",
+            "hardware",
+        ),
+        (
+            "Smiota Resident Delivery Workflow",
+            "When a carrier deposits a package, the locker controller captures dimensions and weight, closes the door, and issues a 6-digit numeric pickup PIN and dynamic QR code to the resident via SMS and email.",
+            "workflow",
+        ),
+        (
+            "Smiota Refrigerated & Cold Storage Lockers",
+            "Smiota refrigerated smart lockers maintain strict temperature control between 34°F and 40°F (1°C to 4°C) for perishable groceries, meal kits, and temperature-sensitive pharmaceutical supplies.",
+            "hardware",
+        ),
+    ]
+    for title, content, cat in sample_docs:
+        emb = await embedding_service.get_embedding(content)
+        await vector_store.insert_document(title=title, content=content, embedding=emb, category=cat)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await seed_initial_documents()
+    yield
+
+
+app = FastAPI(
+    title="Smiota RAG Knowledge Service",
+    description="Standalone REST microservice providing document ingestion and semantic vector retrieval.",
+    version="1.0.0",
+    lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.get("/health", summary="Health check")
+async def health_check() -> Dict[str, Any]:
+    """Return health status and count of indexed documents."""
+    count = await vector_store.count()
+    return {
+        "status": "ok",
+        "service": settings.SERVICE_NAME,
+        "indexed_chunks": count,
+        "version": "1.0.0",
+    }
+
+
+@app.post(
+    "/api/v1/rag/search",
+    response_model=APIResponse[VectorSearchResponse],
+    summary="Semantic vector search",
+)
+async def search_knowledge(payload: VectorSearchRequest):
+    """Retrieve semantically relevant document chunks matching user query."""
+    try:
+        results = await retriever.retrieve(
+            query=payload.query,
+            category=payload.category,
+            top_k=payload.top_k,
+        )
+        data = VectorSearchResponse(
+            query=payload.query,
+            results=results,
+            total_found=len(results),
+        )
+        return APIResponse(data=data, message="Search completed successfully.")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post(
+    "/api/v1/rag/ingest",
+    response_model=APIResponse[DocumentIngestionResponse],
+    summary="Ingest and chunk document",
+)
+async def ingest_document(payload: DocumentIngestionRequest):
+    """Chunk, embed, and store document in vector storage."""
+    try:
+        chunks = chunker.split_text(payload.content)
+        first_doc_id = ""
+
+        for idx, chunk in enumerate(chunks):
+            emb = await embedding_service.get_embedding(chunk)
+            doc_id = await vector_store.insert_document(
+                title=f"{payload.title} (Part {idx+1})" if len(chunks) > 1 else payload.title,
+                content=chunk,
+                embedding=emb,
+                category=payload.category,
+                metadata={**payload.metadata, "tags": payload.tags},
+            )
+            if not first_doc_id:
+                first_doc_id = doc_id
+
+        data = DocumentIngestionResponse(
+            document_id=first_doc_id,
+            chunks_created=len(chunks),
+            status="indexed",
+        )
+        return APIResponse(data=data, message="Document indexed successfully.")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
