@@ -441,3 +441,84 @@ async def test_why_choose_smiota_package_management_system_routes_to_knowledge()
     decision = await router.classify("why choose smiota package management system?", ctx)
     assert decision.agent_name == "knowledge_assistant"
     assert decision.confidence >= 0.95
+
+
+@pytest.mark.asyncio
+async def test_semantic_router_routes_knowledge_assistant_in_webchat(base_context):
+    """Verify SemanticRouter includes knowledge_assistant in webchat candidates and routes correctly."""
+    mock_provider = MagicMock()
+    mock_provider.generate_embedding = AsyncMock(return_value=[0.0] * 768)
+    mock_provider.generate_completion = AsyncMock(
+        return_value='{"agent": "knowledge_assistant", "confidence": 0.98, "intent": "why_choose_smiota", "reasoning": "Product benefits and architecture overview inquiry"}'
+    )
+
+    router = SemanticRouter(provider=mock_provider)
+    decision = await router.classify("why choose smiota package management system?", base_context)
+
+    assert decision.agent_name == "knowledge_assistant"
+    assert decision.confidence == 0.98
+    assert decision.routing_method == "gemini_semantic"
+    mock_provider.generate_completion.assert_called_once()
+    prompt_used = mock_provider.generate_completion.call_args[1]["prompt"]
+    assert "knowledge_assistant" in prompt_used
+
+
+@pytest.mark.asyncio
+async def test_semantic_router_embedding_similarity_fast_path(base_context):
+    """Verify SemanticRouter can classify via vector embedding cosine similarity."""
+    mock_provider = MagicMock()
+    vector_a = [1.0] + [0.0] * 767
+    mock_provider.generate_embedding = AsyncMock(return_value=vector_a)
+    mock_provider.generate_completion = AsyncMock()
+
+    router = SemanticRouter(provider=mock_provider)
+    router._anchor_embeddings = {"knowledge_assistant": [vector_a]}
+    router._embeddings_initialized = True
+
+    decision = await router.classify("tell me about smart locker features", base_context)
+
+    assert decision.agent_name == "knowledge_assistant"
+    assert decision.routing_method == "embedding_similarity"
+    assert decision.confidence >= 0.90
+    mock_provider.generate_completion.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_clean_rules_prevent_false_positive_on_ambiguous_queries(base_context):
+    """Verify that sentences with isolated keywords like 'package' or 'locker' do not trigger high-confidence customer routing."""
+    router = RuleBasedRouter()
+
+    decision = await router.classify("The package architecture design is scalable", base_context)
+
+    assert decision.confidence < 0.75
+    assert decision.routing_method == "channel_default"
+
+
+@pytest.mark.asyncio
+async def test_composite_router_delegates_ambiguous_queries_to_semantic_router(base_context):
+    """Verify CompositeIntentRouter delegates queries below rule confidence threshold to SemanticRouter."""
+    mock_semantic = MagicMock(spec=SemanticRouter)
+    mock_semantic.classify = AsyncMock(
+        return_value=RouteDecision(
+            agent_name="knowledge_assistant",
+            confidence=0.96,
+            matched_intent="architectural_inquiry",
+            routing_method="gemini_semantic",
+            reasoning="Grounded architecture overview",
+        )
+    )
+
+    rule_router = RuleBasedRouter()
+    composite = CompositeIntentRouter(
+        rule_router=rule_router,
+        semantic_router=mock_semantic,
+        confidence_threshold=0.75,
+    )
+
+    decision = await composite.classify("The package architecture design is scalable", base_context)
+
+    assert decision.agent_name == "knowledge_assistant"
+    assert decision.confidence == 0.96
+    assert decision.routing_method == "gemini_semantic"
+    mock_semantic.classify.assert_called_once()
+

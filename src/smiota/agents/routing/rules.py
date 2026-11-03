@@ -139,7 +139,7 @@ INFORMATIONAL_PREFIXES = [
 
 
 class RuleBasedRouter(BaseIntentRouter):
-    """Classifies user queries using compiled regex patterns, weighted keyword dictionaries,
+    """Classifies user queries using compiled regex patterns, fast-path checks,
 
     and channel guardrails. Runs in < 1 millisecond.
     """
@@ -174,35 +174,42 @@ class RuleBasedRouter(BaseIntentRouter):
         "see ya",
     }
 
-    # High-certainty domain identifiers
+    # High-certainty domain identifiers & compiled regular expressions
     CUSTOMER_REGEX = re.compile(
         r"\b(sm|pkg)-[a-z0-9]+\b|\bpickup code\b|\bcompartment \d+\b", re.IGNORECASE
+    )
+    CUSTOMER_ACTION_REGEX = re.compile(
+        r"\b(pick\s*up|retrieve|collect)\s+(my\s+)?(parcel|package|delivery|mail)\b"
+        r"|\b(open|unlock)\s+(my\s+)?(door|locker|compartment)\b"
+        r"|\b(package|parcel|delivery)\s+(is\s+)?(stuck|jammed|missing)\b"
+        r"|\bwhere\s+is\s+my\s+(package|parcel|delivery)\b",
+        re.IGNORECASE,
     )
     SECURITY_REGEX = re.compile(
         r"\bcve-\d{4}-\d+\b|\bbrute-force\b|\bwazuh\b|\bsiem\b", re.IGNORECASE
     )
     AIOPS_REGEX = re.compile(
-        r"\boomkilled\b|\bgke pod\b|\breadiness probe\b|\bpromql\b|\bcrashloop\b|\bimagepullbackoff\b|\bdaemonset\b|\bstatefulset\b",
+        r"\boomkilled\b|\bgke pod(s)?\b|\bhigh cpu\b|\bcpu\b|\breadiness probe\b|\bpromql\b|\bcrashloop\b|\bimagepullbackoff\b|\bdaemonset(s)?\b|\bstatefulset(s)?\b",
+        re.IGNORECASE,
+    )
+    QA_REGEX = re.compile(
+        r"\b(playwright|selenium|cypress|flaky test|e2e test|end-to-end test|regression test)\b",
+        re.IGNORECASE,
+    )
+    DEVELOPER_REGEX = re.compile(
+        r"\b(pull request|\bpr\b|terraform plan|git diff|code review|repository)\b",
         re.IGNORECASE,
     )
 
-    # Keyword dictionaries for domain classification
+    # Keywords for unambiguous domain classification
     SECURITY_KEYWORDS: ClassVar[list[str]] = [
-        "security",
         "cve",
         "vulnerability",
-        "iam",
         "wazuh",
-        "threat",
         "siem",
-        "service account",
-        "revoke",
-        "quarantine",
-        "credential",
         "brute-force",
         "ssh login",
-        "firewall",
-        "audit",
+        "quarantine",
         "exploit",
     ]
 
@@ -211,128 +218,31 @@ class RuleBasedRouter(BaseIntentRouter):
         "selenium",
         "flaky",
         "regression",
-        "test",
-        "testrunner",
         "cypress",
-        "end-to-end",
-        "e2e",
-        "assertion",
-    ]
-
-    CUSTOMER_KEYWORDS: ClassVar[list[str]] = [
-        "locker",
-        "customer",
-        "ticket",
-        "package",
-        "door",
-        "pickup",
-        "dropoff",
-        "parcel",
-        "compartment",
-        "track",
-        "tracking",
-        "sm-",
-        "pkg-",
-        "pin",
-        "resident",
-        "unlock",
-        "delivery",
-        "box",
-        "deliveries",
-        "collect",
-        "collection",
-        "mail",
-        "uncollected",
-        "unclaimed",
-    ]
-
-    AIOPS_KEYWORDS: ClassVar[list[str]] = [
-        "cpu",
-        "memory",
-        "oom",
-        "restart",
-        "restarting",
-        "crashloop",
-        "smiotaserver",
-        "metric",
-        "prometheus",
-        "opensearch",
-        "grafana",
-        "gke",
-        "pod",
-        "incident",
-        "rca",
-        "crash",
-        "probe",
-        "readiness",
-        "k8s",
-        "kubernetes",
-        "latency",
-        "alert",
-        "5xx",
-        "500",
-        "504",
-        "deployment",
-        "deploy",
-        "rollout",
-        "outage",
-        "changed",
-        "log",
-        "logs",
-        "stdout",
-        "stacktrace",
-        "cluster",
-        "clusters",
-        "namespace",
-        "namespaces",
-        "node",
-        "nodes",
-        "daemonset",
-        "daemonsets",
-        "statefulset",
-        "statefulsets",
-        "ingress",
-        "ingresses",
-        "configmap",
-        "configmaps",
-        "secret",
-        "secrets",
-        "pvc",
-        "pvcs",
-        "hpa",
-        "imagepull",
-        "imagepullbackoff",
-        "notready",
-        "pending pod",
-        "diagnose",
-        "troubleshoot",
-        "dns resolution",
-        "service connectivity",
+        "testrunner",
     ]
 
     DEVELOPER_KEYWORDS: ClassVar[list[str]] = [
-        "pr",
         "pull request",
         "terraform",
-        "code",
         "github",
         "promql",
         "ci/cd",
         "pipeline",
         "diff",
-        "commit",
-        "git",
-        "merge",
-        "repo",
-        "repository",
-        "kubernetes",
-        "k8s",
-        "cluster",
-        "pods",
-        "hpa",
-        "daemonset",
-        "statefulset",
-        "diagnose",
+    ]
+
+    AIOPS_KEYWORDS: ClassVar[list[str]] = [
+        "oom",
+        "oomkilled",
+        "crashloop",
+        "smiotaserver",
+        "prometheus",
+        "opensearch",
+        "grafana",
+        "gke",
+        "readiness probe",
+        "imagepullbackoff",
     ]
 
     KNOWLEDGE_KEYWORDS: ClassVar[list[str]] = [
@@ -503,104 +413,82 @@ class RuleBasedRouter(BaseIntentRouter):
 
         return None
 
+    @classmethod
+    def _match_keywords(cls, query: str, keywords: list[str]) -> list[str]:
+        """Match keywords with word boundaries to avoid false substring hits."""
+        matches = []
+        for keyword in keywords:
+            if " " in keyword or "-" in keyword:
+                if keyword in query:
+                    matches.append(keyword)
+            else:
+                pattern = r"\b" + re.escape(keyword) + r"(?:s|es|ed|ing)?\b"
+                if re.search(pattern, query):
+                    matches.append(keyword)
+        return matches
+
+    def _check_continuity(self, query: str, context: AgentContext) -> RouteDecision | None:
+        """Detect follow-up messages (e.g. 'open it again', 'yes', 'retry') in active conversations."""
+        tokens = set(re.findall(r"\b\w+\b", query))
+        if len(tokens) <= 4 and tokens.intersection(self.CONTINUITY_WORDS):
+            history = context.conversation_history
+            if history:
+                channel_default = "customer" if context.channel == "webchat" else "aiops"
+                return RouteDecision(
+                    agent_name=channel_default,
+                    confidence=0.88,
+                    matched_intent="conversation_continuity",
+                    routing_method="context_continuity",
+                    reasoning="Short follow-up query continuing active conversation session",
+                )
+        return None
+
     async def classify(self, query: str, context: AgentContext) -> RouteDecision:
-        """Classify user query based on channel, rules, and conversation continuity."""
+        """Classify user query based on channel, fast rules, and conversation continuity."""
         normalized_query = query.lower().strip()
         channel = (context.channel or "webchat").lower()
 
         # 1. Greetings classification check (Immediate high confidence < 1ms)
         if self._is_greeting(normalized_query):
             target_agent = "customer" if channel == "webchat" else "aiops"
-            decision = RouteDecision(
+            return RouteDecision(
                 agent_name=target_agent,
                 confidence=0.98,
                 matched_intent="greeting",
                 routing_method="rule_greeting",
                 reasoning=f"Matched standard greeting intent in {channel} channel",
             )
-            logger.debug(
-                f"Rule greeting matched [{target_agent}] (channel={channel})",
-                extra={
-                    "event": "routing.rule.greeting",
-                    "agent_name": target_agent,
-                    "confidence": decision.confidence,
-                    "routing_method": decision.routing_method,
-                    "matched_intent": decision.matched_intent,
-                    "channel": channel,
-                    "session_id": context.session_id,
-                },
-            )
-            return decision
 
         # 1.1 Gratitude & Farewell checks (Immediate high confidence < 1ms)
         if self._is_gratitude(normalized_query):
             target_agent = "customer" if channel == "webchat" else "aiops"
-            decision = RouteDecision(
+            return RouteDecision(
                 agent_name=target_agent,
                 confidence=0.98,
                 matched_intent="gratitude",
                 routing_method="rule_conversational",
                 reasoning=f"Matched gratitude intent in {channel} channel",
             )
-            logger.debug(
-                f"Rule conversational gratitude matched [{target_agent}] (channel={channel})",
-                extra={
-                    "event": "routing.rule.conversational",
-                    "agent_name": target_agent,
-                    "confidence": decision.confidence,
-                    "routing_method": decision.routing_method,
-                    "matched_intent": decision.matched_intent,
-                    "channel": channel,
-                    "session_id": context.session_id,
-                },
-            )
-            return decision
 
         if self._is_farewell(normalized_query):
             target_agent = "customer" if channel == "webchat" else "aiops"
-            decision = RouteDecision(
+            return RouteDecision(
                 agent_name=target_agent,
                 confidence=0.98,
                 matched_intent="farewell",
                 routing_method="rule_conversational",
                 reasoning=f"Matched farewell intent in {channel} channel",
             )
-            logger.debug(
-                f"Rule conversational farewell matched [{target_agent}] (channel={channel})",
-                extra={
-                    "event": "routing.rule.conversational",
-                    "agent_name": target_agent,
-                    "confidence": decision.confidence,
-                    "routing_method": decision.routing_method,
-                    "matched_intent": decision.matched_intent,
-                    "channel": channel,
-                    "session_id": context.session_id,
-                },
-            )
-            return decision
 
         # 2. Multi-turn continuity check: Short queries in active conversations
         continuity_decision = self._check_continuity(normalized_query, context)
         if continuity_decision:
-            logger.debug(
-                f"Rule continuity matched [{continuity_decision.agent_name}] (session={context.session_id})",
-                extra={
-                    "event": "routing.rule.continuity",
-                    "agent_name": continuity_decision.agent_name,
-                    "confidence": continuity_decision.confidence,
-                    "routing_method": continuity_decision.routing_method,
-                    "matched_intent": continuity_decision.matched_intent,
-                    "channel": channel,
-                    "session_id": context.session_id,
-                },
-            )
             return continuity_decision
 
         # 3. Channel-specific routing logic
         if channel == "webchat":
             decision = self._classify_webchat(normalized_query, context=context)
         else:
-            # 4. General internal routing (Slack, Teams, Eval, API)
             decision = self._classify_internal(normalized_query)
 
         logger.debug(
@@ -618,41 +506,10 @@ class RuleBasedRouter(BaseIntentRouter):
         )
         return decision
 
-    def _check_continuity(self, query: str, context: AgentContext) -> RouteDecision | None:
-        """Detect follow-up messages (e.g. 'open it again', 'yes', 'retry') in active conversations."""
-        tokens = set(re.findall(r"\b\w+\b", query))
-        # If very short query (< 5 words) and mostly composed of conversational continuity tokens
-        if len(tokens) <= 4 and tokens.intersection(self.CONTINUITY_WORDS):
-            history = context.conversation_history
-            if history:
-                # Find the most recent assistant message to infer context
-                channel_default = "customer" if context.channel == "webchat" else "aiops"
-                return RouteDecision(
-                    agent_name=channel_default,
-                    confidence=0.88,
-                    matched_intent="conversation_continuity",
-                    routing_method="context_continuity",
-                    reasoning="Short follow-up query continuing active conversation session",
-                )
-        return None
-
-    @classmethod
-    def _match_keywords(cls, query: str, keywords: list[str]) -> list[str]:
-        """Match keywords with word boundaries to avoid false substring hits (e.g. 'pin' in 'looping')."""
-        matches = []
-        for keyword in keywords:
-            if " " in keyword or "-" in keyword:
-                if keyword in query:
-                    matches.append(keyword)
-            else:
-                pattern = r"\b" + re.escape(keyword) + r"(?:s|es|ed|ing)?\b"
-                if re.search(pattern, query):
-                    matches.append(keyword)
-        return matches
-
     def _classify_webchat(self, query: str, context: AgentContext | None = None) -> RouteDecision:
-        """Webchat channel classification (prioritizes customer locker support,
-        with support for operational security & incident queries).
+        """Webchat channel classification with fast-paths for identifiers and knowledge,
+
+        delegating ambiguous natural language queries to SemanticRouter.
         """
         is_anonymous = bool(
             context
@@ -664,13 +521,13 @@ class RuleBasedRouter(BaseIntentRouter):
             and context.user_id != "user-123"
         )
 
-        # 0. Check for public / unauthenticated knowledge routing
         knowledge_matches = self._match_keywords(query, self.KNOWLEDGE_KEYWORDS)
         specific_matches = self._match_keywords(query, self.SPECIFIC_INTEGRATION_KEYWORDS)
+        informational_match = self._match_informational(query)
 
-        # Anonymous visitors (no login details) with knowledge or informational queries route to KnowledgeAssistant
-        if is_anonymous and (knowledge_matches or self._match_informational(query)):
-            decision = RouteDecision(
+        # 0. Check for public / unauthenticated knowledge routing
+        if is_anonymous and (knowledge_matches or informational_match):
+            return RouteDecision(
                 agent_name="knowledge_assistant",
                 confidence=0.96,
                 matched_intent="public_knowledge_qa",
@@ -682,21 +539,10 @@ class RuleBasedRouter(BaseIntentRouter):
                     "is_anonymous": True,
                 },
             )
-            logger.debug(
-                f"Webchat public unauthenticated knowledge matched: {knowledge_matches}",
-                extra={
-                    "event": "routing.rule.webchat.knowledge.public",
-                    "agent_name": decision.agent_name,
-                    "confidence": decision.confidence,
-                    "routing_method": decision.routing_method,
-                    "matched_intent": decision.matched_intent,
-                },
-            )
-            return decision
 
         # Authenticated users asking specific integration/pricing/enterprise spec queries
         if specific_matches:
-            decision = RouteDecision(
+            return RouteDecision(
                 agent_name="knowledge_assistant",
                 confidence=0.96,
                 matched_intent="public_knowledge_qa",
@@ -704,92 +550,17 @@ class RuleBasedRouter(BaseIntentRouter):
                 reasoning=f"Matched Smiota public knowledge/integration keywords: {specific_matches}",
                 metadata={"is_knowledge": True, "matched_keywords": specific_matches},
             )
-            logger.debug(
-                f"Webchat specific knowledge matched: {specific_matches}",
-                extra={
-                    "event": "routing.rule.webchat.knowledge",
-                    "agent_name": decision.agent_name,
-                    "confidence": decision.confidence,
-                    "routing_method": decision.routing_method,
-                    "matched_intent": decision.matched_intent,
-                },
-            )
-            return decision
 
-        # 1. Check standard greeting intent
-        if self._is_greeting(query):
-            decision = RouteDecision(
-                agent_name="customer",
-                confidence=0.98,
-                matched_intent="greeting",
-                routing_method="rule_greeting",
-                reasoning="Matched standard greeting in webchat channel",
-            )
-            logger.debug(
-                "Webchat greeting rule matched",
-                extra={
-                    "event": "routing.rule.webchat.greeting",
-                    "agent_name": decision.agent_name,
-                    "confidence": decision.confidence,
-                    "routing_method": decision.routing_method,
-                    "matched_intent": decision.matched_intent,
-                },
-            )
-            return decision
-
-        # 1.1 Check gratitude and farewell in webchat
-        if self._is_gratitude(query):
-            decision = RouteDecision(
-                agent_name="customer",
-                confidence=0.98,
-                matched_intent="gratitude",
-                routing_method="rule_conversational",
-                reasoning="Matched gratitude in webchat channel",
-            )
-            logger.debug(
-                "Webchat gratitude rule matched",
-                extra={
-                    "event": "routing.rule.webchat.conversational",
-                    "agent_name": decision.agent_name,
-                    "confidence": decision.confidence,
-                    "routing_method": decision.routing_method,
-                    "matched_intent": decision.matched_intent,
-                },
-            )
-            return decision
-
-        if self._is_farewell(query):
-            decision = RouteDecision(
-                agent_name="customer",
-                confidence=0.98,
-                matched_intent="farewell",
-                routing_method="rule_conversational",
-                reasoning="Matched farewell in webchat channel",
-            )
-            logger.debug(
-                "Webchat farewell rule matched",
-                extra={
-                    "event": "routing.rule.webchat.conversational",
-                    "agent_name": decision.agent_name,
-                    "confidence": decision.confidence,
-                    "routing_method": decision.routing_method,
-                    "matched_intent": decision.matched_intent,
-                },
-            )
-            return decision
-
-        # 2. Check Informational questions in webchat (How-to, Definitions, Policies, Instructions, Capabilities, etc.)
-        informational_match = self._match_informational(query)
+        # 1. Informational queries in webchat
         if informational_match:
-            # Check if specifically asks about security
             security_matches = self._match_keywords(query, self.SECURITY_KEYWORDS)
             if security_matches or self.SECURITY_REGEX.search(query):
-                decision = RouteDecision(
+                return RouteDecision(
                     agent_name="security",
                     confidence=0.95,
                     matched_intent="informational",
                     routing_method="rule_informational",
-                    reasoning=f"Matched informational prefix '{informational_match[0]}' ({informational_match[1]}) with security keywords: {security_matches}",
+                    reasoning=f"Matched informational prefix with security keywords: {security_matches}",
                     metadata={
                         "is_informational": True,
                         "category": informational_match[1],
@@ -797,27 +568,14 @@ class RuleBasedRouter(BaseIntentRouter):
                         "domain": "security",
                     },
                 )
-                logger.debug(
-                    f"Webchat informational security matched: category='{informational_match[1]}'",
-                    extra={
-                        "event": "routing.rule.webchat.informational",
-                        "agent_name": decision.agent_name,
-                        "confidence": decision.confidence,
-                        "routing_method": decision.routing_method,
-                        "matched_intent": decision.matched_intent,
-                        "category": informational_match[1],
-                    },
-                )
-                return decision
-            # Check if specifically asks about AIOps
             aiops_matches = self._match_keywords(query, self.AIOPS_KEYWORDS)
             if aiops_matches or self.AIOPS_REGEX.search(query):
-                decision = RouteDecision(
+                return RouteDecision(
                     agent_name="aiops",
                     confidence=0.95,
                     matched_intent="informational",
                     routing_method="rule_informational",
-                    reasoning=f"Matched informational prefix '{informational_match[0]}' ({informational_match[1]}) with AIOps keywords: {aiops_matches}",
+                    reasoning=f"Matched informational prefix with AIOps keywords: {aiops_matches}",
                     metadata={
                         "is_informational": True,
                         "category": informational_match[1],
@@ -825,21 +583,10 @@ class RuleBasedRouter(BaseIntentRouter):
                         "domain": "aiops",
                     },
                 )
-                logger.debug(
-                    f"Webchat informational AIOps matched: category='{informational_match[1]}'",
-                    extra={
-                        "event": "routing.rule.webchat.informational",
-                        "agent_name": decision.agent_name,
-                        "confidence": decision.confidence,
-                        "routing_method": decision.routing_method,
-                        "matched_intent": decision.matched_intent,
-                        "category": informational_match[1],
-                    },
-                )
-                return decision
-            # Webchat informational queries route to knowledge_assistant for anonymous users, customer for authenticated
+
+            # Webchat informational queries route to knowledge_assistant for anonymous, customer for authenticated
             target_agent = "knowledge_assistant" if is_anonymous else "customer"
-            decision = RouteDecision(
+            return RouteDecision(
                 agent_name=target_agent,
                 confidence=0.95,
                 matched_intent="informational",
@@ -852,347 +599,129 @@ class RuleBasedRouter(BaseIntentRouter):
                     "domain": target_agent,
                 },
             )
-            logger.debug(
-                f"Webchat informational {target_agent} matched: category='{informational_match[1]}'",
-                extra={
-                    "event": "routing.rule.webchat.informational",
-                    "agent_name": decision.agent_name,
-                    "confidence": decision.confidence,
-                    "routing_method": decision.routing_method,
-                    "matched_intent": decision.matched_intent,
-                    "category": informational_match[1],
-                },
-            )
-            return decision
 
-        # 3. Strong regex matches (e.g. direct parcel lookup or compartment code without informational phrasing)
+        # 2. Exact locker / package identifier regex
         if self.CUSTOMER_REGEX.search(query):
-            decision = RouteDecision(
+            return RouteDecision(
                 agent_name="customer",
                 confidence=0.98,
                 matched_intent="customer_locker_identifier",
                 routing_method="rule_pattern",
                 reasoning="Matched exact locker or package identifier regex",
             )
-            logger.debug(
-                "Webchat customer locker identifier regex matched",
-                extra={
-                    "event": "routing.rule.webchat.regex",
-                    "agent_name": decision.agent_name,
-                    "confidence": decision.confidence,
-                    "routing_method": decision.routing_method,
-                    "matched_intent": decision.matched_intent,
-                },
-            )
-            return decision
 
-        # 4. Check security keywords (e.g. admin or staff testing in webchat)
+        # 3. Explicit resident locker action pattern
+        if self.CUSTOMER_ACTION_REGEX.search(query):
+            return RouteDecision(
+                agent_name="customer",
+                confidence=0.95,
+                matched_intent="customer_locker_action",
+                routing_method="rule_pattern",
+                reasoning="Matched explicit customer locker action pattern",
+            )
+
+        # 4. Security regex or keywords
         security_matches = self._match_keywords(query, self.SECURITY_KEYWORDS)
         if security_matches or self.SECURITY_REGEX.search(query):
-            confidence = (
-                0.95 if len(security_matches) >= 2 or self.SECURITY_REGEX.search(query) else 0.88
-            )
-            decision = RouteDecision(
+            return RouteDecision(
                 agent_name="security",
-                confidence=confidence,
+                confidence=0.95,
                 matched_intent="security_compliance",
                 routing_method="rule_pattern",
-                reasoning=f"Matched security keywords: {security_matches}",
+                reasoning=f"Matched security pattern or keywords: {security_matches}",
             )
-            logger.debug(
-                "Webchat security keywords matched",
-                extra={
-                    "event": "routing.rule.webchat.keywords",
-                    "agent_name": decision.agent_name,
-                    "confidence": decision.confidence,
-                    "routing_method": decision.routing_method,
-                    "matched_intent": decision.matched_intent,
-                },
-            )
-            return decision
 
-        # 5. Check AIOps keywords (e.g. pod restarts, high CPU)
+        # 5. AIOps regex or keywords
         aiops_matches = self._match_keywords(query, self.AIOPS_KEYWORDS)
         if aiops_matches or self.AIOPS_REGEX.search(query):
-            confidence = 0.95 if len(aiops_matches) >= 2 or self.AIOPS_REGEX.search(query) else 0.88
-            decision = RouteDecision(
+            return RouteDecision(
                 agent_name="aiops",
-                confidence=confidence,
+                confidence=0.95,
                 matched_intent="aiops_sre",
                 routing_method="rule_pattern",
-                reasoning=f"Matched AIOps keywords: {aiops_matches}",
+                reasoning=f"Matched AIOps pattern or keywords: {aiops_matches}",
             )
-            logger.debug(
-                "Webchat AIOps keywords matched",
-                extra={
-                    "event": "routing.rule.webchat.keywords",
-                    "agent_name": decision.agent_name,
-                    "confidence": decision.confidence,
-                    "routing_method": decision.routing_method,
-                    "matched_intent": decision.matched_intent,
-                },
-            )
-            return decision
 
-        # 6. Check Customer keywords
-        customer_matches = self._match_keywords(query, self.CUSTOMER_KEYWORDS)
-        if customer_matches:
-            confidence = 0.95 if len(customer_matches) >= 2 else 0.88
-            decision = RouteDecision(
-                agent_name="customer",
-                confidence=confidence,
-                matched_intent="customer_locker",
-                routing_method="rule_pattern",
-                reasoning=f"Matched customer keywords: {customer_matches}",
-            )
-            logger.debug(
-                "Webchat customer keywords matched",
-                extra={
-                    "event": "routing.rule.webchat.keywords",
-                    "agent_name": decision.agent_name,
-                    "confidence": decision.confidence,
-                    "routing_method": decision.routing_method,
-                    "matched_intent": decision.matched_intent,
-                },
-            )
-            return decision
-
-        # Default webchat fallback is customer assistant (or knowledge_assistant for anonymous)
+        # Default webchat fallback: low confidence (0.40) to let CompositeIntentRouter delegate to SemanticRouter
         fallback_agent = "knowledge_assistant" if is_anonymous else "customer"
-        decision = RouteDecision(
+        return RouteDecision(
             agent_name=fallback_agent,
-            confidence=0.65,
-            matched_intent="knowledge_fallback" if is_anonymous else "customer_fallback",
+            confidence=0.40,
+            matched_intent="knowledge_fallback" if is_anonymous else "channel_default",
             routing_method="channel_default",
             reasoning=f"Default concierge agent for webchat channel ({fallback_agent})",
         )
-        logger.debug(
-            "Webchat channel fallback evaluated",
-            extra={
-                "event": "routing.rule.webchat.fallback",
-                "agent_name": decision.agent_name,
-                "confidence": decision.confidence,
-                "routing_method": decision.routing_method,
-                "matched_intent": decision.matched_intent,
-            },
-        )
-        return decision
 
     def _classify_internal(self, query: str) -> RouteDecision:
         """Internal enterprise channels (Slack, Teams, Eval, API)."""
-        # 0. Check standard greeting intent
-        if self._is_greeting(query):
-            decision = RouteDecision(
-                agent_name="aiops",
-                confidence=0.98,
-                matched_intent="greeting",
-                routing_method="rule_greeting",
-                reasoning="Matched standard greeting in internal channel",
-            )
-            logger.debug(
-                "Internal greeting rule matched",
-                extra={
-                    "event": "routing.rule.internal.greeting",
-                    "agent_name": decision.agent_name,
-                    "confidence": decision.confidence,
-                    "routing_method": decision.routing_method,
-                    "matched_intent": decision.matched_intent,
-                },
-            )
-            return decision
-
-        # Check informational query prefix early
         informational_match = self._match_informational(query)
 
         # 1. Security & Compliance
         security_matches = self._match_keywords(query, self.SECURITY_KEYWORDS)
         if security_matches or self.SECURITY_REGEX.search(query):
-            confidence = (
-                0.95 if (len(security_matches) >= 2 or self.SECURITY_REGEX.search(query)) else 0.88
-            )
+            confidence = 0.95 if (len(security_matches) >= 2 or self.SECURITY_REGEX.search(query)) else 0.88
             intent = "informational" if informational_match else "security_compliance"
             method = "rule_informational" if informational_match else "rule_pattern"
-            meta = (
-                {
-                    "is_informational": True,
-                    "category": informational_match[1],
-                    "matched_prefix": informational_match[0],
-                    "domain": "security",
-                }
-                if informational_match
-                else {}
-            )
-            decision = RouteDecision(
+            return RouteDecision(
                 agent_name="security",
                 confidence=confidence,
                 matched_intent=intent,
                 routing_method=method,
                 reasoning=f"Matched security keywords: {security_matches}",
-                metadata=meta,
+                metadata={"is_informational": True, "domain": "security"} if informational_match else {},
             )
-            logger.debug(
-                "Internal security rule matched",
-                extra={
-                    "event": "routing.rule.internal.matched",
-                    "agent_name": decision.agent_name,
-                    "confidence": decision.confidence,
-                    "routing_method": decision.routing_method,
-                    "matched_intent": decision.matched_intent,
-                },
-            )
-            return decision
 
         # 2. QA & Automated Testing
-        qa_matches = self._match_keywords(query, self.QA_KEYWORDS)
-        if qa_matches:
-            confidence = 0.95 if len(qa_matches) >= 2 else 0.88
-            intent = "informational" if informational_match else "qa_testing"
-            method = "rule_informational" if informational_match else "rule_pattern"
-            meta = (
-                {
-                    "is_informational": True,
-                    "category": informational_match[1],
-                    "matched_prefix": informational_match[0],
-                    "domain": "qa",
-                }
-                if informational_match
-                else {}
-            )
-            decision = RouteDecision(
+        if self.QA_REGEX.search(query):
+            matches = self.QA_REGEX.findall(query)
+            return RouteDecision(
                 agent_name="qa",
-                confidence=confidence,
-                matched_intent=intent,
-                routing_method=method,
-                reasoning=f"Matched QA keywords: {qa_matches}",
-                metadata=meta,
+                confidence=0.95,
+                matched_intent="informational" if informational_match else "qa_testing",
+                routing_method="rule_informational" if informational_match else "rule_pattern",
+                reasoning=f"Matched QA pattern: {matches}",
+                metadata={"is_informational": True, "domain": "qa"} if informational_match else {},
             )
-            logger.debug(
-                "Internal QA rule matched",
-                extra={
-                    "event": "routing.rule.internal.matched",
-                    "agent_name": decision.agent_name,
-                    "confidence": decision.confidence,
-                    "routing_method": decision.routing_method,
-                    "matched_intent": decision.matched_intent,
-                },
-            )
-            return decision
 
         # 3. Customer & Smart Locker
-        customer_matches = self._match_keywords(query, self.CUSTOMER_KEYWORDS)
-        if customer_matches or self.CUSTOMER_REGEX.search(query):
-            confidence = (
-                0.95 if (len(customer_matches) >= 2 or self.CUSTOMER_REGEX.search(query)) else 0.88
-            )
-            intent = "informational" if informational_match else "customer_locker"
-            method = "rule_informational" if informational_match else "rule_pattern"
-            meta = (
-                {
-                    "is_informational": True,
-                    "category": informational_match[1],
-                    "matched_prefix": informational_match[0],
-                    "domain": "customer",
-                }
-                if informational_match
-                else {}
-            )
-            decision = RouteDecision(
+        if self.CUSTOMER_REGEX.search(query) or self.CUSTOMER_ACTION_REGEX.search(query):
+            return RouteDecision(
                 agent_name="customer",
-                confidence=confidence,
-                matched_intent=intent,
-                routing_method=method,
-                reasoning=f"Matched customer keywords: {customer_matches}",
-                metadata=meta,
+                confidence=0.95,
+                matched_intent="informational" if informational_match else "customer_locker",
+                routing_method="rule_informational" if informational_match else "rule_pattern",
+                reasoning="Matched customer locker pattern or identifier",
+                metadata={"is_informational": True, "domain": "customer"} if informational_match else {},
             )
-            logger.debug(
-                "Internal customer rule matched",
-                extra={
-                    "event": "routing.rule.internal.matched",
-                    "agent_name": decision.agent_name,
-                    "confidence": decision.confidence,
-                    "routing_method": decision.routing_method,
-                    "matched_intent": decision.matched_intent,
-                },
-            )
-            return decision
 
         # 4. SRE & AIOps
         aiops_matches = self._match_keywords(query, self.AIOPS_KEYWORDS)
         if aiops_matches or self.AIOPS_REGEX.search(query):
-            confidence = (
-                0.95 if (len(aiops_matches) >= 2 or self.AIOPS_REGEX.search(query)) else 0.88
-            )
-            intent = "informational" if informational_match else "aiops_sre"
-            method = "rule_informational" if informational_match else "rule_pattern"
-            meta = (
-                {
-                    "is_informational": True,
-                    "category": informational_match[1],
-                    "matched_prefix": informational_match[0],
-                    "domain": "aiops",
-                }
-                if informational_match
-                else {}
-            )
-            decision = RouteDecision(
+            confidence = 0.95 if (len(aiops_matches) >= 2 or self.AIOPS_REGEX.search(query)) else 0.88
+            return RouteDecision(
                 agent_name="aiops",
                 confidence=confidence,
-                matched_intent=intent,
-                routing_method=method,
-                reasoning=f"Matched AIOps keywords: {aiops_matches}",
-                metadata=meta,
+                matched_intent="informational" if informational_match else "aiops_sre",
+                routing_method="rule_informational" if informational_match else "rule_pattern",
+                reasoning=f"Matched AIOps keywords or pattern: {aiops_matches}",
+                metadata={"is_informational": True, "domain": "aiops"} if informational_match else {},
             )
-            logger.debug(
-                "Internal AIOps rule matched",
-                extra={
-                    "event": "routing.rule.internal.matched",
-                    "agent_name": decision.agent_name,
-                    "confidence": decision.confidence,
-                    "routing_method": decision.routing_method,
-                    "matched_intent": decision.matched_intent,
-                },
-            )
-            return decision
 
         # 5. Developer & DevOps
-        developer_matches = self._match_keywords(query, self.DEVELOPER_KEYWORDS)
-        if developer_matches:
-            confidence = 0.95 if len(developer_matches) >= 2 else 0.88
-            intent = "informational" if informational_match else "developer_devops"
-            method = "rule_informational" if informational_match else "rule_pattern"
-            meta = (
-                {
-                    "is_informational": True,
-                    "category": informational_match[1],
-                    "matched_prefix": informational_match[0],
-                    "domain": "developer",
-                }
-                if informational_match
-                else {}
-            )
-            decision = RouteDecision(
+        if self.DEVELOPER_REGEX.search(query):
+            matches = self.DEVELOPER_REGEX.findall(query)
+            return RouteDecision(
                 agent_name="developer",
-                confidence=confidence,
-                matched_intent=intent,
-                routing_method=method,
-                reasoning=f"Matched developer keywords: {developer_matches}",
-                metadata=meta,
+                confidence=0.95,
+                matched_intent="informational" if informational_match else "developer_devops",
+                routing_method="rule_informational" if informational_match else "rule_pattern",
+                reasoning=f"Matched developer pattern: {matches}",
+                metadata={"is_informational": True, "domain": "developer"} if informational_match else {},
             )
-            logger.debug(
-                "Internal developer rule matched",
-                extra={
-                    "event": "routing.rule.internal.matched",
-                    "agent_name": decision.agent_name,
-                    "confidence": decision.confidence,
-                    "routing_method": decision.routing_method,
-                    "matched_intent": decision.matched_intent,
-                },
-            )
-            return decision
 
-        # 6. Check General Informational query without domain keywords
+        # 6. General Informational query without domain keywords
         if informational_match:
-            decision = RouteDecision(
+            return RouteDecision(
                 agent_name="aiops",
                 confidence=0.88,
                 matched_intent="informational",
@@ -1204,35 +733,12 @@ class RuleBasedRouter(BaseIntentRouter):
                     "matched_prefix": informational_match[0],
                 },
             )
-            logger.debug(
-                f"Internal informational rule matched: category='{informational_match[1]}'",
-                extra={
-                    "event": "routing.rule.internal.informational",
-                    "agent_name": decision.agent_name,
-                    "confidence": decision.confidence,
-                    "routing_method": decision.routing_method,
-                    "matched_intent": decision.matched_intent,
-                    "category": informational_match[1],
-                },
-            )
-            return decision
 
-        # Default fallback for internal channels
-        decision = RouteDecision(
+        # Default fallback for internal channels (low confidence to delegate to SemanticRouter)
+        return RouteDecision(
             agent_name="aiops",
             confidence=0.40,
             matched_intent="general_fallback",
             routing_method="fallback",
-            reasoning="No specific keyword matched; fallback to default AIOps agent",
+            reasoning="No specific pattern matched; fallback to default AIOps agent",
         )
-        logger.debug(
-            "Internal channel fallback evaluated",
-            extra={
-                "event": "routing.rule.internal.fallback",
-                "agent_name": decision.agent_name,
-                "confidence": decision.confidence,
-                "routing_method": decision.routing_method,
-                "matched_intent": decision.matched_intent,
-            },
-        )
-        return decision

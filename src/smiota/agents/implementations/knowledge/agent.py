@@ -1,4 +1,5 @@
 """Knowledge Assistant Agent: Grounded Smiota Product, Hardware, Solution & Integration QA."""
+
 import re
 from typing import ClassVar
 
@@ -24,10 +25,16 @@ class KnowledgeAssistantAgent(BaseAgent):
     """
 
     PRIVATE_DATA_PATTERNS: ClassVar[list[re.Pattern[str]]] = [
-        re.compile(r"\b(where is my (package|parcel|delivery)|my package|my delivery)\b", re.IGNORECASE),
-        re.compile(r"\b(my pin|my qr code|locker pin|pickup code|door pin|pickup pin)\b", re.IGNORECASE),
+        re.compile(
+            r"\b(where is my (package|parcel|delivery)|my package|my delivery)\b", re.IGNORECASE
+        ),
+        re.compile(
+            r"\b(my pin|my qr code|locker pin|pickup code|door pin|pickup pin)\b", re.IGNORECASE
+        ),
         re.compile(r"\b(open locker|unlock door|open door|door #\d+|locker #\d+)\b", re.IGNORECASE),
-        re.compile(r"\b(tenant account|resident account|look up account|resident profile)\b", re.IGNORECASE),
+        re.compile(
+            r"\b(tenant account|resident account|look up account|resident profile)\b", re.IGNORECASE
+        ),
     ]
 
     CARRIER_TRACKING_PATTERNS: ClassVar[list[re.Pattern[str]]] = [
@@ -172,11 +179,21 @@ class KnowledgeAssistantAgent(BaseAgent):
             },
         )
 
-        suggested_actions = [
-            "Book a Demo (https://smiota.com/contact/)",
-            "Get a Quote (https://smiota.com/get-quote/)",
-            "Contact Sales (sales@smiota.com)",
-        ]
+        # Suggested action pills (commented out for webchat channel)
+        # suggested_actions = [
+        #     "Book a Demo (https://smiota.com/contact/)",
+        #     "Get a Quote (https://smiota.com/get-quote/)",
+        #     "Contact Sales (sales@smiota.com)",
+        # ]
+        suggested_actions = (
+            []
+            if context.channel == "webchat"
+            else [
+                "Book a Demo (https://smiota.com/contact/)",
+                "Get a Quote (https://smiota.com/get-quote/)",
+                "Contact Sales (sales@smiota.com)",
+            ]
+        )
 
         return AgentResult(
             agent_name=self.name,
@@ -187,7 +204,9 @@ class KnowledgeAssistantAgent(BaseAgent):
                 "is_grounded": True,
                 "retrieved_chunks_count": len(scored_chunks),
                 "sources": [
-                    c.chunk.metadata.get("canonical_url") or c.chunk.metadata.get("source_url") or c.chunk.title
+                    c.chunk.metadata.get("canonical_url")
+                    or c.chunk.metadata.get("source_url")
+                    or c.chunk.title
                     for c in scored_chunks
                 ],
             },
