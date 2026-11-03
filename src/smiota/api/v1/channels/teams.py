@@ -12,8 +12,10 @@ import os
 import re
 import time
 import uuid
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
+
 import httpx
+import jwt
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 
@@ -25,8 +27,105 @@ from smiota.core.logging import correlation_id_ctx, logger
 
 router = APIRouter(prefix="/teams", tags=["Channels - Microsoft Teams"])
 
+# Inbound Bot Framework OpenID / JWKS validation clients
+_BOTFRAMEWORK_JWKS_CLIENT = jwt.PyJWKClient(
+    "https://login.botframework.com/v1/.well-known/keys",
+    cache_jwk_set=True,
+    lifespan=86400,
+)
+_AAD_JWKS_CLIENT = jwt.PyJWKClient(
+    "https://login.microsoftonline.com/common/discovery/v2.0/keys",
+    cache_jwk_set=True,
+    lifespan=86400,
+)
+
+
+def _verify_inbound_request(
+    request: Request,
+    payload: dict[str, Any],
+    app_id: str,
+    configured_tid: str | None = None,
+) -> tuple[bool, str | None, dict[str, Any] | None]:
+    """Cryptographically verify incoming Bot Framework JWT token and enforce tenant allowlist."""
+    settings = get_settings()
+
+    # 1. Check if inbound JWT validation is enforced in this environment
+    if not getattr(settings, "TEAMS_VALIDATE_INBOUND_JWT", True):
+        logger.debug(
+            "Inbound Teams JWT validation is disabled (TEAMS_VALIDATE_INBOUND_JWT=False). Permitting request."
+        )
+        return True, None, {}
+
+    # 2. Extract Authorization header
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        # If in dev or test mode and no auth header, permit if configured
+        if getattr(settings, "ENVIRONMENT", "").lower() in ("development", "test", "dev"):
+            logger.warning(
+                "⚠️ [0. TEAMS AUTH] No Bearer token provided, but running in development mode. Allowing request."
+            )
+            return True, None, {}
+        logger.warning("❌ [0. TEAMS AUTH REJECTED] Missing or invalid Authorization header on webhook call")
+        return False, "Missing or invalid Authorization header", None
+
+    token = auth_header.split(" ", 1)[1].strip()
+
+    # 3. Decode unverified claims to verify audience (app_id)
+    try:
+        unverified_claims = jwt.decode(token, options={"verify_signature": False})
+    except Exception as err:
+        logger.warning(f"❌ [0. TEAMS AUTH REJECTED] Invalid JWT format: {err}")
+        return False, f"Malformed JWT: {err}", None
+
+    token_aud = unverified_claims.get("aud")
+    if token_aud != app_id:
+        logger.warning(
+            f"❌ [0. TEAMS AUTH REJECTED] Token audience mismatch: expected '{app_id}', got '{token_aud}'"
+        )
+        return False, f"Token audience mismatch (expected {app_id})", None
+
+    # 4. Verify cryptographic signature against Microsoft's public JWKS keys
+    decoded_claims = None
+    verification_error = None
+    for jwks_client in (_BOTFRAMEWORK_JWKS_CLIENT, _AAD_JWKS_CLIENT):
+        try:
+            signing_key = jwks_client.get_signing_key_from_jwt(token)
+            decoded_claims = jwt.decode(
+                token,
+                signing_key.key,
+                algorithms=["RS256"],
+                audience=app_id,
+                options={"verify_exp": True},
+            )
+            break
+        except Exception as err:
+            verification_error = err
+            continue
+
+    if not decoded_claims:
+        logger.warning(
+            f"❌ [0. TEAMS AUTH REJECTED] JWT signature verification failed against Microsoft JWKS: {verification_error}"
+        )
+        return False, f"JWT signature verification failed: {verification_error}", None
+
+    # 5. Enforce Tenant Allowlist
+    if getattr(settings, "TEAMS_ENFORCE_TENANT_ID", True) and configured_tid:
+        incoming_tid = _resolve_tenant_id(payload=payload, service_url=payload.get("serviceUrl"))
+        token_tid = decoded_claims.get("tid")
+        effective_tid = incoming_tid or token_tid
+        if effective_tid and effective_tid != configured_tid:
+            logger.warning(
+                f"❌ [0. TEAMS TENANT REJECTED] Tenant ID mismatch: incoming '{effective_tid}' != authorized '{configured_tid}'"
+            )
+            return False, f"Tenant ID '{effective_tid}' is not authorized", decoded_claims
+
+    logger.info(
+        f"✅ [0. TEAMS INBOUND AUTH VERIFIED] Microsoft JWT signature & Tenant verified (AppId: {app_id})"
+    )
+    return True, None, decoded_claims
+
 # In-memory token cache: app_id -> (access_token, expiry_timestamp)
-_BOT_TOKEN_CACHE: Dict[str, Tuple[str, float]] = {}
+_BOT_TOKEN_CACHE: dict[str, tuple[str, float]] = {}
 
 
 def _clean_teams_text(raw_text: str) -> str:
@@ -38,7 +137,9 @@ def _clean_teams_text(raw_text: str) -> str:
     return cleaned.strip()
 
 
-def _resolve_tenant_id(payload: Optional[Dict[str, Any]] = None, service_url: Optional[str] = None) -> Optional[str]:
+def _resolve_tenant_id(
+    payload: dict[str, Any] | None = None, service_url: str | None = None
+) -> str | None:
     """Resolve Microsoft Entra ID Tenant ID from payload, service URL, or environment."""
     if payload:
         tenant_from_channel = payload.get("channelData", {}).get("tenant", {}).get("id")
@@ -51,13 +152,17 @@ def _resolve_tenant_id(payload: Optional[Dict[str, Any]] = None, service_url: Op
                 return part
 
     settings = get_settings()
-    configured_tid = getattr(settings, "MICROSOFT_APP_TENANT_ID", None) or os.getenv("MICROSOFT_APP_TENANT_ID")
+    configured_tid = getattr(settings, "MICROSOFT_APP_TENANT_ID", None) or os.getenv(
+        "MICROSOFT_APP_TENANT_ID"
+    )
     if configured_tid:
         return str(configured_tid).strip()
     return None
 
 
-async def _get_bot_framework_token(app_id: str, app_password: str, tenant_id: Optional[str] = None) -> Optional[str]:
+async def _get_bot_framework_token(
+    app_id: str, app_password: str, tenant_id: str | None = None
+) -> str | None:
     """Obtain a Bearer token from Microsoft Bot Framework / Entra ID OAuth endpoint."""
     now = time.time()
     authority = tenant_id or "botframework.com"
@@ -88,14 +193,18 @@ async def _get_bot_framework_token(app_id: str, app_password: str, tenant_id: Op
                     token = data.get("access_token")
                     expires_in = data.get("expires_in", 3600)
                     _BOT_TOKEN_CACHE[cache_key] = (token, now + expires_in)
-                    logger.info(f"Successfully acquired Microsoft Bot Framework OAuth token [authority={auth_target}]")
+                    logger.info(
+                        f"Successfully acquired Microsoft Bot Framework OAuth token [authority={auth_target}]"
+                    )
                     return token
                 else:
                     logger.warning(
                         f"Failed to fetch Microsoft Bot token from {auth_target}: HTTP {resp.status_code} - {resp.text}"
                     )
             except Exception as e:
-                logger.error(f"Exception fetching Microsoft Bot token from {auth_target}: {e}", exc_info=True)
+                logger.error(
+                    f"Exception fetching Microsoft Bot token from {auth_target}: {e}", exc_info=True
+                )
 
     return None
 
@@ -103,10 +212,10 @@ async def _get_bot_framework_token(app_id: str, app_password: str, tenant_id: Op
 async def _post_reply_to_teams(
     service_url: str,
     conversation_id: str,
-    reply_activity: Dict[str, Any],
+    reply_activity: dict[str, Any],
     app_id: str,
     app_password: str,
-    tenant_id: Optional[str] = None,
+    tenant_id: str | None = None,
 ) -> bool:
     """Send an activity message back to Teams via the Bot Connector REST API."""
     if not app_password:
@@ -132,7 +241,9 @@ async def _post_reply_to_teams(
     # 2. Direct conversation endpoint: POST /v3/conversations/{conversationId}/activities
     endpoints = []
     if reply_to_id:
-        endpoints.append(f"{clean_service_url}/v3/conversations/{conversation_id}/activities/{reply_to_id}")
+        endpoints.append(
+            f"{clean_service_url}/v3/conversations/{conversation_id}/activities/{reply_to_id}"
+        )
     endpoints.append(f"{clean_service_url}/v3/conversations/{conversation_id}/activities")
 
     try:
@@ -159,7 +270,7 @@ async def _post_reply_to_teams(
 async def ms_teams_webhook(
     request: Request,
     orchestrator: AgentOrchestrator = Depends(get_orchestrator),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Handles incoming MS Teams conversation activities and dispatches them to Smiota Agents."""
     try:
         payload = await request.json()
@@ -177,7 +288,11 @@ async def ms_teams_webhook(
     bot_recipient = payload.get("recipient", {})
 
     settings = get_settings()
-    app_id = settings.MICROSOFT_APP_ID or os.getenv("MICROSOFT_APP_ID") or "c93bfc04-2bf6-4c89-b04f-5d4ef6aa734a"
+    app_id = (
+        settings.MICROSOFT_APP_ID
+        or os.getenv("MICROSOFT_APP_ID")
+        or "c93bfc04-2bf6-4c89-b04f-5d4ef6aa734a"
+    )
     app_password = settings.MICROSOFT_APP_PASSWORD or os.getenv("MICROSOFT_APP_PASSWORD")
     tenant_id = _resolve_tenant_id(payload=payload, service_url=service_url)
 
@@ -191,6 +306,20 @@ async def ms_teams_webhook(
         corr_id = f"corr-{uuid.uuid4().hex[:12]}"
         correlation_id_ctx.set(corr_id)
 
+    # Authenticate inbound Microsoft Teams request
+    is_authenticated, auth_err, _ = _verify_inbound_request(
+        request=request,
+        payload=payload,
+        app_id=app_id,
+        configured_tid=tenant_id,
+    )
+    if not is_authenticated:
+        status_code = 403 if "Tenant" in str(auth_err) else 401
+        return JSONResponse(
+            status_code=status_code,
+            content={"error": f"{'Forbidden' if status_code == 403 else 'Unauthorized'}: {auth_err}"},
+        )
+
     logger.info(
         f"👉 [1. TEAMS INGRESS] Activity received [type='{activity_type}'] from user '{user_name}' (ID: {user_id}) | "
         f"Conv: '{conversation_id}' | ServiceUrl: {service_url} | HasPassword: {bool(app_password)}"
@@ -203,13 +332,17 @@ async def ms_teams_webhook(
 
     # 1. Handle member added / conversation update
     if activity_type == "conversationUpdate":
-        logger.info(f"MS Teams conversationUpdate event acknowledged [user='{user_name}', conv='{conversation_id}']")
+        logger.info(
+            f"MS Teams conversationUpdate event acknowledged [user='{user_name}', conv='{conversation_id}']"
+        )
         welcome_text = (
-            f"Hello {user_name}! 👋 I am your Smiota Assistant for Microsoft Teams.\n\n"
+            f"Hello {user_name}! 👋 I am your Smiota DevOps & SRE Assistant for Microsoft Teams.\n\n"
             "I can help you with:\n"
-            "• 🔍 **AIOps & SRE**: Cluster health, pod metrics, Prometheus alerts, incident RCA\n"
-            "• 📦 **Smart Lockers**: Parcel tracking, locker doors, and pickup diagnostics\n"
-            "• 🛡️ **DevSecOps**: Security scans, dependency audits, and deployments"
+            "• ☸️ **Kubernetes Inspection**: Clusters, namespaces, nodes, pods, deployments, services, ingresses, configmaps, secrets metadata, HPAs, and quotas\n"
+            "• 🩺 **SRE Troubleshooting**: Deep RCA for CrashLoopBackOff, ImagePullBackOff, pending pods, node conditions, PVC storage, internal DNS, and network connectivity\n"
+            "• 📊 **AIOps & Observability**: Cluster health, live Prometheus telemetry, 5xx error rates, latency analysis, and container logs\n"
+            "• 🛡️ **DevSecOps**: Security scans, dependency audits, and CI/CD pipelines\n"
+            "• 📦 **Smart Lockers**: Parcel tracking and locker diagnostics"
         )
         reply_activity = {
             "type": "message",
@@ -303,7 +436,9 @@ async def ms_teams_webhook(
                 )
             return reply_activity
         except Exception as err:
-            logger.error(f"Error processing Teams message through orchestrator: {err}", exc_info=True)
+            logger.error(
+                f"Error processing Teams message through orchestrator: {err}", exc_info=True
+            )
             err_activity = {
                 "type": "message",
                 "from": bot_sender,

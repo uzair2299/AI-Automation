@@ -1,17 +1,7 @@
-"""Observability tool client bindings for AIOps Agent."""
-from smiota.mcp.servers.observability.tools import (
-    query_prometheus_metrics,
-    search_opensearch_logs,
-    restart_gke_deployment,
-    get_pod_restart_reason,
-    query_http_error_rates,
-    query_latency_metrics,
-    correlate_deployment_with_incident,
-    get_recent_system_changes,
-    get_service_logs,
-)
+"""Observability and Kubernetes tool client bindings for AIOps Agent."""
 
 AIOPS_BOUND_TOOLS = [
+    # Live Telemetry & Observability
     "query_prometheus_metrics",
     "search_opensearch_logs",
     "restart_gke_deployment",
@@ -21,5 +11,43 @@ AIOPS_BOUND_TOOLS = [
     "correlate_deployment_with_incident",
     "get_recent_system_changes",
     "get_service_logs",
+    # 1. Kubernetes Inspection Tools (22 tools)
+    "list_clusters",
+    "get_cluster_info",
+    "list_namespaces",
+    "get_namespace",
+    "list_nodes",
+    "get_node_details",
+    "list_pods",
+    "get_pod_details",
+    "get_pod_logs",
+    "get_pod_previous_logs",
+    "list_deployments",
+    "get_deployment_details",
+    "list_statefulsets",
+    "list_daemonsets",
+    "list_services",
+    "list_ingresses",
+    "list_configmaps",
+    "list_secrets_metadata",
+    "list_events",
+    "get_pod_metrics",
+    "get_resource_quotas",
+    "get_hpa_status",
+    # 2. Kubernetes Troubleshooting Tools (15 tools)
+    "diagnose_pod",
+    "diagnose_crashloop",
+    "diagnose_image_pull",
+    "diagnose_pending_pod",
+    "diagnose_node",
+    "diagnose_deployment",
+    "diagnose_service",
+    "diagnose_ingress",
+    "analyze_pod_events",
+    "analyze_container_logs",
+    "check_pod_restarts",
+    "check_resource_pressure",
+    "check_pvc_status",
+    "check_dns_resolution",
+    "check_network_connectivity",
 ]
-

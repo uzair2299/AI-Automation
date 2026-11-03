@@ -78,3 +78,58 @@ async def test_ms_teams_webhook_dispatches_to_service_url():
             assert call_kwargs["service_url"] == "https://smba.trafficmanager.net/amer/"
             assert call_kwargs["conversation_id"] == "a:conv-personal"
             assert call_kwargs["reply_activity"]["text"]
+
+
+
+@pytest.mark.asyncio
+async def test_ms_teams_inbound_auth_enforcement():
+    """Verify inbound JWT validation rejects missing headers and untrusted tenants in production mode."""
+    app = create_app()
+    transport = ASGITransport(app=app)
+    
+    with patch("smiota.api.v1.channels.teams.get_settings") as mock_settings:
+        from smiota.core.config import ProductionSettings
+        prod_settings = ProductionSettings()
+        prod_settings.TEAMS_VALIDATE_INBOUND_JWT = True
+        prod_settings.TEAMS_ENFORCE_TENANT_ID = True
+        prod_settings.ENVIRONMENT = "production"
+        mock_settings.return_value = prod_settings
+
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            payload = {
+                "type": "message",
+                "from": {"id": "29:attacker", "name": "Attacker"},
+                "conversation": {"id": "19:conv"},
+                "text": "Unauthorized injection attempt",
+            }
+            # Missing Authorization header -> 401 Unauthorized
+            res_missing_auth = await client.post("/api/v1/channels/teams/webhook", json=payload)
+            assert res_missing_auth.status_code == 401
+            assert "Unauthorized" in res_missing_auth.json()["error"]
+
+            # Malformed Bearer token -> 401 Unauthorized
+            res_malformed = await client.post(
+                "/api/v1/channels/teams/webhook",
+                json=payload,
+                headers={"Authorization": "Bearer not-a-valid-jwt"}
+            )
+            assert res_malformed.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_ms_teams_tenant_isolation_guard():
+    """Verify inbound request is rejected if tenant ID does not match corporate tenant."""
+    app = create_app()
+    transport = ASGITransport(app=app)
+    
+    with patch("smiota.api.v1.channels.teams._verify_inbound_request") as mock_verify:
+        mock_verify.return_value = (False, "Tenant ID 'foreign-tenant-xyz' is not authorized", None)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            payload = {
+                "type": "message",
+                "channelData": {"tenant": {"id": "foreign-tenant-xyz"}},
+                "text": "Hello from foreign tenant",
+            }
+            res_tenant_reject = await client.post("/api/v1/channels/teams/webhook", json=payload)
+            assert res_tenant_reject.status_code == 403
+            assert "Forbidden" in res_tenant_reject.json()["error"]

@@ -1,20 +1,33 @@
 """AIOps Agent: Real-time Incident Investigation, Live Metrics, and GKE Diagnostics."""
+
 import re
-from smiota.agents.base import BaseAgent, AgentContext, AgentResult
-from smiota.agents.routing.rules import GREETINGS
-from smiota.schemas.agents import AgentCapability
+
+from smiota.agents.base import AgentContext, AgentResult, BaseAgent
 from smiota.agents.implementations.aiops.prompts import AIOPS_SYSTEM_PROMPT
 from smiota.agents.implementations.aiops.tools import AIOPS_BOUND_TOOLS
+from smiota.agents.routing.rules import GREETINGS
+from smiota.core.logging import logger
+from smiota.mcp.servers.devops.k8s_tools import (
+    check_dns_resolution,
+    check_network_connectivity,
+    check_pvc_status,
+    diagnose_image_pull,
+    diagnose_node,
+    diagnose_pending_pod,
+    get_cluster_info,
+    list_clusters,
+    list_namespaces,
+)
 from smiota.mcp.servers.observability.tools import (
-    get_pod_restart_reason,
-    get_cluster_pod_counts,
-    query_http_error_rates,
-    query_latency_metrics,
     correlate_deployment_with_incident,
+    get_cluster_pod_counts,
+    get_pod_restart_reason,
     get_recent_system_changes,
     get_service_logs,
+    query_http_error_rates,
+    query_latency_metrics,
 )
-from smiota.core.logging import logger
+from smiota.schemas.agents import AgentCapability
 
 
 class AIOpsAgent(BaseAgent):
@@ -26,14 +39,46 @@ class AIOpsAgent(BaseAgent):
             description="Specialized in incident investigation, live metrics analysis, and GKE diagnostics.",
             domain="aiops",
             capabilities=[
-                AgentCapability(name="metric_analysis", description="Inspect live Prometheus and GCP metrics"),
-                AgentCapability(name="log_correlation", description="Correlate logs across OpenSearch and Cloud Logging"),
-                AgentCapability(name="pod_crash_investigation", description="Diagnose Kubernetes pod status, exit codes, and resource metrics"),
-                AgentCapability(name="http_error_investigation", description="Inspect live HTTP 5xx error rates and endpoint health"),
-                AgentCapability(name="latency_investigation", description="Analyze live latency percentiles and subsystem performance"),
-                AgentCapability(name="deployment_correlation", description="Correlate deployments and rollouts with live telemetry"),
-                AgentCapability(name="change_audit", description="Audit real GCP Cloud Audit and ConfigMap mutation events"),
-                AgentCapability(name="remediation_dispatch", description="Propose and execute approved cluster remediation", access_level="remediation"),
+                AgentCapability(
+                    name="metric_analysis", description="Inspect live Prometheus and GCP metrics"
+                ),
+                AgentCapability(
+                    name="log_correlation",
+                    description="Correlate logs across OpenSearch and Cloud Logging",
+                ),
+                AgentCapability(
+                    name="pod_crash_investigation",
+                    description="Diagnose Kubernetes pod status, exit codes, and resource metrics",
+                ),
+                AgentCapability(
+                    name="http_error_investigation",
+                    description="Inspect live HTTP 5xx error rates and endpoint health",
+                ),
+                AgentCapability(
+                    name="latency_investigation",
+                    description="Analyze live latency percentiles and subsystem performance",
+                ),
+                AgentCapability(
+                    name="deployment_correlation",
+                    description="Correlate deployments and rollouts with live telemetry",
+                ),
+                AgentCapability(
+                    name="change_audit",
+                    description="Audit real GCP Cloud Audit and ConfigMap mutation events",
+                ),
+                AgentCapability(
+                    name="remediation_dispatch",
+                    description="Propose and execute approved cluster remediation",
+                    access_level="remediation",
+                ),
+                AgentCapability(
+                    name="k8s_cluster_inspection",
+                    description="Inspect live Kubernetes clusters, namespaces, pods, deployments, and services",
+                ),
+                AgentCapability(
+                    name="k8s_sre_troubleshooting",
+                    description="SRE root cause analysis for CrashLoopBackOff, ImagePullBackOff, pending pods, and network issues",
+                ),
             ],
             system_prompt=AIOPS_SYSTEM_PROMPT,
             bound_tools=AIOPS_BOUND_TOOLS,
@@ -52,11 +97,13 @@ class AIOpsAgent(BaseAgent):
                 "user_id": context.user_id,
                 "channel": context.channel,
                 "query": query,
-            }
+            },
         )
 
         # 1. Greetings & Welcome
-        if clean_q in GREETINGS or any(clean_q == w or clean_q.startswith(w + " ") for w in GREETINGS):
+        if clean_q in GREETINGS or any(
+            clean_q == w or clean_q.startswith(w + " ") for w in GREETINGS
+        ):
             return AgentResult(
                 agent_name=self.name,
                 content="Hello! 👋 I'm your Smiota AIOps & SRE Assistant. How can I assist you with infrastructure, live telemetry, or cluster diagnostics today?",
@@ -69,9 +116,41 @@ class AIOpsAgent(BaseAgent):
             )
 
         # 2. Differentiate Investigation vs. Mutating Remediation Action
-        is_investigation = (
-            any(q.startswith(p) for p in ["why", "what", "how", "is ", "are ", "did ", "explain", "diagnose", "investigate", "tell me why", "check", "show", "query"])
-            or any(kw in q for kw in ["why is", "why are", "why did", "what caused", "what changed", "reason", "diagnose", "investigate", "crashloop", "restarting", "crashing", "did the", "logs", "metrics"])
+        is_investigation = any(
+            q.startswith(p)
+            for p in [
+                "why",
+                "what",
+                "how",
+                "is ",
+                "are ",
+                "did ",
+                "explain",
+                "diagnose",
+                "investigate",
+                "tell me why",
+                "check",
+                "show",
+                "query",
+            ]
+        ) or any(
+            kw in q
+            for kw in [
+                "why is",
+                "why are",
+                "why did",
+                "what caused",
+                "what changed",
+                "reason",
+                "diagnose",
+                "investigate",
+                "crashloop",
+                "restarting",
+                "crashing",
+                "did the",
+                "logs",
+                "metrics",
+            ]
         )
 
         is_mutating_action = (
@@ -82,7 +161,9 @@ class AIOpsAgent(BaseAgent):
 
         # 3. Mutating Remediation (Requires Human Approval)
         if is_mutating_action:
-            logger.warning(f"🛑 [AIOPS SRE GATE] Mutating action identified: '{query}' -> Halting for SRE Authorization Card")
+            logger.warning(
+                f"🛑 [AIOPS SRE GATE] Mutating action identified: '{query}' -> Halting for SRE Authorization Card"
+            )
             deployment_name = "smiota-agent-core-api"
             if "payment" in q:
                 deployment_name = "payments-service"
@@ -103,11 +184,18 @@ class AIOpsAgent(BaseAgent):
                     "deployment_name": deployment_name,
                     "reason": f"Triggered by user request: {query}",
                 },
-                suggested_actions=["Wait for SRE/Admin approval", "Review Grafana error rates post-rollout"],
+                suggested_actions=[
+                    "Wait for SRE/Admin approval",
+                    "Review Grafana error rates post-rollout",
+                ],
             )
 
         # 4. SCENARIO 1: Pod Restarts Investigation
-        if ("restart" in q or "crash" in q or "oom" in q or "smiotaserver" in q) and is_investigation and not ("log" in q or "logs" in q):
+        if (
+            ("restart" in q or "crash" in q or "oom" in q or "smiotaserver" in q)
+            and is_investigation
+            and not ("log" in q or "logs" in q)
+        ):
             service_name = "smiotaserver"
             if "payment" in q:
                 service_name = "payments-service"
@@ -180,19 +268,29 @@ class AIOpsAgent(BaseAgent):
                 suggested_actions=[
                     f"Query Prometheus memory metrics for {service_name}",
                     f"Check pod CPU usage for {service_name}",
-                    f"View pod details in Grafana",
+                    "View pod details in Grafana",
                 ],
             )
 
         # 5. SCENARIO 2: HTTP 5xx Error Spike Investigation
-        if ("5xx" in q or "500" in q or "504" in q or "error rate" in q or "error spike" in q or "errors increase" in q) and is_investigation:
+        if (
+            "5xx" in q
+            or "500" in q
+            or "504" in q
+            or "error rate" in q
+            or "error spike" in q
+            or "errors increase" in q
+        ) and is_investigation:
             service_name = "smiota-agent-core-api"
             http_telemetry = await query_http_error_rates(service_name=service_name)
             rate_str = http_telemetry.get("current_5xx_rate", "0.00%")
             data_source = http_telemetry.get("data_source", "Live Prometheus")
             has_errors = http_telemetry.get("has_active_errors", False)
 
-            if http_telemetry.get("status") == "unreachable" or http_telemetry.get("is_reachable") is False:
+            if (
+                http_telemetry.get("status") == "unreachable"
+                or http_telemetry.get("is_reachable") is False
+            ):
                 content = (
                     f"### ⚠️ Live Prometheus Telemetry Notice: Production API Error Rates\n\n"
                     f"**Status:** **Prometheus Unreachable from Current Environment**\n"
@@ -235,7 +333,9 @@ class AIOpsAgent(BaseAgent):
             )
 
         # 6. SCENARIO 3: API Latency Increase Investigation
-        if ("latency" in q or "slow" in q or "p95" in q or "p99" in q or "response time" in q) and is_investigation:
+        if (
+            "latency" in q or "slow" in q or "p95" in q or "p99" in q or "response time" in q
+        ) and is_investigation:
             service_name = "smiota-agent-core-api"
             latency_data = await query_latency_metrics(service_name=service_name)
             p95 = latency_data.get("p95_ms", 42)
@@ -269,7 +369,14 @@ class AIOpsAgent(BaseAgent):
         # 7. SCENARIO 4: Did Latest Deployment Cause The Problem?
         if (
             ("deployment" in q or "deploy" in q or "rollout" in q or "release" in q)
-            and ("cause" in q or "problem" in q or "incident" in q or "did" in q or "latest" in q or "break" in q)
+            and (
+                "cause" in q
+                or "problem" in q
+                or "incident" in q
+                or "did" in q
+                or "latest" in q
+                or "break" in q
+            )
             and is_investigation
         ):
             service_name = "smiota-agent-core-api"
@@ -302,9 +409,12 @@ class AIOpsAgent(BaseAgent):
 
         # 8. SCENARIO 5: What Changed Before The Incident?
         if (
-            ("what changed" in q or "changes before" in q or "recent changes" in q or "change log" in q or ("what" in q and "change" in q))
-            and is_investigation
-        ):
+            "what changed" in q
+            or "changes before" in q
+            or "recent changes" in q
+            or "change log" in q
+            or ("what" in q and "change" in q)
+        ) and is_investigation:
             changes_data = await get_recent_system_changes()
             timeline = changes_data.get("audit_timeline", [])
             data_source = changes_data.get("data_source", "Live GCP Cloud Audit")
@@ -316,7 +426,9 @@ class AIOpsAgent(BaseAgent):
                     for ch in timeline
                 )
             else:
-                timeline_formatted = "- No recent mutation audit events returned from GCP Cloud Logging API."
+                timeline_formatted = (
+                    "- No recent mutation audit events returned from GCP Cloud Logging API."
+                )
 
             content = (
                 f"### 📋 Live AIOps Audit Timeline: Recent Infrastructure Changes\n\n"
@@ -343,9 +455,8 @@ class AIOpsAgent(BaseAgent):
 
         # 9. Service Log Inspection
         is_log_query = (
-            ("log" in q or "logs" in q or "stdout" in q or "trace" in q or "stacktrace" in q)
-            and not is_mutating_action
-        )
+            "log" in q or "logs" in q or "stdout" in q or "trace" in q or "stacktrace" in q
+        ) and not is_mutating_action
         if is_log_query:
             target_service = None
             known_services = {
@@ -375,11 +486,11 @@ class AIOpsAgent(BaseAgent):
                         "### 📋 Service Log Inspection via OpenSearch & GKE\n\n"
                         "You can inspect live container logs for any Smiota service directly here.\n\n"
                         "#### 🔍 Try asking:\n"
-                        "- *\"Show logs for smiotaserver\"*\n"
-                        "- *\"Show error logs for payments-service\"*\n"
-                        "- *\"Show logs for smiota-agent-core-api\"*\n"
-                        "- *\"Show logs for notification-service\"*\n"
-                        "- *\"Show logs for envoy-gateway\"*\n\n"
+                        '- *"Show logs for smiotaserver"*\n'
+                        '- *"Show error logs for payments-service"*\n'
+                        '- *"Show logs for smiota-agent-core-api"*\n'
+                        '- *"Show logs for notification-service"*\n'
+                        '- *"Show logs for envoy-gateway"*\n\n'
                         "Note: Live application logs are stored in self-hosted OpenSearch (`https://opensearch.int.smiotaapps.com`)."
                     ),
                     requires_approval=False,
@@ -390,7 +501,9 @@ class AIOpsAgent(BaseAgent):
                     ],
                 )
 
-            log_data = await get_service_logs(service_name=target_service, level_filter=level_filter)
+            log_data = await get_service_logs(
+                service_name=target_service, level_filter=level_filter
+            )
             if log_data.get("status") == "unreachable":
                 content = (
                     f"### 📋 Live Service Logs: `{target_service}`\n\n"
@@ -403,7 +516,11 @@ class AIOpsAgent(BaseAgent):
                 )
             else:
                 entries = log_data.get("logs", [])
-                log_lines = "\n".join(str(l) for l in entries) if entries else "No matching log entries found."
+                log_lines = (
+                    "\n".join(str(l) for l in entries)
+                    if entries
+                    else "No matching log entries found."
+                )
                 content = (
                     f"### 📋 Live Service Logs: `{target_service}`\n\n"
                     f"```log\n{log_lines}\n```\n\n"
@@ -426,7 +543,16 @@ class AIOpsAgent(BaseAgent):
             or "number of pods" in q
             or "count pods" in q
             or "pod count" in q
-            or ("pod" in q and ("number" in q or "count" in q or "total" in q or "how many" in q or "numbers" in q))
+            or (
+                "pod" in q
+                and (
+                    "number" in q
+                    or "count" in q
+                    or "total" in q
+                    or "how many" in q
+                    or "numbers" in q
+                )
+            )
         )
         if is_pod_count_query:
             logger.info(f"📊 [AIOPS WORKFLOW] Executing Pod Count Inventory Query: '{query}'")
@@ -446,7 +572,7 @@ class AIOpsAgent(BaseAgent):
 
             total = pod_data.get("total_pods", 0)
             ns_dict = pod_data.get("namespaces", {})
-            
+
             # Format top namespaces table
             lines = []
             for ns, cnt in ns_dict.items():
@@ -473,6 +599,154 @@ class AIOpsAgent(BaseAgent):
                     "Why is smiotaserver restarting?",
                     "Check active alerts in Alertmanager",
                 ],
+            )
+
+        # 9. SCENARIO: Kubernetes Inspection & SRE Troubleshooting Tools
+        if "cluster" in q and ("list" in q or "info" in q or "show" in q or "version" in q):
+            info = await get_cluster_info()
+            clusters = await list_clusters(include_details=True)
+            clusters_list = clusters.get("clusters", [])
+            lines = [
+                f"- **{c.get('name')}** | Status: `{c.get('status')}` | Version: `{c.get('k8s_version')}`"
+                for c in clusters_list
+            ]
+            content = (
+                f"### ☸️ Live Kubernetes & GKE Cluster Information\n\n"
+                f"- **Cluster:** `{info.get('cluster_name')}`\n"
+                f"- **Kubernetes Version:** `{info.get('git_version')}`\n"
+                f"- **API Endpoint:** `{info.get('endpoint')}`\n"
+                f"- **Region:** `{info.get('region')}` ({info.get('project_id')})\n\n"
+                f"#### 🌐 Available Clusters ({clusters.get('total_clusters')}):\n"
+                + "\n".join(lines)
+            )
+            return AgentResult(
+                agent_name=self.name,
+                content=content,
+                requires_approval=False,
+                suggested_actions=["List namespaces", "List nodes", "List pods"],
+            )
+
+        if "namespace" in q and ("list" in q or "show" in q or "get" in q):
+            ns_resp = await list_namespaces()
+            items = ns_resp.get("namespaces", [])
+            lines = [f"- `{ns.get('name'):22}` : Status **{ns.get('status')}**" for ns in items]
+            content = f"### ☸️ Live Kubernetes Namespaces ({ns_resp.get('total')})\n\n" + "\n".join(
+                lines
+            )
+            return AgentResult(
+                agent_name=self.name,
+                content=content,
+                requires_approval=False,
+                suggested_actions=["List pods", "Get resource quotas"],
+            )
+
+        if "image" in q and ("pull" in q or "backoff" in q or "errimage" in q):
+            diag = await diagnose_image_pull(
+                pod_name="smiota-agent-core-api", namespace="smiota-prod"
+            )
+            content = (
+                f"### 🩺 SRE ImagePullBackOff Investigation\n\n"
+                f"**Status:** **{diag.get('status')}**\n"
+                f"- **Image:** `{diag.get('image', 'N/A')}`\n"
+                f"- **Conclusion:** {diag.get('root_cause', 'Image pull verified successfully.')}\n\n"
+                f"#### 💡 SRE Guidance:\n{diag.get('suggested_fix', 'No registry issues detected.')}"
+            )
+            return AgentResult(
+                agent_name=self.name,
+                content=content,
+                requires_approval=False,
+                suggested_actions=["Check regcred secret", "Artifact Registry status"],
+            )
+
+        if "pending" in q and "pod" in q:
+            diag = await diagnose_pending_pod(
+                pod_name="smiota-worker-pending", namespace="smiota-prod"
+            )
+            content = (
+                f"### 🩺 SRE Pending Pod Scheduling Diagnostics\n\n"
+                f"**Status:** **{diag.get('status')}**\n"
+                f"- **Blocking Reason:** {diag.get('blocking_reason', 'N/A')}\n"
+                f"- **Root Cause:** {diag.get('root_cause', 'N/A')}\n\n"
+                f"#### 💡 Recommendations:\n"
+                + "\n".join(f"- {r}" for r in diag.get("recommendations", []))
+            )
+            return AgentResult(
+                agent_name=self.name,
+                content=content,
+                requires_approval=False,
+                suggested_actions=["Check node capacity", "List nodes"],
+            )
+
+        if "node" in q and (
+            "diagnose" in q or "notready" in q or "condition" in q or "pressure" in q
+        ):
+            diag = await diagnose_node(node_name="gke-application-default-pool-4a8b1c2d-node-1")
+            content = (
+                f"### 🩺 SRE Node Health & Pressure Diagnostics\n\n"
+                f"**Node Status:** **{diag.get('node_condition')}**\n"
+                f"- **Active Pressures:** `{', '.join(diag.get('pressures_detected', [])) or 'None'}`\n"
+                f"- **Kubelet Responsive:** **{diag.get('kubelet_responsive')}**\n"
+                f"- **Conclusion:** {diag.get('conclusion')}"
+            )
+            return AgentResult(
+                agent_name=self.name,
+                content=content,
+                requires_approval=False,
+                suggested_actions=["List all nodes", "Check resource pressure"],
+            )
+
+        if "dns" in q and ("resolution" in q or "check" in q or "diagnose" in q or "coredns" in q):
+            diag = await check_dns_resolution(namespace="smiota-prod")
+            content = (
+                f"### 🩺 SRE Internal DNS Resolution Diagnostics\n\n"
+                f"**DNS Health:** **{diag.get('status')}**\n"
+                f"- **CoreDNS Replicas:** **{diag.get('coredns_pods_running')}**\n"
+                f"- **Cluster DNS IP:** `{diag.get('cluster_dns_ip')}`\n"
+                f"- **Latency:** **{diag.get('resolution_latency_ms')} ms**\n"
+                f"- **Conclusion:** {diag.get('conclusion')}"
+            )
+            return AgentResult(
+                agent_name=self.name,
+                content=content,
+                requires_approval=False,
+                suggested_actions=["Check network connectivity", "CoreDNS logs"],
+            )
+
+        if ("network" in q or "connectivity" in q) and (
+            "check" in q or "diagnose" in q or "service" in q
+        ):
+            diag = await check_network_connectivity(
+                source_pod="smiota-agent-core-api-78f99c864-q9m2l",
+                target_service="smiotaserver",
+                namespace="smiota-prod",
+            )
+            content = (
+                f"### 🩺 SRE Network & Service Connectivity Analysis\n\n"
+                f"**Status:** **{diag.get('status')}**\n"
+                f"- **Path:** `{diag.get('source_pod')}` -> `{diag.get('target_service')}:{diag.get('target_port')}`\n"
+                f"- **NetworkPolicy Blocking:** **{diag.get('network_policies_blocking')}**\n"
+                f"- **Conclusion:** {diag.get('conclusion')}"
+            )
+            return AgentResult(
+                agent_name=self.name,
+                content=content,
+                requires_approval=False,
+                suggested_actions=["Diagnose service", "List ingresses"],
+            )
+
+        if ("pvc" in q or "storage" in q) and ("status" in q or "check" in q or "mount" in q):
+            diag = await check_pvc_status(namespace="smiota-prod")
+            content = (
+                f"### 🩺 SRE Storage & PVC Diagnostics\n\n"
+                f"**Status:** **{diag.get('status')}**\n"
+                f"- **Total PVCs:** {diag.get('total_pvcs')}\n"
+                f"- **Conclusion:** {diag.get('conclusion')}"
+            )
+            return AgentResult(
+                agent_name=self.name,
+                content=content,
+                requires_approval=False,
+                suggested_actions=["List statefulsets", "Check storage classes"],
             )
 
         # 10. General AIOps Telemetry Query

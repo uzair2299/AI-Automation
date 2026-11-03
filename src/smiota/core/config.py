@@ -30,7 +30,7 @@ class BaseAppSettings(BaseSettings):
     CORS_ORIGINS: list[str] = ["*"]
 
     # GCP & Vertex AI Configuration
-    GCP_PROJECT_ID: str = "project-smiota-psi-1"
+    GCP_PROJECT_ID: str = "project-smiota-psi-1" 
     GCP_REGION: str = "global"
     GEMINI_MODEL: str = "gemini-3.7-flash"
     GEMINI_EMBEDDING_MODEL: str = "text-embedding-004"
@@ -66,6 +66,8 @@ class BaseAppSettings(BaseSettings):
     MICROSOFT_APP_PASSWORD: Optional[str] = None
     MICROSOFT_APP_TENANT_ID: Optional[str] = "a0bd7ccc-cdd6-4e8a-be39-63dc7bbf315a"
     TEAMS_APP_ID: Optional[str] = "d6c463d0-d6a3-4704-bd53-f5fcb06256a2"
+    TEAMS_VALIDATE_INBOUND_JWT: bool = True
+    TEAMS_ENFORCE_TENANT_ID: bool = True
 
     # Chat Session Persistence & Storage Provider
     CHAT_STORAGE_BACKEND: str = "memory"  # Options: 'memory', 'redis', 'postgres'
@@ -100,6 +102,8 @@ class DevelopmentSettings(BaseAppSettings):
     ENABLE_SWAGGER: bool = True
     CORS_ORIGINS: list[str] = ["*"]
     GCP_PROJECT_ID: str = "project-smiota-psi-1"
+    TEAMS_VALIDATE_INBOUND_JWT: bool = False
+    TEAMS_ENFORCE_TENANT_ID: bool = False
 
 
 class StagingSettings(BaseAppSettings):
@@ -140,6 +144,8 @@ class TestSettings(BaseAppSettings):
     ENABLE_SWAGGER: bool = True
     CORS_ORIGINS: list[str] = ["*"]
     GCP_PROJECT_ID: str = "smiota-cloud-test"
+    TEAMS_VALIDATE_INBOUND_JWT: bool = False
+    TEAMS_ENFORCE_TENANT_ID: bool = False
     SMIOTA_AUTH_DUMMY_MODE: bool = False
     REQUIRE_HUMAN_APPROVAL_FOR_REMEDIATION: bool = True
     RAG_EMBEDDING_PROVIDER: str = "deterministic"

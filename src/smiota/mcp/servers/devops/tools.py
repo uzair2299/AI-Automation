@@ -1,6 +1,53 @@
-"""DevOps, CI/CD, and IaC MCP Tools (GitHub, Terraform, ArgoCD, PromQL)."""
-from typing import Optional
+"""DevOps, CI/CD, IaC, and Kubernetes MCP Tools.
+
+Combines CI/CD pipeline, Terraform, GitHub diff, and full Kubernetes cluster
+inspection and SRE troubleshooting tools.
+"""
+
 from smiota.mcp.security import mcp_tool
+
+# Re-export all 37 Kubernetes and SRE Troubleshooting MCP tools
+from smiota.mcp.servers.devops.k8s_tools import (
+    analyze_container_logs,
+    analyze_pod_events,
+    check_dns_resolution,
+    check_network_connectivity,
+    check_pod_restarts,
+    check_pvc_status,
+    check_resource_pressure,
+    diagnose_crashloop,
+    diagnose_deployment,
+    diagnose_image_pull,
+    diagnose_ingress,
+    diagnose_node,
+    diagnose_pending_pod,
+    # 2. Kubernetes Troubleshooting Tools (15 tools)
+    diagnose_pod,
+    diagnose_service,
+    get_cluster_info,
+    get_deployment_details,
+    get_hpa_status,
+    get_namespace,
+    get_node_details,
+    get_pod_details,
+    get_pod_logs,
+    get_pod_metrics,
+    get_pod_previous_logs,
+    get_resource_quotas,
+    # 1. Kubernetes Inspection Tools (22 tools)
+    list_clusters,
+    list_configmaps,
+    list_daemonsets,
+    list_deployments,
+    list_events,
+    list_ingresses,
+    list_namespaces,
+    list_nodes,
+    list_pods,
+    list_secrets_metadata,
+    list_services,
+    list_statefulsets,
+)
 from smiota.schemas.mcp import ToolAccessLevel
 
 
@@ -59,7 +106,7 @@ async def generate_promql_query(metric_intent: str) -> dict:
 async def trigger_cicd_pipeline(
     pipeline_name: str,
     target_branch: str,
-    approval_token: Optional[str] = None,
+    approval_token: str | None = None,
 ) -> dict:
     """Trigger CI/CD pipeline execution."""
     return {
@@ -68,3 +115,51 @@ async def trigger_cicd_pipeline(
         "branch": target_branch,
         "approved_by_token": approval_token,
     }
+
+
+__all__ = [
+    "analyze_container_logs",
+    "analyze_pod_events",
+    "check_dns_resolution",
+    "check_network_connectivity",
+    "check_pod_restarts",
+    "check_pvc_status",
+    "check_resource_pressure",
+    "diagnose_crashloop",
+    "diagnose_deployment",
+    "diagnose_image_pull",
+    "diagnose_ingress",
+    "diagnose_node",
+    "diagnose_pending_pod",
+    # 2. Kubernetes Troubleshooting Tools
+    "diagnose_pod",
+    "diagnose_service",
+    # CI/CD & IaC
+    "fetch_github_pr_diff",
+    "generate_promql_query",
+    "get_cluster_info",
+    "get_deployment_details",
+    "get_hpa_status",
+    "get_namespace",
+    "get_node_details",
+    "get_pod_details",
+    "get_pod_logs",
+    "get_pod_metrics",
+    "get_pod_previous_logs",
+    "get_resource_quotas",
+    # 1. Kubernetes Inspection Tools
+    "list_clusters",
+    "list_configmaps",
+    "list_daemonsets",
+    "list_deployments",
+    "list_events",
+    "list_ingresses",
+    "list_namespaces",
+    "list_nodes",
+    "list_pods",
+    "list_secrets_metadata",
+    "list_services",
+    "list_statefulsets",
+    "trigger_cicd_pipeline",
+    "validate_terraform_plan",
+]

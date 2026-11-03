@@ -1,4 +1,5 @@
 """High-speed, zero-latency rule and regex intent router."""
+
 import re
 from typing import ClassVar
 
@@ -126,69 +127,274 @@ class RuleBasedRouter(BaseIntentRouter):
     INFORMATIONAL_CATEGORIES: ClassVar[dict[str, list[str]]] = INFORMATIONAL_CATEGORIES
 
     GRATITUDE: ClassVar[set[str]] = {
-        "thank you", "thanks", "thank u", "thx", "appreciate it", "many thanks",
-        "thank you so much", "thanks a lot", "thank you very much",
+        "thank you",
+        "thanks",
+        "thank u",
+        "thx",
+        "appreciate it",
+        "many thanks",
+        "thank you so much",
+        "thanks a lot",
+        "thank you very much",
     }
     FAREWELLS: ClassVar[set[str]] = {
-        "bye", "byee", "goodbye", "cya", "see you", "take care", "have a good day",
-        "have a nice day", "have a great day", "bye bye", "later", "see ya",
+        "bye",
+        "byee",
+        "goodbye",
+        "cya",
+        "see you",
+        "take care",
+        "have a good day",
+        "have a nice day",
+        "have a great day",
+        "bye bye",
+        "later",
+        "see ya",
     }
 
     # High-certainty domain identifiers
-    CUSTOMER_REGEX = re.compile(r"\b(sm|pkg)-[a-z0-9]+\b|\bpickup code\b|\bcompartment \d+\b", re.IGNORECASE)
-    SECURITY_REGEX = re.compile(r"\bcve-\d{4}-\d+\b|\bbrute-force\b|\bwazuh\b|\bsiem\b", re.IGNORECASE)
-    AIOPS_REGEX = re.compile(r"\boomkilled\b|\bgke pod\b|\breadiness probe\b|\bpromql\b", re.IGNORECASE)
+    CUSTOMER_REGEX = re.compile(
+        r"\b(sm|pkg)-[a-z0-9]+\b|\bpickup code\b|\bcompartment \d+\b", re.IGNORECASE
+    )
+    SECURITY_REGEX = re.compile(
+        r"\bcve-\d{4}-\d+\b|\bbrute-force\b|\bwazuh\b|\bsiem\b", re.IGNORECASE
+    )
+    AIOPS_REGEX = re.compile(
+        r"\boomkilled\b|\bgke pod\b|\breadiness probe\b|\bpromql\b|\bcrashloop\b|\bimagepullbackoff\b|\bdaemonset\b|\bstatefulset\b",
+        re.IGNORECASE,
+    )
 
     # Keyword dictionaries for domain classification
     SECURITY_KEYWORDS: ClassVar[list[str]] = [
-        "security", "cve", "vulnerability", "iam", "wazuh", "threat", "siem",
-        "service account", "revoke", "quarantine", "credential", "brute-force",
-        "ssh login", "firewall", "audit", "exploit",
+        "security",
+        "cve",
+        "vulnerability",
+        "iam",
+        "wazuh",
+        "threat",
+        "siem",
+        "service account",
+        "revoke",
+        "quarantine",
+        "credential",
+        "brute-force",
+        "ssh login",
+        "firewall",
+        "audit",
+        "exploit",
     ]
 
     QA_KEYWORDS: ClassVar[list[str]] = [
-        "playwright", "selenium", "flaky", "regression", "test", "testrunner",
-        "cypress", "end-to-end", "e2e", "assertion",
+        "playwright",
+        "selenium",
+        "flaky",
+        "regression",
+        "test",
+        "testrunner",
+        "cypress",
+        "end-to-end",
+        "e2e",
+        "assertion",
     ]
 
     CUSTOMER_KEYWORDS: ClassVar[list[str]] = [
-        "locker", "customer", "ticket", "package", "door", "pickup", "dropoff",
-        "parcel", "compartment", "track", "tracking", "sm-", "pkg-", "pin",
-        "resident", "unlock", "delivery", "box", "deliveries", "collect", "collection", "mail",
-        "uncollected", "unclaimed",
+        "locker",
+        "customer",
+        "ticket",
+        "package",
+        "door",
+        "pickup",
+        "dropoff",
+        "parcel",
+        "compartment",
+        "track",
+        "tracking",
+        "sm-",
+        "pkg-",
+        "pin",
+        "resident",
+        "unlock",
+        "delivery",
+        "box",
+        "deliveries",
+        "collect",
+        "collection",
+        "mail",
+        "uncollected",
+        "unclaimed",
     ]
 
     AIOPS_KEYWORDS: ClassVar[list[str]] = [
-        "cpu", "memory", "oom", "restart", "restarting", "crashloop", "smiotaserver", "metric", "prometheus", "opensearch",
-        "grafana", "gke", "pod", "incident", "rca", "crash", "probe", "readiness",
-        "k8s", "kubernetes", "latency", "alert", "5xx", "500", "504", "deployment", "deploy", "rollout", "outage", "changed", "log", "logs", "stdout", "stacktrace",
+        "cpu",
+        "memory",
+        "oom",
+        "restart",
+        "restarting",
+        "crashloop",
+        "smiotaserver",
+        "metric",
+        "prometheus",
+        "opensearch",
+        "grafana",
+        "gke",
+        "pod",
+        "incident",
+        "rca",
+        "crash",
+        "probe",
+        "readiness",
+        "k8s",
+        "kubernetes",
+        "latency",
+        "alert",
+        "5xx",
+        "500",
+        "504",
+        "deployment",
+        "deploy",
+        "rollout",
+        "outage",
+        "changed",
+        "log",
+        "logs",
+        "stdout",
+        "stacktrace",
+        "cluster",
+        "clusters",
+        "namespace",
+        "namespaces",
+        "node",
+        "nodes",
+        "daemonset",
+        "daemonsets",
+        "statefulset",
+        "statefulsets",
+        "ingress",
+        "ingresses",
+        "configmap",
+        "configmaps",
+        "secret",
+        "secrets",
+        "pvc",
+        "pvcs",
+        "hpa",
+        "imagepull",
+        "imagepullbackoff",
+        "notready",
+        "pending pod",
+        "diagnose",
+        "troubleshoot",
+        "dns resolution",
+        "service connectivity",
     ]
 
     DEVELOPER_KEYWORDS: ClassVar[list[str]] = [
-        "pr", "pull request", "terraform", "code", "github", "promql", "ci/cd",
-        "pipeline", "diff", "commit", "git", "merge", "repo", "repository",
+        "pr",
+        "pull request",
+        "terraform",
+        "code",
+        "github",
+        "promql",
+        "ci/cd",
+        "pipeline",
+        "diff",
+        "commit",
+        "git",
+        "merge",
+        "repo",
+        "repository",
+        "kubernetes",
+        "k8s",
+        "cluster",
+        "pods",
+        "hpa",
+        "daemonset",
+        "statefulset",
+        "diagnose",
     ]
 
     KNOWLEDGE_KEYWORDS: ClassVar[list[str]] = [
-        "smart locker", "smart lockers", "outdoor locker", "day-use", "refrigerated",
-        "temperature-controlled", "asset management", "mailroom software", "package room",
-        "yardi", "realpage", "entrata", "appfolio", "koha", "ex libris", "alma", "sip2",
-        "ncip", "hid global", "cbord", "transact", "servicenow", "okta", "azure ad",
-        "compartment size", "pricing", "cost", "quote", "demo", "bopis",
-        "specifications", "ada compliance", "ul listing",
-        "student housing", "book a demo", "get a quote",
+        "smart locker",
+        "smart lockers",
+        "outdoor locker",
+        "day-use",
+        "refrigerated",
+        "temperature-controlled",
+        "asset management",
+        "mailroom software",
+        "package room",
+        "yardi",
+        "realpage",
+        "entrata",
+        "appfolio",
+        "koha",
+        "ex libris",
+        "alma",
+        "sip2",
+        "ncip",
+        "hid global",
+        "cbord",
+        "transact",
+        "servicenow",
+        "okta",
+        "azure ad",
+        "compartment size",
+        "pricing",
+        "cost",
+        "quote",
+        "demo",
+        "bopis",
+        "specifications",
+        "ada compliance",
+        "ul listing",
+        "student housing",
+        "book a demo",
+        "get a quote",
     ]
 
     SPECIFIC_INTEGRATION_KEYWORDS: ClassVar[list[str]] = [
-        "yardi", "realpage", "entrata", "appfolio", "koha", "ex libris", "alma", "sip2",
-        "ncip", "hid global", "cbord", "transact", "servicenow", "okta", "azure ad",
-        "pricing", "quote", "book a demo", "get a quote", "ada compliance", "ul listing",
+        "yardi",
+        "realpage",
+        "entrata",
+        "appfolio",
+        "koha",
+        "ex libris",
+        "alma",
+        "sip2",
+        "ncip",
+        "hid global",
+        "cbord",
+        "transact",
+        "servicenow",
+        "okta",
+        "azure ad",
+        "pricing",
+        "quote",
+        "book a demo",
+        "get a quote",
+        "ada compliance",
+        "ul listing",
     ]
 
     # Conversational continuity tokens
     CONTINUITY_WORDS: ClassVar[set[str]] = {
-        "yes", "no", "open", "retry", "ok", "okay", "sure", "thanks", "thank you",
-        "again", "code", "pin", "where", "how", "what", "please", "help",
+        "yes",
+        "no",
+        "open",
+        "retry",
+        "ok",
+        "okay",
+        "sure",
+        "thanks",
+        "thank you",
+        "again",
+        "code",
+        "pin",
+        "where",
+        "how",
+        "what",
+        "please",
+        "help",
     }
 
     @classmethod
@@ -200,7 +406,13 @@ class RuleBasedRouter(BaseIntentRouter):
         if clean_query in cls.GREETINGS:
             return True
         tokens = clean_query.split()
-        return bool(len(tokens) <= 3 and any(clean_query == greeting or clean_query.startswith(greeting + " ") for greeting in cls.GREETINGS))
+        return bool(
+            len(tokens) <= 3
+            and any(
+                clean_query == greeting or clean_query.startswith(greeting + " ")
+                for greeting in cls.GREETINGS
+            )
+        )
 
     @classmethod
     def _is_gratitude(cls, query: str) -> bool:
@@ -209,7 +421,13 @@ class RuleBasedRouter(BaseIntentRouter):
         if clean_query in cls.GRATITUDE:
             return True
         tokens = clean_query.split()
-        return bool(len(tokens) <= 5 and any(clean_query == gratitude or clean_query.startswith(gratitude + " ") for gratitude in cls.GRATITUDE))
+        return bool(
+            len(tokens) <= 5
+            and any(
+                clean_query == gratitude or clean_query.startswith(gratitude + " ")
+                for gratitude in cls.GRATITUDE
+            )
+        )
 
     @classmethod
     def _is_farewell(cls, query: str) -> bool:
@@ -218,7 +436,13 @@ class RuleBasedRouter(BaseIntentRouter):
         if clean_query in cls.FAREWELLS:
             return True
         tokens = clean_query.split()
-        return bool(len(tokens) <= 5 and any(clean_query == farewell or clean_query.startswith(farewell + " ") for farewell in cls.FAREWELLS))
+        return bool(
+            len(tokens) <= 5
+            and any(
+                clean_query == farewell or clean_query.startswith(farewell + " ")
+                for farewell in cls.FAREWELLS
+            )
+        )
 
     @classmethod
     def _match_informational(cls, query: str) -> tuple[str, str] | None:
@@ -238,7 +462,11 @@ class RuleBasedRouter(BaseIntentRouter):
             prefix_no_punct = re.sub(r"[^\w\s]", " ", prefix_normalized).strip()
             prefix_no_punct = " ".join(prefix_no_punct.split())
 
-            if query_normalized.startswith(prefix_normalized) or query_clean.startswith(prefix_normalized) or query_no_punct.startswith(prefix_no_punct):
+            if (
+                query_normalized.startswith(prefix_normalized)
+                or query_clean.startswith(prefix_normalized)
+                or query_no_punct.startswith(prefix_no_punct)
+            ):
                 category = "general"
                 for cat, prefixes in cls.INFORMATIONAL_CATEGORIES.items():
                     if prefix in prefixes:
@@ -421,7 +649,11 @@ class RuleBasedRouter(BaseIntentRouter):
                 matched_intent="public_knowledge_qa",
                 routing_method="rule_knowledge_public",
                 reasoning=f"Public unauthenticated user routed to KnowledgeAssistant: {knowledge_matches or 'informational'}",
-                metadata={"is_knowledge": True, "matched_keywords": knowledge_matches, "is_anonymous": True},
+                metadata={
+                    "is_knowledge": True,
+                    "matched_keywords": knowledge_matches,
+                    "is_anonymous": True,
+                },
             )
             logger.debug(
                 f"Webchat public unauthenticated knowledge matched: {knowledge_matches}",
@@ -531,7 +763,12 @@ class RuleBasedRouter(BaseIntentRouter):
                     matched_intent="informational",
                     routing_method="rule_informational",
                     reasoning=f"Matched informational prefix '{informational_match[0]}' ({informational_match[1]}) with security keywords: {security_matches}",
-                    metadata={"is_informational": True, "category": informational_match[1], "matched_prefix": informational_match[0], "domain": "security"},
+                    metadata={
+                        "is_informational": True,
+                        "category": informational_match[1],
+                        "matched_prefix": informational_match[0],
+                        "domain": "security",
+                    },
                 )
                 logger.debug(
                     f"Webchat informational security matched: category='{informational_match[1]}'",
@@ -554,7 +791,12 @@ class RuleBasedRouter(BaseIntentRouter):
                     matched_intent="informational",
                     routing_method="rule_informational",
                     reasoning=f"Matched informational prefix '{informational_match[0]}' ({informational_match[1]}) with AIOps keywords: {aiops_matches}",
-                    metadata={"is_informational": True, "category": informational_match[1], "matched_prefix": informational_match[0], "domain": "aiops"},
+                    metadata={
+                        "is_informational": True,
+                        "category": informational_match[1],
+                        "matched_prefix": informational_match[0],
+                        "domain": "aiops",
+                    },
                 )
                 logger.debug(
                     f"Webchat informational AIOps matched: category='{informational_match[1]}'",
@@ -576,7 +818,12 @@ class RuleBasedRouter(BaseIntentRouter):
                 matched_intent="informational",
                 routing_method="rule_informational",
                 reasoning=f"Matched informational query prefix: '{informational_match[0]}' (Category: {informational_match[1]})",
-                metadata={"is_informational": True, "category": informational_match[1], "matched_prefix": informational_match[0], "domain": target_agent},
+                metadata={
+                    "is_informational": True,
+                    "category": informational_match[1],
+                    "matched_prefix": informational_match[0],
+                    "domain": target_agent,
+                },
             )
             logger.debug(
                 f"Webchat informational {target_agent} matched: category='{informational_match[1]}'",
@@ -615,7 +862,9 @@ class RuleBasedRouter(BaseIntentRouter):
         # 4. Check security keywords (e.g. admin or staff testing in webchat)
         security_matches = self._match_keywords(query, self.SECURITY_KEYWORDS)
         if security_matches or self.SECURITY_REGEX.search(query):
-            confidence = 0.95 if len(security_matches) >= 2 or self.SECURITY_REGEX.search(query) else 0.88
+            confidence = (
+                0.95 if len(security_matches) >= 2 or self.SECURITY_REGEX.search(query) else 0.88
+            )
             decision = RouteDecision(
                 agent_name="security",
                 confidence=confidence,
@@ -731,10 +980,21 @@ class RuleBasedRouter(BaseIntentRouter):
         # 1. Security & Compliance
         security_matches = self._match_keywords(query, self.SECURITY_KEYWORDS)
         if security_matches or self.SECURITY_REGEX.search(query):
-            confidence = 0.95 if (len(security_matches) >= 2 or self.SECURITY_REGEX.search(query)) else 0.88
+            confidence = (
+                0.95 if (len(security_matches) >= 2 or self.SECURITY_REGEX.search(query)) else 0.88
+            )
             intent = "informational" if informational_match else "security_compliance"
             method = "rule_informational" if informational_match else "rule_pattern"
-            meta = {"is_informational": True, "category": informational_match[1], "matched_prefix": informational_match[0], "domain": "security"} if informational_match else {}
+            meta = (
+                {
+                    "is_informational": True,
+                    "category": informational_match[1],
+                    "matched_prefix": informational_match[0],
+                    "domain": "security",
+                }
+                if informational_match
+                else {}
+            )
             decision = RouteDecision(
                 agent_name="security",
                 confidence=confidence,
@@ -761,7 +1021,16 @@ class RuleBasedRouter(BaseIntentRouter):
             confidence = 0.95 if len(qa_matches) >= 2 else 0.88
             intent = "informational" if informational_match else "qa_testing"
             method = "rule_informational" if informational_match else "rule_pattern"
-            meta = {"is_informational": True, "category": informational_match[1], "matched_prefix": informational_match[0], "domain": "qa"} if informational_match else {}
+            meta = (
+                {
+                    "is_informational": True,
+                    "category": informational_match[1],
+                    "matched_prefix": informational_match[0],
+                    "domain": "qa",
+                }
+                if informational_match
+                else {}
+            )
             decision = RouteDecision(
                 agent_name="qa",
                 confidence=confidence,
@@ -785,10 +1054,21 @@ class RuleBasedRouter(BaseIntentRouter):
         # 3. Customer & Smart Locker
         customer_matches = self._match_keywords(query, self.CUSTOMER_KEYWORDS)
         if customer_matches or self.CUSTOMER_REGEX.search(query):
-            confidence = 0.95 if (len(customer_matches) >= 2 or self.CUSTOMER_REGEX.search(query)) else 0.88
+            confidence = (
+                0.95 if (len(customer_matches) >= 2 or self.CUSTOMER_REGEX.search(query)) else 0.88
+            )
             intent = "informational" if informational_match else "customer_locker"
             method = "rule_informational" if informational_match else "rule_pattern"
-            meta = {"is_informational": True, "category": informational_match[1], "matched_prefix": informational_match[0], "domain": "customer"} if informational_match else {}
+            meta = (
+                {
+                    "is_informational": True,
+                    "category": informational_match[1],
+                    "matched_prefix": informational_match[0],
+                    "domain": "customer",
+                }
+                if informational_match
+                else {}
+            )
             decision = RouteDecision(
                 agent_name="customer",
                 confidence=confidence,
@@ -812,10 +1092,21 @@ class RuleBasedRouter(BaseIntentRouter):
         # 4. SRE & AIOps
         aiops_matches = self._match_keywords(query, self.AIOPS_KEYWORDS)
         if aiops_matches or self.AIOPS_REGEX.search(query):
-            confidence = 0.95 if (len(aiops_matches) >= 2 or self.AIOPS_REGEX.search(query)) else 0.88
+            confidence = (
+                0.95 if (len(aiops_matches) >= 2 or self.AIOPS_REGEX.search(query)) else 0.88
+            )
             intent = "informational" if informational_match else "aiops_sre"
             method = "rule_informational" if informational_match else "rule_pattern"
-            meta = {"is_informational": True, "category": informational_match[1], "matched_prefix": informational_match[0], "domain": "aiops"} if informational_match else {}
+            meta = (
+                {
+                    "is_informational": True,
+                    "category": informational_match[1],
+                    "matched_prefix": informational_match[0],
+                    "domain": "aiops",
+                }
+                if informational_match
+                else {}
+            )
             decision = RouteDecision(
                 agent_name="aiops",
                 confidence=confidence,
@@ -842,7 +1133,16 @@ class RuleBasedRouter(BaseIntentRouter):
             confidence = 0.95 if len(developer_matches) >= 2 else 0.88
             intent = "informational" if informational_match else "developer_devops"
             method = "rule_informational" if informational_match else "rule_pattern"
-            meta = {"is_informational": True, "category": informational_match[1], "matched_prefix": informational_match[0], "domain": "developer"} if informational_match else {}
+            meta = (
+                {
+                    "is_informational": True,
+                    "category": informational_match[1],
+                    "matched_prefix": informational_match[0],
+                    "domain": "developer",
+                }
+                if informational_match
+                else {}
+            )
             decision = RouteDecision(
                 agent_name="developer",
                 confidence=confidence,
@@ -871,7 +1171,11 @@ class RuleBasedRouter(BaseIntentRouter):
                 matched_intent="informational",
                 routing_method="rule_informational",
                 reasoning=f"Matched internal informational query prefix: '{informational_match[0]}' (Category: {informational_match[1]})",
-                metadata={"is_informational": True, "category": informational_match[1], "matched_prefix": informational_match[0]},
+                metadata={
+                    "is_informational": True,
+                    "category": informational_match[1],
+                    "matched_prefix": informational_match[0],
+                },
             )
             logger.debug(
                 f"Internal informational rule matched: category='{informational_match[1]}'",
