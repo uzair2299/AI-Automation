@@ -1,25 +1,48 @@
 """Standalone RAG Knowledge Microservice FastAPI Application."""
 from contextlib import asynccontextmanager
+import logging
+from pathlib import Path
+import sys
 from typing import Any, Dict
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-import logging
+# Ensure rag-service root directory is in sys.path when running from workspace root
+_RAG_SERVICE_DIR = str(Path(__file__).resolve().parent.parent)
+if _RAG_SERVICE_DIR not in sys.path:
+    sys.path.insert(0, _RAG_SERVICE_DIR)
 
-from app.chunking import DocumentChunker
-from app.config import settings
-from app.embeddings import EmbeddingService
-from app.loader import load_real_knowledge_base
-from app.models import (
-    APIResponse,
-    DocumentIngestionRequest,
-    DocumentIngestionResponse,
-    VectorSearchRequest,
-    VectorSearchResponse,
-)
-from app.pgvector_store import PgVectorStoreClient
-from app.retriever import KnowledgeRetriever
-from app.vector_store import VectorStoreClient
+try:
+    from app.chunking import DocumentChunker
+    from app.config import settings
+    from app.embeddings import EmbeddingService
+    from app.loader import load_real_knowledge_base
+    from app.models import (
+        APIResponse,
+        DocumentIngestionRequest,
+        DocumentIngestionResponse,
+        VectorSearchRequest,
+        VectorSearchResponse,
+    )
+    from app.pgvector_store import PgVectorStoreClient
+    from app.retriever import KnowledgeRetriever
+    from app.vector_store import VectorStoreClient
+except ImportError:
+    from .chunking import DocumentChunker
+    from .config import settings
+    from .embeddings import EmbeddingService
+    from .loader import load_real_knowledge_base
+    from .models import (
+        APIResponse,
+        DocumentIngestionRequest,
+        DocumentIngestionResponse,
+        VectorSearchRequest,
+        VectorSearchResponse,
+    )
+    from .pgvector_store import PgVectorStoreClient
+    from .retriever import KnowledgeRetriever
+    from .vector_store import VectorStoreClient
 
 logger = logging.getLogger("rag-service")
 

@@ -1,8 +1,12 @@
 """Vector Store backend for storing and querying embedded documents."""
 import math
-import uuid
 from typing import Any, Dict, List, Optional
-from app.models import DocumentMetadata, DocumentSearchResult
+import uuid
+
+try:
+    from app.models import DocumentMetadata, DocumentSearchResult
+except ImportError:
+    from .models import DocumentMetadata, DocumentSearchResult
 
 
 def cosine_similarity(a: List[float], b: List[float]) -> float:

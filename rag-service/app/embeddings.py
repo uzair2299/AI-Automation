@@ -3,7 +3,11 @@ import hashlib
 import math
 import re
 from typing import List
-from app.config import settings
+
+try:
+    from app.config import settings
+except ImportError:
+    from .config import settings
 
 
 class EmbeddingService:

@@ -1,0 +1,11 @@
+{
+  "include": [
+    "src",
+    "rag-service",
+    "tests"
+  ],
+  "extraPaths": [
+    "src",
+    "rag-service"
+  ]
+}

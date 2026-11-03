@@ -4,8 +4,12 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from app.chunking import DocumentChunker
-from app.embeddings import EmbeddingService
+try:
+    from app.chunking import DocumentChunker
+    from app.embeddings import EmbeddingService
+except ImportError:
+    from .chunking import DocumentChunker
+    from .embeddings import EmbeddingService
 
 logger = logging.getLogger("rag-service.loader")
 
@@ -146,4 +150,3 @@ async def load_real_knowledge_base(
         "pages_processed": pages_processed,
         "chunks_indexed": total_chunks,
     }
-

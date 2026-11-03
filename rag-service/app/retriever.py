@@ -1,8 +1,14 @@
 """Retrieval coordinator marrying embedding generation with vector search."""
 from typing import List, Optional
-from app.embeddings import EmbeddingService
-from app.models import DocumentSearchResult
-from app.vector_store import VectorStoreClient
+
+try:
+    from app.embeddings import EmbeddingService
+    from app.models import DocumentSearchResult
+    from app.vector_store import VectorStoreClient
+except ImportError:
+    from .embeddings import EmbeddingService
+    from .models import DocumentSearchResult
+    from .vector_store import VectorStoreClient
 
 
 class KnowledgeRetriever:
@@ -26,4 +32,3 @@ class KnowledgeRetriever:
             category=category,
         )
         return results
-

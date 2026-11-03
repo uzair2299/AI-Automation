@@ -3,13 +3,17 @@ from __future__ import annotations
 
 import json
 import logging
-import uuid
 from typing import Any, Dict, List, Optional
+import uuid
 
 import asyncpg
 
-from app.config import settings
-from app.models import DocumentMetadata, DocumentSearchResult
+try:
+    from app.config import settings
+    from app.models import DocumentMetadata, DocumentSearchResult
+except ImportError:
+    from .config import settings
+    from .models import DocumentMetadata, DocumentSearchResult
 
 logger = logging.getLogger("rag-service.pgvector")
 
