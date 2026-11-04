@@ -46,7 +46,7 @@ retriever = get_retriever()
 
 
 async def seed_initial_documents():
-    """Seed knowledge base using real website content JSONL, with graceful bootstrap fallback."""
+    """Seed knowledge base using real website content JSONL."""
     logger.info("Entering seed_initial_documents")
     global vector_store, retriever
     current_store = get_vector_store()
@@ -73,7 +73,7 @@ async def seed_initial_documents():
         retriever = new_retriever
 
     try:
-        # 1. Attempt to index real scraped knowledge base from website_content.jsonl
+        # Index real knowledge base strictly from website_content.jsonl
         stats = await load_real_knowledge_base(
             vector_store=current_store,
             embedding_service=get_embedding_service(),
@@ -81,38 +81,24 @@ async def seed_initial_documents():
             max_pages=getattr(settings, "SEED_MAX_PAGES", 50),
         )
         if stats.get("chunks_indexed", 0) > 0:
+            logger.info(
+                "Successfully seeded real knowledge base: %d chunks indexed",
+                stats.get("chunks_indexed", 0),
+            )
             logger.info("Exiting seed_initial_documents (indexed real knowledge base)")
             return
+        logger.warning(
+            "No chunks indexed from knowledge file (stats: %s). Vector store remains empty without mocked fallbacks.",
+            stats,
+        )
     except Exception as exc:
-        logger.error("Error loading knowledge base during seed: %s", exc, exc_info=True)
+        logger.error(
+            "Error loading real knowledge base during seed: %s. Vector store remains unseeded.",
+            exc,
+            exc_info=True,
+        )
 
-    # 2. Minimal fallback only if knowledge file is missing
-    logger.info("Falling back to builtin bootstrap seed documents")
-    sample_docs = [
-        (
-            "Smiota Smart Locker Hardware Specs",
-            "Smiota smart lockers feature NEMA 4 rated steel enclosures, dual-locking motorized solenoids, internal infrared parcel sensors, and high-resolution touchscreen control terminals.",
-            "hardware",
-        ),
-        (
-            "Smiota Resident Delivery Workflow",
-            "When a carrier deposits a package, the locker controller captures dimensions and weight, closes the door, and issues a 6-digit numeric pickup PIN and dynamic QR code to the resident via SMS and email.",
-            "workflow",
-        ),
-        (
-            "Smiota Refrigerated & Cold Storage Lockers",
-            "Smiota refrigerated smart lockers maintain strict temperature control between 34°F and 40°F (1°C to 4°C) for perishable groceries, meal kits, and temperature-sensitive pharmaceutical supplies.",
-            "hardware",
-        ),
-    ]
-    try:
-        emb_svc = get_embedding_service()
-        for title, content, cat in sample_docs:
-            emb = await emb_svc.get_embedding(content)
-            await current_store.insert_document(title=title, content=content, embedding=emb, category=cat)
-        logger.info("Exiting seed_initial_documents (bootstrap documents seeded)")
-    except Exception as exc:
-        logger.error("Failed to insert sample bootstrap documents: %s", exc, exc_info=True)
+    logger.info("Exiting seed_initial_documents")
 
 
 @asynccontextmanager
