@@ -5,8 +5,10 @@ from pathlib import Path
 import sys
 from typing import Any, Dict
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 # Ensure rag-service root directory is in sys.path when running from workspace root
 _RAG_SERVICE_DIR = str(Path(__file__).resolve().parent.parent)
@@ -18,6 +20,7 @@ try:
     from app.config import settings
     from app.embeddings import EmbeddingService
     from app.loader import load_real_knowledge_base
+    from app.logging import CorrelationIdMiddleware, setup_logging
     from app.models import (
         APIResponse,
         DocumentIngestionRequest,
@@ -33,6 +36,7 @@ except ImportError:
     from .config import settings
     from .embeddings import EmbeddingService
     from .loader import load_real_knowledge_base
+    from .logging import CorrelationIdMiddleware, setup_logging
     from .models import (
         APIResponse,
         DocumentIngestionRequest,
@@ -44,7 +48,8 @@ except ImportError:
     from .retriever import KnowledgeRetriever
     from .vector_store import VectorStoreClient
 
-logger = logging.getLogger("rag-service")
+# Initialize structured logging engine with correlation filter
+logger = setup_logging()
 
 # Shared service singletons with pgvector support
 if getattr(settings, "VECTOR_STORE_BACKEND", "memory").lower() == "pgvector":
@@ -59,31 +64,39 @@ retriever = KnowledgeRetriever(vector_store=vector_store, embedding_service=embe
 
 async def seed_initial_documents():
     """Seed knowledge base using real website content JSONL, with graceful bootstrap fallback."""
+    logger.info("Entering seed_initial_documents")
     global vector_store, retriever
     try:
         if await vector_store.count() > 0:
+            logger.info("Vector store already contains documents, skipping initial seed")
+            logger.info("Exiting seed_initial_documents")
             return
     except Exception as exc:
         logger.warning(
-            f"Could not connect to PostgreSQL pgvector ({exc}). "
-            "Falling back to high-speed in-memory vector storage so RAG service remains online."
+            "Could not connect to PostgreSQL pgvector (%s). Falling back to in-memory vector storage: %s",
+            exc,
+            exc,
+            exc_info=True,
         )
         vector_store = VectorStoreClient()
         retriever = KnowledgeRetriever(vector_store=vector_store, embedding_service=embedding_service)
 
     try:
-        # 1. Attempt to index real scraped knowledge base (506 pages from website_content.jsonl)
+        # 1. Attempt to index real scraped knowledge base from website_content.jsonl
         stats = await load_real_knowledge_base(
             vector_store=vector_store,
             embedding_service=embedding_service,
             chunker=chunker,
+            max_pages=getattr(settings, "SEED_MAX_PAGES", 50),
         )
         if stats.get("chunks_indexed", 0) > 0:
+            logger.info("Exiting seed_initial_documents (indexed real knowledge base)")
             return
     except Exception as exc:
-        logger.warning(f"Error loading knowledge base: {exc}")
+        logger.error("Error loading knowledge base during seed: %s", exc, exc_info=True)
 
     # 2. Minimal fallback only if knowledge file is missing
+    logger.info("Falling back to builtin bootstrap seed documents")
     sample_docs = [
         (
             "Smiota Smart Locker Hardware Specs",
@@ -101,18 +114,24 @@ async def seed_initial_documents():
             "hardware",
         ),
     ]
-    for title, content, cat in sample_docs:
-        emb = await embedding_service.get_embedding(content)
-        await vector_store.insert_document(title=title, content=content, embedding=emb, category=cat)
+    try:
+        for title, content, cat in sample_docs:
+            emb = await embedding_service.get_embedding(content)
+            await vector_store.insert_document(title=title, content=content, embedding=emb, category=cat)
+        logger.info("Exiting seed_initial_documents (bootstrap documents seeded)")
+    except Exception as exc:
+        logger.error("Failed to insert sample bootstrap documents: %s", exc, exc_info=True)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    logger.info("Starting up RAG service lifespan")
     try:
         await seed_initial_documents()
     except Exception as exc:
-        logger.error(f"Error during RAG service startup lifespan: {exc}")
+        logger.error("Error during RAG service startup lifespan: %s", exc, exc_info=True)
     yield
+    logger.info("Shutting down RAG service lifespan")
 
 
 app = FastAPI(
@@ -122,6 +141,8 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Distributed correlation tracing and CORS middleware
+app.add_middleware(CorrelationIdMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -131,16 +152,52 @@ app.add_middleware(
 )
 
 
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Log validation failures and return structured response."""
+    logger.warning("Request validation failed on %s: %s", request.url.path, exc.errors())
+    return JSONResponse(
+        status_code=422,
+        content={"status": "error", "message": "Request validation failed", "errors": exc.errors()},
+    )
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    """Log HTTP exceptions with proper details."""
+    logger.warning("HTTPException on %s [%d]: %s", request.url.path, exc.status_code, exc.detail)
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"status": "error", "message": exc.detail},
+    )
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    """Catch-all for unhandled exceptions with full traceback logging."""
+    logger.error("Unhandled exception on %s: %s", request.url.path, exc, exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"status": "error", "message": "An internal server error occurred"},
+    )
+
+
 @app.get("/health", summary="Health check")
 async def health_check() -> Dict[str, Any]:
     """Return health status and count of indexed documents."""
-    count = await vector_store.count()
-    return {
-        "status": "ok",
-        "service": settings.SERVICE_NAME,
-        "indexed_chunks": count,
-        "version": "1.0.0",
-    }
+    logger.info("Entering health_check endpoint")
+    try:
+        count = await vector_store.count()
+        logger.info("Exiting health_check endpoint")
+        return {
+            "status": "ok",
+            "service": settings.SERVICE_NAME,
+            "indexed_chunks": count,
+            "version": "1.0.0",
+        }
+    except Exception as exc:
+        logger.error("Error during health_check endpoint: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail="Health check failed")
 
 
 @app.post(
@@ -150,6 +207,7 @@ async def health_check() -> Dict[str, Any]:
 )
 async def search_knowledge(payload: VectorSearchRequest):
     """Retrieve semantically relevant document chunks matching user query."""
+    logger.info("Entering search_knowledge endpoint")
     try:
         results = await retriever.retrieve(
             query=payload.query,
@@ -161,9 +219,13 @@ async def search_knowledge(payload: VectorSearchRequest):
             results=results,
             total_found=len(results),
         )
+        logger.info("Exiting search_knowledge endpoint")
         return APIResponse(data=data, message="Search completed successfully.")
+    except HTTPException:
+        raise
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        logger.error("Error during search_knowledge endpoint: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail="Vector search operation failed")
 
 
 @app.post(
@@ -173,6 +235,7 @@ async def search_knowledge(payload: VectorSearchRequest):
 )
 async def ingest_document(payload: DocumentIngestionRequest):
     """Chunk, embed, and store document in vector storage."""
+    logger.info("Entering ingest_document endpoint")
     try:
         chunks = chunker.split_text(payload.content)
         first_doc_id = ""
@@ -194,9 +257,13 @@ async def ingest_document(payload: DocumentIngestionRequest):
             chunks_created=len(chunks),
             status="indexed",
         )
+        logger.info("Exiting ingest_document endpoint")
         return APIResponse(data=data, message="Document indexed successfully.")
+    except HTTPException:
+        raise
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        logger.error("Error during ingest_document endpoint: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail="Document ingestion failed")
 
 
 @app.post(
@@ -205,6 +272,7 @@ async def ingest_document(payload: DocumentIngestionRequest):
 )
 async def sync_knowledge():
     """Trigger on-demand ingestion of real website_content.jsonl knowledge."""
+    logger.info("Entering sync_knowledge endpoint")
     try:
         stats = await load_real_knowledge_base(
             vector_store=vector_store,
@@ -212,9 +280,13 @@ async def sync_knowledge():
             chunker=chunker,
         )
         count = await vector_store.count()
+        logger.info("Exiting sync_knowledge endpoint")
         return APIResponse(
             data={"stats": stats, "total_chunks": count},
             message="Knowledge synchronization completed.",
         )
+    except HTTPException:
+        raise
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        logger.error("Error during sync_knowledge endpoint: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail="Knowledge synchronization failed")

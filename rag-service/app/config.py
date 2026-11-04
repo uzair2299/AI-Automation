@@ -1,4 +1,5 @@
 """Configuration settings for Standalone RAG Knowledge Service."""
+from typing import Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -11,6 +12,8 @@ class RAGServiceSettings(BaseSettings):
     HOST: str = "0.0.0.0"
     PORT: int = 8001
     DEBUG: bool = False
+    ENVIRONMENT: str = "development"
+    LOG_LEVEL: str = "INFO"
 
     # Embedding settings
     EMBEDDING_PROVIDER: str = "deterministic"  # "gemini" or "deterministic"
@@ -32,6 +35,8 @@ class RAGServiceSettings(BaseSettings):
     QDRANT_URL: str = ""
     QDRANT_API_KEY: str = ""
 
+    # Seeding settings
+    SEED_MAX_PAGES: int = 50
+
 
 settings = RAGServiceSettings()
-

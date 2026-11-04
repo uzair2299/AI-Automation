@@ -1,4 +1,5 @@
 """Retrieval coordinator marrying embedding generation with vector search."""
+import logging
 from typing import List, Optional
 
 try:
@@ -9,6 +10,8 @@ except ImportError:
     from .embeddings import EmbeddingService
     from .models import DocumentSearchResult
     from .vector_store import VectorStoreClient
+
+logger = logging.getLogger("rag-service.retriever")
 
 
 class KnowledgeRetriever:
@@ -25,10 +28,16 @@ class KnowledgeRetriever:
         top_k: int = 5,
     ) -> List[DocumentSearchResult]:
         """Embed user query and retrieve top matching document chunks."""
-        query_embedding = await self.embedding_service.get_embedding(query)
-        results = await self.vector_store.search(
-            query_embedding=query_embedding,
-            top_k=top_k,
-            category=category,
-        )
-        return results
+        logger.info("Entering KnowledgeRetriever.retrieve")
+        try:
+            query_embedding = await self.embedding_service.get_embedding(query)
+            results = await self.vector_store.search(
+                query_embedding=query_embedding,
+                top_k=top_k,
+                category=category,
+            )
+            logger.info("Exiting KnowledgeRetriever.retrieve")
+            return results
+        except Exception as exc:
+            logger.error("Error occurred in KnowledgeRetriever.retrieve: %s", exc, exc_info=True)
+            raise

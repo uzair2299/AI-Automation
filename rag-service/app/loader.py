@@ -57,14 +57,17 @@ async def load_real_knowledge_base(
     chunker: DocumentChunker,
     file_path: Optional[Path] = None,
     batch_size: int = 50,
+    max_pages: Optional[int] = None,
 ) -> Dict[str, Any]:
     """Ingest, chunk, embed, and store real Smiota website knowledge into vector store."""
+    logger.info("Entering load_real_knowledge_base")
     target_file = file_path or find_knowledge_file()
     if not target_file:
         logger.warning(
             "Could not locate website_content.jsonl in search paths: %s",
             [str(p) for p in KNOWLEDGE_SEARCH_PATHS],
         )
+        logger.info("Exiting load_real_knowledge_base (file not found)")
         return {"status": "not_found", "chunks_indexed": 0, "pages_processed": 0}
 
     logger.info("Starting ingestion of real knowledge from: %s", target_file)
@@ -73,83 +76,106 @@ async def load_real_knowledge_base(
     total_chunks = 0
     docs_batch: List[Dict[str, Any]] = []
 
-    with open(target_file, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
+    try:
+        with open(target_file, "r", encoding="utf-8") as f:
+            for line_num, line in enumerate(f, start=1):
+                if max_pages and pages_processed >= max_pages:
+                    logger.info("Reached maximum page limit of %d during ingestion", max_pages)
+                    break
 
+                line = line.strip()
+                if not line:
+                    continue
+
+                try:
+                    record = json.loads(line)
+                except Exception as exc:
+                    logger.warning("Failed to parse JSON record on line %d: %s", line_num, exc, exc_info=True)
+                    continue
+
+                pages_processed += 1
+                title = (
+                    record.get("page_title")
+                    or record.get("main_heading")
+                    or "Smiota Smart Locker Knowledge"
+                ).strip()
+
+                content = (record.get("content_markdown") or "").strip()
+                meta_desc = (record.get("meta_description") or "").strip()
+                headings = record.get("headings") or []
+
+                # If content is short, enrich with meta description and headings
+                if len(content.split()) < 30:
+                    parts = []
+                    if content:
+                        parts.append(content)
+                    if meta_desc and meta_desc != content:
+                        parts.append(meta_desc)
+                    if headings:
+                        clean_headings = [
+                            h.replace("H1: ", "").replace("H2: ", "").replace("H3: ", "").replace("H4: ", "")
+                            for h in headings[:6]
+                        ]
+                        parts.append("Topics covered: " + ", ".join(clean_headings))
+                    content = "\n\n".join(parts)
+
+                if not content.strip():
+                    continue
+
+                url = record.get("source_url") or record.get("canonical_url") or ""
+                category = infer_category(url, title)
+                chunks = chunker.split_text(content)
+
+                for idx, chunk_text in enumerate(chunks):
+                    emb = await embedding_service.get_embedding(chunk_text)
+                    chunk_title = f"{title} (Part {idx+1})" if len(chunks) > 1 else title
+                    docs_batch.append(
+                        {
+                            "title": chunk_title,
+                            "category": category,
+                            "content": chunk_text,
+                            "metadata": {
+                                "source_url": url,
+                                "original_title": title,
+                                "chunk_index": idx,
+                                "total_chunks": len(chunks),
+                            },
+                            "tags": [category, "website", "smiota"],
+                            "embedding": emb,
+                        }
+                    )
+
+                    if len(docs_batch) >= batch_size:
+                        try:
+                            await vector_store.insert_documents_batch(docs_batch)
+                            total_chunks += len(docs_batch)
+                        except Exception as exc:
+                            logger.error(
+                                "Failed to insert documents batch into vector store: %s", exc, exc_info=True
+                            )
+                            raise
+                        docs_batch = []
+
+        if docs_batch:
             try:
-                record = json.loads(line)
-            except Exception:
-                continue
+                await vector_store.insert_documents_batch(docs_batch)
+                total_chunks += len(docs_batch)
+            except Exception as exc:
+                logger.error("Failed to insert final documents batch into vector store: %s", exc, exc_info=True)
+                raise
 
-            pages_processed += 1
-            title = (
-                record.get("page_title")
-                or record.get("main_heading")
-                or "Smiota Smart Locker Knowledge"
-            ).strip()
-
-            content = (record.get("content_markdown") or "").strip()
-            meta_desc = (record.get("meta_description") or "").strip()
-            headings = record.get("headings") or []
-
-            # If content is short, enrich with meta description and headings
-            if len(content.split()) < 30:
-                parts = []
-                if content:
-                    parts.append(content)
-                if meta_desc and meta_desc != content:
-                    parts.append(meta_desc)
-                if headings:
-                    clean_headings = [h.replace("H1: ", "").replace("H2: ", "").replace("H3: ", "").replace("H4: ", "") for h in headings[:6]]
-                    parts.append("Topics covered: " + ", ".join(clean_headings))
-                content = "\n\n".join(parts)
-
-            if not content.strip():
-                continue
-
-            url = record.get("source_url") or record.get("canonical_url") or ""
-            category = infer_category(url, title)
-            chunks = chunker.split_text(content)
-
-            for idx, chunk_text in enumerate(chunks):
-                emb = await embedding_service.get_embedding(chunk_text)
-                chunk_title = f"{title} (Part {idx+1})" if len(chunks) > 1 else title
-                docs_batch.append(
-                    {
-                        "title": chunk_title,
-                        "category": category,
-                        "content": chunk_text,
-                        "metadata": {
-                            "source_url": url,
-                            "original_title": title,
-                            "chunk_index": idx,
-                            "total_chunks": len(chunks),
-                        },
-                        "tags": [category, "website", "smiota"],
-                        "embedding": emb,
-                    }
-                )
-
-                if len(docs_batch) >= batch_size:
-                    await vector_store.insert_documents_batch(docs_batch)
-                    total_chunks += len(docs_batch)
-                    docs_batch = []
-
-    if docs_batch:
-        await vector_store.insert_documents_batch(docs_batch)
-        total_chunks += len(docs_batch)
-
-    logger.info(
-        "Successfully indexed real knowledge base: %d pages processed, %d chunks stored.",
-        pages_processed,
-        total_chunks,
-    )
-    return {
-        "status": "success",
-        "file": str(target_file),
-        "pages_processed": pages_processed,
-        "chunks_indexed": total_chunks,
-    }
+        logger.info(
+            "Successfully indexed real knowledge base: %d pages processed, %d chunks stored.",
+            pages_processed,
+            total_chunks,
+        )
+        logger.info("Exiting load_real_knowledge_base successfully")
+        return {
+            "status": "success",
+            "file": str(target_file),
+            "pages_processed": pages_processed,
+            "chunks_indexed": total_chunks,
+        }
+    except Exception as exc:
+        logger.error("Error occurred in load_real_knowledge_base: %s", exc, exc_info=True)
+        raise

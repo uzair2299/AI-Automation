@@ -1,4 +1,5 @@
 """Vector Store backend for storing and querying embedded documents."""
+import logging
 import math
 from typing import Any, Dict, List, Optional
 import uuid
@@ -7,6 +8,8 @@ try:
     from app.models import DocumentMetadata, DocumentSearchResult
 except ImportError:
     from .models import DocumentMetadata, DocumentSearchResult
+
+logger = logging.getLogger("rag-service.vector_store")
 
 
 def cosine_similarity(a: List[float], b: List[float]) -> float:
@@ -37,43 +40,55 @@ class VectorStoreClient:
         metadata: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Insert embedded document chunk into store."""
-        doc_id = str(uuid.uuid4())
-        doc_meta = DocumentMetadata(
-            title=title,
-            category=category,
-            content=content,
-            metadata=metadata or {},
-            tags=metadata.get("tags", []) if metadata else [],
-        )
-        self._storage[doc_id] = {
-            "metadata": doc_meta,
-            "embedding": embedding,
-        }
-        return doc_id
+        logger.debug("Entering VectorStoreClient.insert_document")
+        try:
+            doc_id = str(uuid.uuid4())
+            doc_meta = DocumentMetadata(
+                title=title,
+                category=category,
+                content=content,
+                metadata=metadata or {},
+                tags=metadata.get("tags", []) if metadata else [],
+            )
+            self._storage[doc_id] = {
+                "metadata": doc_meta,
+                "embedding": embedding,
+            }
+            logger.debug("Exiting VectorStoreClient.insert_document")
+            return doc_id
+        except Exception as exc:
+            logger.error("Failed to insert document into VectorStoreClient: %s", exc, exc_info=True)
+            raise
 
     async def insert_documents_batch(
         self,
         docs: List[Dict[str, Any]],
     ) -> List[str]:
         """Bulk insert multiple document chunks into in-memory store."""
-        inserted_ids = []
-        for d in docs:
-            doc_id = str(d.get("document_id") or uuid.uuid4())
-            meta = d.get("metadata") or {}
-            tags = d.get("tags") or meta.get("tags", [])
-            doc_meta = DocumentMetadata(
-                title=d.get("title", "Untitled"),
-                category=d.get("category", "general"),
-                content=d.get("content", ""),
-                metadata=meta,
-                tags=tags,
-            )
-            self._storage[doc_id] = {
-                "metadata": doc_meta,
-                "embedding": d.get("embedding", []),
-            }
-            inserted_ids.append(doc_id)
-        return inserted_ids
+        logger.info("Entering VectorStoreClient.insert_documents_batch")
+        try:
+            inserted_ids = []
+            for d in docs:
+                doc_id = str(d.get("document_id") or uuid.uuid4())
+                meta = d.get("metadata") or {}
+                tags = d.get("tags") or meta.get("tags", [])
+                doc_meta = DocumentMetadata(
+                    title=d.get("title", "Untitled"),
+                    category=d.get("category", "general"),
+                    content=d.get("content", ""),
+                    metadata=meta,
+                    tags=tags,
+                )
+                self._storage[doc_id] = {
+                    "metadata": doc_meta,
+                    "embedding": d.get("embedding", []),
+                }
+                inserted_ids.append(doc_id)
+            logger.info("Exiting VectorStoreClient.insert_documents_batch")
+            return inserted_ids
+        except Exception as exc:
+            logger.error("Failed to batch insert documents into VectorStoreClient: %s", exc, exc_info=True)
+            raise
 
     async def search(
         self,
@@ -82,26 +97,35 @@ class VectorStoreClient:
         category: Optional[str] = None,
     ) -> List[DocumentSearchResult]:
         """Perform nearest-neighbor search based on cosine similarity."""
-        scored: List[DocumentSearchResult] = []
+        logger.info("Entering VectorStoreClient.search")
+        try:
+            scored: List[DocumentSearchResult] = []
 
-        for doc_id, entry in self._storage.items():
-            meta = entry["metadata"]
-            if category and meta.category != category:
-                continue
+            for doc_id, entry in self._storage.items():
+                meta = entry["metadata"]
+                if category and meta.category != category:
+                    continue
 
-            sim = cosine_similarity(query_embedding, entry["embedding"])
-            scored.append(
-                DocumentSearchResult(
-                    document_id=doc_id,
-                    similarity_score=round(float(sim), 4),
-                    document=meta,
+                sim = cosine_similarity(query_embedding, entry["embedding"])
+                scored.append(
+                    DocumentSearchResult(
+                        document_id=doc_id,
+                        similarity_score=round(float(sim), 4),
+                        document=meta,
+                    )
                 )
-            )
 
-        # Sort descending by similarity score
-        scored.sort(key=lambda x: x.similarity_score, reverse=True)
-        return scored[:top_k]
+            scored.sort(key=lambda x: x.similarity_score, reverse=True)
+            results = scored[:top_k]
+            logger.info("Exiting VectorStoreClient.search")
+            return results
+        except Exception as exc:
+            logger.error("Failed to execute search in VectorStoreClient: %s", exc, exc_info=True)
+            raise
 
     async def count(self) -> int:
-        """Return total indexed chunks."""
-        return len(self._storage)
+        """Return total number of stored documents."""
+        logger.debug("Entering VectorStoreClient.count")
+        cnt = len(self._storage)
+        logger.debug("Exiting VectorStoreClient.count")
+        return cnt
