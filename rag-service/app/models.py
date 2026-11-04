@@ -1,15 +1,8 @@
 """Data contracts and schemas for RAG REST Service."""
-from typing import Any, Generic, List, Optional, TypeVar
+from typing import Any, List, Optional
 from pydantic import BaseModel, Field
 
-T = TypeVar("T")
-
-
-class APIResponse(BaseModel, Generic[T]):
-    """Standardized API Response Envelope."""
-    data: Optional[T] = None
-    message: Optional[str] = None
-    status: str = "success"
+from smiota_common.models import APIResponse
 
 
 class DocumentMetadata(BaseModel):
@@ -61,3 +54,14 @@ class DocumentIngestionResponse(BaseModel):
     chunks_created: int
     status: str = "indexed"
 
+
+__all__ = [
+    "APIResponse",
+    "DocumentChunkRecord",
+    "DocumentIngestionRequest",
+    "DocumentIngestionResponse",
+    "DocumentMetadata",
+    "DocumentSearchResult",
+    "VectorSearchRequest",
+    "VectorSearchResponse",
+]

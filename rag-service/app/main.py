@@ -1,4 +1,5 @@
 """Standalone RAG Knowledge Microservice FastAPI Application."""
+
 from contextlib import asynccontextmanager
 import logging
 from pathlib import Path
@@ -58,8 +59,12 @@ else:
     vector_store = VectorStoreClient()
 
 embedding_service = EmbeddingService(dimension=settings.EMBEDDING_DIMENSION)
-chunker = DocumentChunker(target_chunk_size=settings.TARGET_CHUNK_SIZE, overlap=settings.CHUNK_OVERLAP)
-retriever = KnowledgeRetriever(vector_store=vector_store, embedding_service=embedding_service)
+chunker = DocumentChunker(
+    target_chunk_size=settings.TARGET_CHUNK_SIZE, overlap=settings.CHUNK_OVERLAP
+)
+retriever = KnowledgeRetriever(
+    vector_store=vector_store, embedding_service=embedding_service
+)
 
 
 async def seed_initial_documents():
@@ -68,7 +73,9 @@ async def seed_initial_documents():
     global vector_store, retriever
     try:
         if await vector_store.count() > 0:
-            logger.info("Vector store already contains documents, skipping initial seed")
+            logger.info(
+                "Vector store already contains documents, skipping initial seed"
+            )
             logger.info("Exiting seed_initial_documents")
             return
     except Exception as exc:
@@ -79,7 +86,9 @@ async def seed_initial_documents():
             exc_info=True,
         )
         vector_store = VectorStoreClient()
-        retriever = KnowledgeRetriever(vector_store=vector_store, embedding_service=embedding_service)
+        retriever = KnowledgeRetriever(
+            vector_store=vector_store, embedding_service=embedding_service
+        )
 
     try:
         # 1. Attempt to index real scraped knowledge base from website_content.jsonl
@@ -117,10 +126,14 @@ async def seed_initial_documents():
     try:
         for title, content, cat in sample_docs:
             emb = await embedding_service.get_embedding(content)
-            await vector_store.insert_document(title=title, content=content, embedding=emb, category=cat)
+            await vector_store.insert_document(
+                title=title, content=content, embedding=emb, category=cat
+            )
         logger.info("Exiting seed_initial_documents (bootstrap documents seeded)")
     except Exception as exc:
-        logger.error("Failed to insert sample bootstrap documents: %s", exc, exc_info=True)
+        logger.error(
+            "Failed to insert sample bootstrap documents: %s", exc, exc_info=True
+        )
 
 
 @asynccontextmanager
@@ -129,7 +142,9 @@ async def lifespan(app: FastAPI):
     try:
         await seed_initial_documents()
     except Exception as exc:
-        logger.error("Error during RAG service startup lifespan: %s", exc, exc_info=True)
+        logger.error(
+            "Error during RAG service startup lifespan: %s", exc, exc_info=True
+        )
     yield
     logger.info("Shutting down RAG service lifespan")
 
@@ -142,7 +157,7 @@ app = FastAPI(
 )
 
 # Distributed correlation tracing and CORS middleware
-app.add_middleware(CorrelationIdMiddleware)
+app.add_middleware(CorrelationIdMiddleware, id_prefix="rag")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -155,17 +170,25 @@ app.add_middleware(
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     """Log validation failures and return structured response."""
-    logger.warning("Request validation failed on %s: %s", request.url.path, exc.errors())
+    logger.warning(
+        "Request validation failed on %s: %s", request.url.path, exc.errors()
+    )
     return JSONResponse(
         status_code=422,
-        content={"status": "error", "message": "Request validation failed", "errors": exc.errors()},
+        content={
+            "status": "error",
+            "message": "Request validation failed",
+            "errors": exc.errors(),
+        },
     )
 
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
     """Log HTTP exceptions with proper details."""
-    logger.warning("HTTPException on %s [%d]: %s", request.url.path, exc.status_code, exc.detail)
+    logger.warning(
+        "HTTPException on %s [%d]: %s", request.url.path, exc.status_code, exc.detail
+    )
     return JSONResponse(
         status_code=exc.status_code,
         content={"status": "error", "message": exc.detail},
@@ -243,7 +266,11 @@ async def ingest_document(payload: DocumentIngestionRequest):
         for idx, chunk in enumerate(chunks):
             emb = await embedding_service.get_embedding(chunk)
             doc_id = await vector_store.insert_document(
-                title=f"{payload.title} (Part {idx+1})" if len(chunks) > 1 else payload.title,
+                title=(
+                    f"{payload.title} (Part {idx+1})"
+                    if len(chunks) > 1
+                    else payload.title
+                ),
                 content=chunk,
                 embedding=emb,
                 category=payload.category,

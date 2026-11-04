@@ -18,8 +18,12 @@ except ImportError:
     from .config import settings
     from .models import CompartmentInfo, LockerStatusResponse
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
-logger = logging.getLogger("smart-locker-mcp")
+try:
+    from smiota_common.logging import setup_logging
+    logger = setup_logging(service_name="smart-locker-mcp")
+except ImportError:
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+    logger = logging.getLogger("smart-locker-mcp")
 
 mcp = FastMCP("smart-locker-mcp")
 

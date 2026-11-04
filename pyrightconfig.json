@@ -5,13 +5,15 @@
     "tests",
     "mcp-servers/k8s-sre",
     "mcp-servers/observability",
-    "mcp-servers/smart-locker"
+    "mcp-servers/smart-locker",
+    "packages/common"
   ],
   "extraPaths": [
     "src",
     "rag-service",
     "mcp-servers/k8s-sre",
     "mcp-servers/observability",
-    "mcp-servers/smart-locker"
+    "mcp-servers/smart-locker",
+    "packages/common"
   ]
 }
