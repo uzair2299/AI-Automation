@@ -4,16 +4,12 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-try:
-    from app.chunking import DocumentChunker
-    from app.embeddings import EmbeddingService
-except ImportError:
-    from .chunking import DocumentChunker
-    from .embeddings import EmbeddingService
+from app.services.chunking import DocumentChunker
+from app.services.embeddings import EmbeddingService
 
-logger = logging.getLogger("rag-service.loader")
+logger = logging.getLogger("rag-service.services.loader")
 
-_BASE_DIR = Path(__file__).resolve().parent.parent
+_BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 KNOWLEDGE_SEARCH_PATHS = [
     _BASE_DIR / "data" / "knowledge" / "public" / "website_content.jsonl",
@@ -179,3 +175,4 @@ async def load_real_knowledge_base(
     except Exception as exc:
         logger.error("Error occurred in load_real_knowledge_base: %s", exc, exc_info=True)
         raise
+

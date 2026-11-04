@@ -2,16 +2,11 @@
 import logging
 from typing import List, Optional
 
-try:
-    from app.embeddings import EmbeddingService
-    from app.models import DocumentSearchResult
-    from app.vector_store import VectorStoreClient
-except ImportError:
-    from .embeddings import EmbeddingService
-    from .models import DocumentSearchResult
-    from .vector_store import VectorStoreClient
+from app.schemas.document import DocumentSearchResult
+from app.services.embeddings import EmbeddingService
+from app.storage.memory import VectorStoreClient
 
-logger = logging.getLogger("rag-service.retriever")
+logger = logging.getLogger("rag-service.services.retriever")
 
 
 class KnowledgeRetriever:
@@ -41,3 +36,4 @@ class KnowledgeRetriever:
         except Exception as exc:
             logger.error("Error occurred in KnowledgeRetriever.retrieve: %s", exc, exc_info=True)
             raise
+

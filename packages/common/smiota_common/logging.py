@@ -116,3 +116,4 @@ def setup_logging(
     logger = logging.getLogger(service_name)
     logger.setLevel(level)
     return logger
+

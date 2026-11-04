@@ -18,3 +18,4 @@ class APIResponse(BaseModel, Generic[T]):
     message: Optional[str] = Field(default=None, description="Informational message or operation summary")
     status: str = Field(default="success", description="'success' or 'error'")
     errors: Optional[List[ErrorDetail]] = Field(default=None, description="Optional list of error details")
+

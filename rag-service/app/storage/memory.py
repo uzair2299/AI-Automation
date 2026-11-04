@@ -1,15 +1,12 @@
-"""Vector Store backend for storing and querying embedded documents."""
+"""In-memory Vector Store implementation with cosine similarity search."""
 import logging
 import math
 from typing import Any, Dict, List, Optional
 import uuid
 
-try:
-    from app.models import DocumentMetadata, DocumentSearchResult
-except ImportError:
-    from .models import DocumentMetadata, DocumentSearchResult
+from app.schemas.document import DocumentMetadata, DocumentSearchResult
 
-logger = logging.getLogger("rag-service.vector_store")
+logger = logging.getLogger("rag-service.storage.memory")
 
 
 def cosine_similarity(a: List[float], b: List[float]) -> float:
@@ -129,3 +126,4 @@ class VectorStoreClient:
         cnt = len(self._storage)
         logger.debug("Exiting VectorStoreClient.count")
         return cnt
+

@@ -7,10 +7,7 @@ from smiota_common.logging import (
 )
 from smiota_common.middleware import CorrelationIdMiddleware
 
-try:
-    from app.config import settings
-except ImportError:
-    from .config import settings
+from app.core.config import settings
 
 
 def setup_logging():
@@ -29,3 +26,4 @@ __all__ = [
     "correlation_id_ctx",
     "setup_logging",
 ]
+

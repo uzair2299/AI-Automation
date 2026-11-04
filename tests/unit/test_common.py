@@ -121,3 +121,4 @@ def test_correlation_id_middleware():
     assert cid2 is not None
     assert cid2.startswith("test-corr-")
     assert resp2.json()["correlation_id"] == cid2
+

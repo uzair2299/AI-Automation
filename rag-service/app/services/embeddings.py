@@ -5,12 +5,9 @@ import math
 import re
 from typing import List
 
-try:
-    from app.config import settings
-except ImportError:
-    from .config import settings
+from app.core.config import settings
 
-logger = logging.getLogger("rag-service.embeddings")
+logger = logging.getLogger("rag-service.services.embeddings")
 
 
 class EmbeddingService:
@@ -71,3 +68,4 @@ class EmbeddingService:
         except Exception as exc:
             logger.error("Failed to generate embedding: %s", exc, exc_info=True)
             raise
+

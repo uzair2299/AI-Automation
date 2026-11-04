@@ -25,3 +25,4 @@ class CorrelationIdMiddleware(BaseHTTPMiddleware):
             return response
         finally:
             correlation_id_ctx.reset(token)
+

@@ -8,14 +8,10 @@ import uuid
 
 import asyncpg
 
-try:
-    from app.config import settings
-    from app.models import DocumentMetadata, DocumentSearchResult
-except ImportError:
-    from .config import settings
-    from .models import DocumentMetadata, DocumentSearchResult
+from app.core.config import settings
+from app.schemas.document import DocumentMetadata, DocumentSearchResult
 
-logger = logging.getLogger("rag-service.pgvector")
+logger = logging.getLogger("rag-service.storage.pgvector")
 
 
 class PgVectorStoreClient:
@@ -230,3 +226,4 @@ class PgVectorStoreClient:
         except Exception as exc:
             logger.error("Failed to get document count from pgvector: %s", exc, exc_info=True)
             raise
+

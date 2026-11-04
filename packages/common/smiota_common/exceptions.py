@@ -47,3 +47,4 @@ class AuthorizationError(SmiotaException):
 
     def __init__(self, message: str = "Forbidden: insufficient permissions for this operation."):
         super().__init__(message=message, status_code=403, error_code="PERMISSION_DENIED")
+

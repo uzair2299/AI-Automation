@@ -1,5 +1,4 @@
 """Configuration settings for Standalone RAG Knowledge Service."""
-from typing import Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -40,3 +39,4 @@ class RAGServiceSettings(BaseSettings):
 
 
 settings = RAGServiceSettings()
+
