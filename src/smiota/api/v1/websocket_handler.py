@@ -224,6 +224,12 @@ class WebSocketChatHandler:
         try:
             # Route to multi-agent core
             result = await self.orchestrator.route_and_execute(user_message, context)
+            prov = result.metadata.get("provenance") or {}
+            source_type = result.metadata.get("source_type") or prov.get("source_type")
+            is_grounded = result.metadata.get("is_grounded") or prov.get("is_grounded")
+            rag_latency_ms = result.metadata.get("rag_latency_ms") or prov.get("rag_latency_ms")
+            llm_latency_ms = result.metadata.get("llm_latency_ms") or prov.get("llm_latency_ms")
+            sources_count = len(result.metadata.get("structured_sources") or result.metadata.get("sources") or [])
             logger.info(
                 "Agent execution completed for WebSocket chat",
                 extra={
@@ -231,6 +237,11 @@ class WebSocketChatHandler:
                     "session_id": self.session_id,
                     "agent_name": result.agent_name,
                     "requires_approval": result.requires_approval,
+                    "source_type": source_type,
+                    "is_grounded": is_grounded,
+                    "rag_latency_ms": rag_latency_ms,
+                    "llm_latency_ms": llm_latency_ms,
+                    "sources_count": sources_count,
                 },
             )
             await self._stream_response(result)
@@ -382,6 +393,10 @@ class WebSocketChatHandler:
                 "session_id": self.session_id,
                 "agent_name": agent_display,
                 "has_card": bool(card_data),
+                "source_type": completion_metadata.get("source_type"),
+                "is_grounded": completion_metadata.get("is_grounded"),
+                "rag_latency_ms": completion_metadata.get("rag_latency_ms"),
+                "llm_latency_ms": completion_metadata.get("llm_latency_ms"),
             },
         )
 

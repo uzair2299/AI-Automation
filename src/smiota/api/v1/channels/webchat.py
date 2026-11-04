@@ -381,34 +381,42 @@ async def embed_widget(
         function formatInlineMarkdown(text) {
             if (!text) return '';
             let formatted = text;
+            const links = [];
 
-            // Hyperlinks: [Label](url)
+            // 1. Hyperlinks: [Label](url) -> protect with placeholder tokens (no underscores)
             formatted = formatted.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, label, rawUrl) => {
                 const unescapedUrl = rawUrl.replace(/&amp;/g, '&');
                 const safeUrl = sanitizeUrl(unescapedUrl);
                 if (safeUrl) {
-                    return `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:text-indigo-800 underline font-medium inline-flex items-center gap-0.5 transition-colors">${label}<svg class="w-3 h-3 inline-block shrink-0 opacity-70 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg></a>`;
+                    const id = `%%LINKTOKEN${links.length}%%`;
+                    links.push(`<a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:text-indigo-800 underline font-medium inline-flex items-center gap-0.5 transition-colors">${label}<svg class="w-3 h-3 inline-block shrink-0 opacity-70 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg></a>`);
+                    return id;
                 }
                 return label;
             });
 
-            // Autolinks: standalone http/https URLs not already in href
+            // 2. Autolinks: standalone http/https URLs -> protect with placeholder tokens
             formatted = formatted.replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g, (match, prefix, rawUrl) => {
                 const unescapedUrl = rawUrl.replace(/&amp;/g, '&');
                 const safeUrl = sanitizeUrl(unescapedUrl);
                 if (safeUrl) {
-                    return `${prefix}<a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:text-indigo-800 underline font-medium inline-flex items-center gap-0.5 transition-colors">${rawUrl}<svg class="w-3 h-3 inline-block shrink-0 opacity-70 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg></a>`;
+                    const id = `%%LINKTOKEN${links.length}%%`;
+                    links.push(`<a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:text-indigo-800 underline font-medium inline-flex items-center gap-0.5 transition-colors">${rawUrl}<svg class="w-3 h-3 inline-block shrink-0 opacity-70 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg></a>`);
+                    return `${prefix}${id}`;
                 }
                 return match;
             });
 
-            // Bold: **text** or __text__
+            // 3. Bold: **text** or __text__
             formatted = formatted.replace(/\*\*(.+?)\*\*/g, '<strong class="font-semibold text-slate-900">$1</strong>');
             formatted = formatted.replace(/__(.+?)__/g, '<strong class="font-semibold text-slate-900">$1</strong>');
 
-            // Italic: *(text)* or *text* or _text_
+            // 4. Italic: *(text)* or *text* or _text_
             formatted = formatted.replace(/\*(?!\s)([^*\n]+?)(?<!\s)\*/g, '<em class="italic text-slate-700 font-medium">$1</em>');
-            formatted = formatted.replace(/_(?!\s)([^_\n]+?)(?<!\s)_/g, '<em class="italic text-slate-700 font-medium">$1</em>');
+            formatted = formatted.replace(/(^|[\s(])_([^_]+)_([\s).,!?:;]|$)/g, '$1<em class="italic text-slate-700 font-medium">$2</em>$3');
+
+            // 5. Restore Links
+            formatted = formatted.replace(/%%LINKTOKEN(\d+)%%/g, (match, idx) => links[parseInt(idx, 10)] || '');
 
             return formatted;
         }
@@ -689,150 +697,34 @@ async def embed_widget(
         }
 
         
+        // Telemetry & Provenance Logging (Kept strictly under the hood in logging scope & payload, not displayed on UI)
+        function logProvenanceTelemetry(metadata) {
+            if (!metadata) return;
+            try {
+                const prov = metadata.provenance || metadata;
+                const sourceType = prov.source_type || metadata.source_type;
+                const isGrounded = Boolean(prov.is_grounded || metadata.is_grounded);
+                const ragMs = prov.rag_latency_ms || metadata.rag_latency_ms;
+                const llmMs = prov.llm_latency_ms || metadata.llm_latency_ms;
+                const sources = prov.structured_sources || metadata.structured_sources || prov.detailed_sources || metadata.detailed_sources || prov.sources || metadata.sources || [];
+                console.log("[Telemetry & Provenance]", {
+                    source_type: sourceType,
+                    is_grounded: isGrounded,
+                    rag_latency_ms: ragMs,
+                    llm_latency_ms: llmMs,
+                    sources_count: Array.isArray(sources) ? sources.length : 0,
+                    sources: sources,
+                    payload_metadata: metadata
+                });
+            } catch (e) {
+                console.debug("Telemetry logging error:", e);
+            }
+        }
+
         function renderProvenanceBadge(metadata) {
-            if (!metadata) return '';
-            const prov = metadata.provenance || metadata;
-            const sourceType = prov.source_type || metadata.source_type;
-
-            if (sourceType === 'private_resident_data' || sourceType === 'carrier_tracking' || prov.refusal_type) {
-                return `
-                    <div class="mt-2.5 pt-1.5 border-t border-slate-100 flex items-center space-x-1.5 text-[11px] text-slate-400 select-none">
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
-                            🛡️ Privacy Policy Boundary
-                        </span>
-                    </div>
-                `;
-            }
-
-            // Extract structured sources list (checking structured_sources, detailed_sources, sources)
-            let sources = prov.structured_sources || metadata.structured_sources || prov.detailed_sources || metadata.detailed_sources || [];
-            if (!sources || sources.length === 0) {
-                const rawSources = prov.sources || metadata.sources || [];
-                if (Array.isArray(rawSources) && rawSources.length > 0) {
-                    sources = rawSources.map(s => {
-                        if (typeof s === 'string') {
-                            return { title: 'Smiota Documentation', url: s, source_type: 'website' };
-                        }
-                        return s;
-                    });
-                }
-            }
-
-            const chunksCount = sources.length || prov.retrieved_chunks_count || 0;
-            const isGrounded = Boolean(prov.is_grounded || (chunksCount > 0));
-            const ragMs = prov.rag_latency_ms ? (prov.rag_latency_ms + "ms") : "";
-            const llmMs = prov.llm_latency_ms ? (prov.llm_latency_ms + "ms") : "";
-
-            if (isGrounded && sources.length > 0) {
-                const cardsHtml = sources.map(s => {
-                    const rawTitle = s.title || 'Smiota Documentation';
-                    const cleanTitle = escapeHtml(rawTitle.replace(/\s*\(part\s+\d+\)\s*$/i, '').trim());
-                    const rawUrl = s.url || '';
-                    const safeUrl = sanitizeUrl(rawUrl);
-                    let domain = 'smiota.com';
-                    if (s.domain) {
-                        domain = escapeHtml(s.domain);
-                    } else if (safeUrl) {
-                        try {
-                            domain = escapeHtml(new URL(rawUrl).hostname.replace(/^www\./, ''));
-                        } catch(e) {
-                            domain = 'smiota.com';
-                        }
-                    }
-
-                    const type = String(s.source_type || 'website').toLowerCase();
-                    let typeIcon = '🌐';
-                    let typeBadge = 'Website';
-                    let badgeClass = 'bg-sky-50 text-sky-700 border-sky-200';
-
-                    if (type === 'pdf') {
-                        typeIcon = '📄';
-                        typeBadge = 'PDF Document';
-                        badgeClass = 'bg-rose-50 text-rose-700 border-rose-200';
-                    } else if (type === 'runbook') {
-                        typeIcon = '📖';
-                        typeBadge = 'Runbook';
-                        badgeClass = 'bg-amber-50 text-amber-700 border-amber-200';
-                    } else if (type === 'internal_docs') {
-                        typeIcon = '📑';
-                        typeBadge = 'Internal Docs';
-                        badgeClass = 'bg-purple-50 text-purple-700 border-purple-200';
-                    }
-
-                    const linkButton = safeUrl
-                        ? `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 bg-white hover:bg-indigo-50/90 border border-slate-200 hover:border-indigo-200 px-2.5 py-1 rounded-lg transition-colors shadow-2xs shrink-0">
-                            <span>Open source</span>
-                            <svg class="w-3 h-3 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
-                           </a>`
-                        : `<span class="text-[10px] text-slate-400 font-mono italic">Verified reference</span>`;
-
-                    return `
-                        <div class="bg-slate-50/90 hover:bg-slate-100/80 border border-slate-200/80 rounded-xl p-2.5 transition flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-2xs">
-                            <div class="min-w-0 flex-1">
-                                <div class="flex items-center gap-1.5 mb-1">
-                                    <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border ${badgeClass}">
-                                        <span>${typeIcon}</span>
-                                        <span>${typeBadge}</span>
-                                    </span>
-                                    <span class="text-[10px] text-slate-400 font-mono truncate">${domain}</span>
-                                </div>
-                                <div class="text-xs font-semibold text-slate-800 truncate" title="${cleanTitle}">
-                                    ${cleanTitle}
-                                </div>
-                            </div>
-                            <div class="shrink-0 flex items-center justify-end">
-                                ${linkButton}
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-
-                return `
-                    <div class="mt-3 pt-2 border-t border-slate-100 text-xs">
-                        <!-- Grounding telemetry banner -->
-                        <div class="flex items-center justify-between text-slate-500 mb-1.5">
-                            <span class="inline-flex items-center space-x-1 text-[10px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                                <svg class="w-3 h-3 text-emerald-600 mr-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                                <span>Grounded via RAG (${sources.length} source${sources.length > 1 ? 's' : ''})</span>
-                            </span>
-                            <span class="text-[10px] text-slate-400 font-mono select-none">
-                                ${ragMs ? `RAG: ${ragMs}` : 'RAG'} + ${llmMs ? `LLM: ${llmMs}` : 'Gemini'}
-                            </span>
-                        </div>
-
-                        <!-- Collapsible Sources Section -->
-                        <details class="group mt-1 rounded-xl border border-slate-200/80 bg-white/80 overflow-hidden shadow-2xs">
-                            <summary class="cursor-pointer select-none text-xs font-semibold text-slate-700 hover:text-indigo-600 flex items-center justify-between px-3 py-2 bg-slate-50/70 hover:bg-slate-100/70 transition-colors">
-                                <span class="inline-flex items-center gap-1.5">
-                                    <svg class="w-3.5 h-3.5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
-                                    <span>Sources (${sources.length})</span>
-                                </span>
-                                <span class="inline-flex items-center gap-1 text-[11px] text-slate-400 group-hover:text-indigo-600 font-normal">
-                                    <span class="group-open:hidden">Show</span>
-                                    <span class="hidden group-open:inline">Hide</span>
-                                    <svg class="w-3.5 h-3.5 transition-transform duration-200 group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                                </span>
-                            </summary>
-                            <div class="p-2 space-y-1.5 border-t border-slate-100 bg-white">
-                                ${cardsHtml}
-                            </div>
-                        </details>
-                    </div>
-                `;
-            }
-
-            if (sourceType === 'llm_direct' || (chunksCount === 0 && !isGrounded)) {
-                return `
-                    <div class="mt-2.5 pt-1.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400 select-none">
-                        <span class="inline-flex items-center space-x-1 text-[10px] font-medium text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
-                            <svg class="w-3 h-3 text-amber-600 mr-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                            <span>Direct LLM (0 RAG matches)</span>
-                        </span>
-                        <span class="text-[10px] text-slate-400 font-mono">${llmMs ? `LLM: ${llmMs}` : 'Gemini'}</span>
-                    </div>
-                `;
-            }
-
+            // Keep telemetry and provenance strictly in logging scope under the hood and in payload.
+            // Do not display extra information on the UI to the user.
+            logProvenanceTelemetry(metadata);
             return '';
         }
 
@@ -852,6 +744,7 @@ async def embed_widget(
                         </div>
                     `;
                 }
+                logProvenanceTelemetry(metadata);
 
                 div.innerHTML = `
                     <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-violet-600 to-indigo-600 text-white shadow-xs flex items-center justify-center p-1.5 shrink-0 select-none relative">${botAvatarSvg}</div>
@@ -862,7 +755,6 @@ async def embed_widget(
                         </div>
                         <div class="bot-text-body text-slate-700 text-sm leading-relaxed space-y-1">${formatMarkdown(text)}</div>
                         ${approvalBadge}
-                        ${renderProvenanceBadge(metadata)}
                     </div>
                 `;
             } else {
@@ -1074,16 +966,10 @@ async def embed_widget(
                 const actions = (typeof msg.content === 'object' && msg.content !== null) ? msg.content.suggested_actions : null;
 
                 const meta = msg.metadata || (typeof msg.content === 'object' ? msg.content?.metadata : null) || {};
+                logProvenanceTelemetry(meta);
                 if (currentStreamBody) {
                     if (textContent) {
                         currentStreamBody.innerHTML = formatMarkdown(textContent);
-                    }
-                    const badgeHtml = renderProvenanceBadge(meta);
-                    if (badgeHtml) {
-                        const badgeContainer = document.createElement('div');
-                        badgeContainer.className = 'provenance-wrapper';
-                        badgeContainer.innerHTML = badgeHtml;
-                        currentStreamBody.parentElement.appendChild(badgeContainer);
                     }
                 } else if (textContent) {
                     appendMessage('bot', textContent, agentName, requiresApproval, [], meta);

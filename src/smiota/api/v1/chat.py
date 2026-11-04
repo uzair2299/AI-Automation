@@ -9,6 +9,7 @@ from smiota.agents.orchestrator import AgentOrchestrator
 from smiota.api.deps import get_chat_repo, get_current_user, get_orchestrator
 from smiota.api.v1.websocket_handler import WebSocketChatHandler
 from smiota.core.exceptions import AuthorizationError
+from smiota.core.logging import logger
 from smiota.core.security import AuthenticatedUser
 from smiota.repositories.chat_repository import BaseChatRepository
 from smiota.schemas.chat import ChatMessageRequest, ChatMessageResponse, SourceReference
@@ -64,6 +65,22 @@ async def send_message(
         query=payload.message,
         context=context,
         preferred_agent=payload.target_agent,
+    )
+
+    prov = result.metadata.get("provenance") or {}
+    logger.info(
+        "Chat request processed successfully",
+        extra={
+            "event": "chat.request.completed",
+            "session_id": session_id,
+            "agent_name": result.agent_name,
+            "channel": payload.channel,
+            "source_type": result.metadata.get("source_type") or prov.get("source_type"),
+            "is_grounded": result.metadata.get("is_grounded") or prov.get("is_grounded"),
+            "rag_latency_ms": result.metadata.get("rag_latency_ms") or prov.get("rag_latency_ms"),
+            "llm_latency_ms": result.metadata.get("llm_latency_ms") or prov.get("llm_latency_ms"),
+            "sources_count": len(result.metadata.get("structured_sources") or result.metadata.get("sources") or []),
+        },
     )
 
     # For webchat channel, action pills and suggestions are commented out for now

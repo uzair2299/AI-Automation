@@ -4,8 +4,8 @@ import subprocess
 import tempfile
 
 
-def test_webchat_file_contains_markdown_and_source_components():
-    """Verify that webchat HTML contains Markdown functions, styling, tables, and collapsible source cards."""
+def test_webchat_file_contains_markdown_and_telemetry_logging():
+    """Verify that webchat HTML contains Markdown functions, styling, tables, and keeps telemetry in logging scope without displaying on UI."""
     with open("src/smiota/api/v1/channels/webchat.py", "r", encoding="utf-8") as f:
         content = f.read()
 
@@ -20,11 +20,9 @@ def test_webchat_file_contains_markdown_and_source_components():
     assert "min-w-full divide-y" in content
     assert "navigator.clipboard.writeText" in content
 
-    # Source cards elements
-    assert "Sources (${sources.length})" in content
-    assert "Open source" in content
-    assert "<details" in content
-    assert "<summary" in content
+    # Under-the-hood telemetry logging (telemetry logged to console and retained in payload, not rendered on UI)
+    assert "logProvenanceTelemetry" in content
+    assert "[Telemetry & Provenance]" in content
 
 
 def test_javascript_markdown_rendering_with_node():
