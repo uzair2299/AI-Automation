@@ -150,9 +150,9 @@ class RAGConfig:
     # --------------------------------------------------------------------------
     # Root directory path containing knowledge documents (.jsonl, .json, .txt, .md).
     # Defaults to the public knowledge partition for unauthenticated visitors.
-    knowledge_dir: str = "data/knowledge/public"
-    public_knowledge_dir: str = "data/knowledge/public"
-    internal_knowledge_dir: str = "data/knowledge/internal"
+    knowledge_dir: str = "rag-service/data/knowledge/public"
+    public_knowledge_dir: str = "rag-service/data/knowledge/public"
+    internal_knowledge_dir: str = "rag-service/data/knowledge/internal"
     auto_index_on_startup: bool = True
 
     # Supported file extensions when scanning the knowledge directory.
@@ -161,7 +161,7 @@ class RAGConfig:
     )
 
     # Backward-compatible file path for single JSONL ingestion workflows.
-    default_jsonl_path: str = "data/knowledge/public/website_content.jsonl"
+    default_jsonl_path: str = "rag-service/data/knowledge/public/website_content.jsonl"
 
     @classmethod
     def from_settings(cls, **overrides: Any) -> "RAGConfig":
@@ -184,7 +184,7 @@ class RAGConfig:
         )
         knowledge_dir = overrides.get(
             "knowledge_dir",
-            getattr(settings, "RAG_KNOWLEDGE_DIR", "data/knowledge/public"),
+            getattr(settings, "RAG_KNOWLEDGE_DIR", "rag-service/data/knowledge/public"),
         )
         embedding_provider = overrides.get(
             "embedding_provider",

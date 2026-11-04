@@ -24,14 +24,14 @@
 ## Local Development & Docker
 
 ```bash
-cd mcp-observability
+cd mcp-servers/observability
 pip install -r requirements.txt
 python -m app.server
 ```
 
 Or via Docker:
 ```bash
-docker build -t smiota-observability-mcp:latest -f mcp-observability/Dockerfile mcp-observability/
+docker build -t smiota-observability-mcp:latest -f mcp-servers/observability/Dockerfile mcp-servers/observability/
 docker run -p 8081:8081 smiota-observability-mcp:latest
 ```
 

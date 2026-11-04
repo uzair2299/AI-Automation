@@ -53,7 +53,7 @@ services:
   # ============================================================================
   k8s-sre-mcp:
     build:
-      context: ./mcp-server
+      context: ./mcp-servers/k8s-sre
       dockerfile: Dockerfile
     container_name: k8s-sre-mcp
     restart: unless-stopped
@@ -73,7 +73,7 @@ services:
   # ============================================================================
   observability-mcp:
     build:
-      context: ./mcp-observability
+      context: ./mcp-servers/observability
       dockerfile: Dockerfile
     container_name: observability-mcp
     restart: unless-stopped
@@ -93,7 +93,9 @@ services:
   # Hardware solenoid actuation, compartment sensors, and internal AI APIs.
   # ============================================================================
   smart-locker-mcp:
-    image: python:3.11-slim
+    build:
+      context: ./mcp-servers/smart-locker
+      dockerfile: Dockerfile
     container_name: smart-locker-mcp
     restart: unless-stopped
     ports:
@@ -101,16 +103,8 @@ services:
     environment:
       - MCP_HOST=0.0.0.0
       - MCP_PORT=8082
-    command: >
-      sh -c "pip install mcp httpx uvicorn && python -c '
-      from mcp.server.mcpserver import MCPServer
-      mcp = MCPServer(\"smart-locker-mcp\")
-      @mcp.tool()
-      def get_locker_status(locker_id: str = \"LOCKER-01\"): return {\"status\": \"ONLINE\", \"compartments_free\": 12}
-      mcp.settings.host=\"0.0.0.0\"
-      mcp.settings.port=8082
-      mcp.run(transport=\"streamable-http\")
-      '"
+      - MCP_TRANSPORT=streamable-http
+      - LOG_LEVEL=INFO
     networks:
       - smiota-mesh
 
@@ -130,7 +124,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
-      - ./data/knowledge:/app/data/knowledge:ro
+      - ./rag-service/data/knowledge:/app/data/knowledge:ro
     environment:
       - HOST=0.0.0.0
       - PORT=8001

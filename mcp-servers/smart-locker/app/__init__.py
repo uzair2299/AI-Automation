@@ -1,0 +1,3 @@
+"""Smiota Smart Locker Hardware & Compartment MCP Server."""
+__version__ = "1.0.0"
+

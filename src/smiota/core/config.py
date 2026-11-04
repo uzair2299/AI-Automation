@@ -85,8 +85,8 @@ class BaseAppSettings(BaseSettings):
     VECTOR_STORE_BACKEND: str = "memory"  # Options: 'memory', future: 'pgvector'
     RAG_EMBEDDING_PROVIDER: str = "vertex"  # Options: 'vertex', 'deterministic'
     RAG_AUTO_INDEX_ON_STARTUP: bool = True
-    RAG_KNOWLEDGE_DIR: str = "data/knowledge/public"
-    RAG_INPUT_JSONL_PATH: str = "data/knowledge/public/website_content.jsonl"
+    RAG_KNOWLEDGE_DIR: str = "rag-service/data/knowledge/public"
+    RAG_INPUT_JSONL_PATH: str = "rag-service/data/knowledge/public/website_content.jsonl"
 
     # Model Context Protocol & Remote Services
     MCP_READ_ONLY_DEFAULT: bool = True

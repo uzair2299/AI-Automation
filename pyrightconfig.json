@@ -2,11 +2,16 @@
   "include": [
     "src",
     "rag-service",
-    "tests"
+    "tests",
+    "mcp-servers/k8s-sre",
+    "mcp-servers/observability",
+    "mcp-servers/smart-locker"
   ],
   "extraPaths": [
     "src",
-    "rag-service"
+    "rag-service",
+    "mcp-servers/k8s-sre",
+    "mcp-servers/observability",
+    "mcp-servers/smart-locker"
   ]
 }
-

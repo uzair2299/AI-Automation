@@ -13,10 +13,13 @@ except ImportError:
 
 logger = logging.getLogger("rag-service.loader")
 
+_BASE_DIR = Path(__file__).resolve().parent.parent
+
 KNOWLEDGE_SEARCH_PATHS = [
+    _BASE_DIR / "data" / "knowledge" / "public" / "website_content.jsonl",
     Path("/app/data/knowledge/public/website_content.jsonl"),
+    Path("rag-service/data/knowledge/public/website_content.jsonl"),
     Path("data/knowledge/public/website_content.jsonl"),
-    Path("../data/knowledge/public/website_content.jsonl"),
 ]
 
 
