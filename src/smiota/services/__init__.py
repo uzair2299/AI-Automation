@@ -7,6 +7,7 @@ from smiota.services.auth_service import (
     SmiotaAuthClient,
     smiota_auth_client,
 )
+from smiota.services.source_processor import SourceProcessor, get_source_processor
 
 __all__ = [
     "package_service",
@@ -16,4 +17,6 @@ __all__ = [
     "BackendIdentity",
     "SmiotaAuthClient",
     "smiota_auth_client",
+    "SourceProcessor",
+    "get_source_processor",
 ]

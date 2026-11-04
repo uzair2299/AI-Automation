@@ -87,6 +87,14 @@ class BaseAppSettings(BaseSettings):
     RAG_AUTO_INDEX_ON_STARTUP: bool = True
     RAG_KNOWLEDGE_DIR: str = "rag-service/data/knowledge/public"
     RAG_INPUT_JSONL_PATH: str = "rag-service/data/knowledge/public/website_content.jsonl"
+    RAG_SOURCES_ENABLED: bool = True
+    RAG_MAX_DISPLAYED_SOURCES: int = 5
+    RAG_ALLOWED_SOURCE_DOMAINS: list[str] = [
+        "smiota.com",
+        "dev.smiotaapps.com",
+        "smiotaapps.com",
+    ]
+    RAG_MIN_RELEVANCE_THRESHOLD: float | None = None
 
     # Model Context Protocol & Remote Services
     MCP_READ_ONLY_DEFAULT: bool = True

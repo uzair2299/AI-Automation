@@ -332,6 +332,15 @@ class WebSocketChatHandler:
         # "suggested_actions": result.suggested_actions,
         content_payload: dict[str, Any] = {
             "text": result.content,
+            "answer": result.content,
+            "sources": [
+                s if isinstance(s, dict) else s.model_dump()
+                for s in (
+                    result.metadata.get("structured_sources")
+                    or result.metadata.get("detailed_sources")
+                    or []
+                )
+            ],
             "suggested_actions": [],
         }
         if card_data:

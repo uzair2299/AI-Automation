@@ -353,81 +353,228 @@ async def embed_widget(
             window.parent.postMessage({ type: 'resize-chatbot', height: height }, '*');
         }
 
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        // Safe URL scheme validator (Strictly allow https, http, mailto, and relative paths; reject javascript:, data:, etc.)
+        function sanitizeUrl(rawUrl) {
+            if (!rawUrl || typeof rawUrl !== 'string') return null;
+            const trimmed = rawUrl.trim();
+            // Disallow control characters and javascript/data/vbscript/file schemes
+            if (/[\s<>'"\\]/i.test(trimmed) || /^(javascript|data|vbscript|file):/i.test(trimmed)) {
+                return null;
+            }
+            if (/^(https?:\/\/|\/|mailto:)/i.test(trimmed)) {
+                return trimmed;
+            }
+            return null;
+        }
+
+        // Helper to format inline bold, italic, and safe hyperlinks
+        function formatInlineMarkdown(text) {
+            if (!text) return '';
+            let formatted = text;
+
+            // Hyperlinks: [Label](url)
+            formatted = formatted.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, label, rawUrl) => {
+                const unescapedUrl = rawUrl.replace(/&amp;/g, '&');
+                const safeUrl = sanitizeUrl(unescapedUrl);
+                if (safeUrl) {
+                    return `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:text-indigo-800 underline font-medium inline-flex items-center gap-0.5 transition-colors">${label}<svg class="w-3 h-3 inline-block shrink-0 opacity-70 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg></a>`;
+                }
+                return label;
+            });
+
+            // Autolinks: standalone http/https URLs not already in href
+            formatted = formatted.replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g, (match, prefix, rawUrl) => {
+                const unescapedUrl = rawUrl.replace(/&amp;/g, '&');
+                const safeUrl = sanitizeUrl(unescapedUrl);
+                if (safeUrl) {
+                    return `${prefix}<a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:text-indigo-800 underline font-medium inline-flex items-center gap-0.5 transition-colors">${rawUrl}<svg class="w-3 h-3 inline-block shrink-0 opacity-70 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg></a>`;
+                }
+                return match;
+            });
+
+            // Bold: **text** or __text__
+            formatted = formatted.replace(/\*\*(.+?)\*\*/g, '<strong class="font-semibold text-slate-900">$1</strong>');
+            formatted = formatted.replace(/__(.+?)__/g, '<strong class="font-semibold text-slate-900">$1</strong>');
+
+            // Italic: *(text)* or *text* or _text_
+            formatted = formatted.replace(/\*(?!\s)([^*\n]+?)(?<!\s)\*/g, '<em class="italic text-slate-700 font-medium">$1</em>');
+            formatted = formatted.replace(/_(?!\s)([^_\n]+?)(?<!\s)_/g, '<em class="italic text-slate-700 font-medium">$1</em>');
+
+            return formatted;
+        }
+
         function formatMarkdown(str) {
             if (!str) return '';
-            
+
             // Normalize line breaks
-            let text = str.replace(/\r\n/g, '\n');
+            let text = String(str).replace(/\r\n/g, '\n');
 
             // 1. Normalize squashed separators & headings
             text = text.replace(/\s*(---|___|\*\*\*)\s*/g, '\n\n---\n\n');
-            text = text.replace(/\s*(#{1,4}\s+)/g, '\n\n$1');
-            text = text.replace(/(#{1,4}\s+[^?\n:]+[?:])\s+([A-Z])/g, '$1\n\n$2');
+            text = text.replace(/\s*(#{1,6}\s+)/g, '\n\n$1');
+            text = text.replace(/(#{1,6}\s+[^?\n:]+[?:])\s+([A-Z])/g, '$1\n\n$2');
 
             // 2. Normalize inline bullet and numbered lists that lack newlines
-            // e.g. "deliveries: * Small: ... * Medium: ..." or "works: 1. Delivery ... 2. Instant ..."
             text = text.replace(/([.:!?])\s*([*•\-])\s+/g, '$1\n* ');
             text = text.replace(/([.:!?])\s*(\d+\.)\s+/g, '$1\n$2 ');
 
-            // 3. Bold: **text**
-            text = text.replace(/\*\*(.+?)\*\*/g, '<strong class="font-semibold text-slate-900">$1</strong>');
+            // 3. Extract and protect fenced code blocks ```lang\ncode\n```
+            const codeBlocks = [];
+            text = text.replace(/```([a-zA-Z0-9_+-]*)\n?([\s\S]*?)```/g, (match, lang, code) => {
+                const id = `@@CODEBLOCK_${codeBlocks.length}@@`;
+                const cleanLang = (lang || 'code').trim();
+                const trimmedCode = code.replace(/\n$/, '');
+                codeBlocks.push({
+                    lang: escapeHtml(cleanLang),
+                    codeEscaped: escapeHtml(trimmedCode),
+                    rawCode: encodeURIComponent(trimmedCode)
+                });
+                return `\n\n${id}\n\n`;
+            });
 
-            // 4. Inline code: `code`
-            text = text.replace(/`([^`\n]+)`/g, '<code class="bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded font-mono text-xs border border-indigo-100 font-medium">$1</code>');
+            // 4. Extract and protect inline code `code`
+            const inlineCodes = [];
+            text = text.replace(/`([^`\n]+)`/g, (match, code) => {
+                const id = `@@INLINECODE_${inlineCodes.length}@@`;
+                inlineCodes.push(escapeHtml(code));
+                return id;
+            });
 
-            // 5. Italic: *(text)* or *text* (excluding space directly after opening *)
-            text = text.replace(/\*(?!\s)([^*\n]+?)(?<!\s)\*/g, '<em class="text-slate-600 not-italic font-medium">$1</em>');
+            // 5. Escape raw HTML entities to strictly prevent XSS attacks
+            text = escapeHtml(text);
 
-            // Process lines for headings, dividers, lists, and paragraphs
+            // 6. Process block-level Markdown elements (Tables, Headings, Lists, Blockquotes, HRs)
             const rawLines = text.split('\n');
             const processed = [];
             let inList = false;
             let listType = null; // 'ul' or 'ol'
+            let inTable = false;
+            let tableHeaders = [];
+            let tableRows = [];
+
+            function closeList() {
+                if (inList) {
+                    processed.push(listType === 'ul' ? '</ul>' : '</ol>');
+                    inList = false;
+                    listType = null;
+                }
+            }
+
+            function flushTable() {
+                if (inTable && tableHeaders.length > 0) {
+                    const theadHtml = tableHeaders.map(h => `<th class="px-3 py-2 text-left text-xs font-semibold text-slate-800 bg-slate-100/90 border-b border-slate-200">${formatInlineMarkdown(h)}</th>`).join('');
+                    const tbodyHtml = tableRows.map(row => {
+                        const cells = row.map(c => `<td class="px-3 py-2 text-xs text-slate-700 border-b border-slate-100">${formatInlineMarkdown(c)}</td>`).join('');
+                        return `<tr class="hover:bg-slate-50/70 transition-colors">${cells}</tr>`;
+                    }).join('');
+                    processed.push(`
+                        <div class="my-2.5 overflow-x-auto rounded-xl border border-slate-200 shadow-2xs">
+                            <table class="min-w-full divide-y divide-slate-200 text-xs">
+                                <thead><tr>${theadHtml}</tr></thead>
+                                <tbody class="divide-y divide-slate-100 bg-white">${tbodyHtml}</tbody>
+                            </table>
+                        </div>
+                    `);
+                    inTable = false;
+                    tableHeaders = [];
+                    tableRows = [];
+                }
+            }
 
             for (let i = 0; i < rawLines.length; i++) {
                 const line = rawLines[i].trim();
-                if (!line) {
-                    if (inList) {
-                        processed.push(listType === 'ul' ? '</ul>' : '</ol>');
-                        inList = false;
-                        listType = null;
-                    }
+
+                // Check for code block placeholder lines
+                if (/^___CODE_BLOCK_\d+___$/.test(line)) {
+                    closeList();
+                    flushTable();
+                    processed.push(line);
                     continue;
                 }
 
-                // Horizontal divider: --- or ***
-                if (/^[-*_]{3,}$/.test(line)) {
-                    if (inList) {
-                        processed.push(listType === 'ul' ? '</ul>' : '</ol>');
-                        inList = false;
-                        listType = null;
+                if (!line) {
+                    closeList();
+                    flushTable();
+                    continue;
+                }
+
+                // Table parsing (Pipes: | Col 1 | Col 2 |)
+                if (line.startsWith('|') && line.endsWith('|')) {
+                    closeList();
+                    const cells = line.split('|').slice(1, -1).map(c => c.trim());
+                    // Check if this line is separator row (e.g. | :--- | :--- |)
+                    const isSeparator = cells.every(c => /^:?-+:?$/.test(c));
+                    if (isSeparator) {
+                        inTable = true;
+                        continue;
                     }
+                    if (!inTable) {
+                        tableHeaders = cells;
+                    } else {
+                        tableRows.push(cells);
+                    }
+                    continue;
+                } else if (inTable) {
+                    flushTable();
+                }
+
+                // Horizontal divider: ---, ***, ___
+                if (/^[-*_]{3,}$/.test(line)) {
+                    closeList();
                     processed.push('<hr class="my-3 border-slate-200/80">');
                     continue;
                 }
 
-                // Markdown headings: #, ##, ###
-                const headingMatch = line.match(/^(#{1,4})\s+(.+)$/);
-                if (headingMatch) {
-                    if (inList) {
-                        processed.push(listType === 'ul' ? '</ul>' : '</ol>');
-                        inList = false;
-                        listType = null;
-                    }
-                    processed.push(`<div class="font-semibold text-slate-900 text-sm mt-3 mb-1.5 flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-indigo-500 inline-block"></span>${headingMatch[2]}</div>`);
+                // Blockquotes: > quote
+                if (line.startsWith('&gt;') || line.startsWith('>')) {
+                    closeList();
+                    const quoteText = line.replace(/^(&gt;|>)\s*/, '');
+                    processed.push(`<blockquote class="border-l-4 border-indigo-400 pl-3 py-1.5 my-2 text-slate-600 italic bg-indigo-50/40 rounded-r text-xs leading-relaxed">${formatInlineMarkdown(quoteText)}</blockquote>`);
                     continue;
                 }
 
-                // Unordered list items: *, -, •
-                const ulMatch = line.match(/^([*•\-])\s+(.+)$/);
+                // Headings: # through ######
+                const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
+                if (headingMatch) {
+                    closeList();
+                    const level = headingMatch[1].length;
+                    const headingText = formatInlineMarkdown(headingMatch[2]);
+                    if (level === 1) {
+                        processed.push(`<h1 class="text-base font-bold text-slate-900 mt-3 mb-1.5 flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-indigo-600 inline-block shrink-0"></span>${headingText}</h1>`);
+                    } else if (level === 2) {
+                        processed.push(`<h2 class="text-sm font-bold text-slate-900 mt-2.5 mb-1 flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-indigo-500 inline-block shrink-0"></span>${headingText}</h2>`);
+                    } else if (level === 3) {
+                        processed.push(`<h3 class="text-xs font-bold text-slate-900 mt-2 mb-1">${headingText}</h3>`);
+                    } else if (level === 4) {
+                        processed.push(`<h4 class="text-xs font-semibold text-slate-800 mt-1.5 mb-0.5">${headingText}</h4>`);
+                    } else if (level === 5) {
+                        processed.push(`<h5 class="text-[11px] font-semibold text-slate-700 mt-1 mb-0.5">${headingText}</h5>`);
+                    } else {
+                        processed.push(`<h6 class="text-[11px] font-medium text-slate-600 mt-1 mb-0.5">${headingText}</h6>`);
+                    }
+                    continue;
+                }
+
+                // Unordered list items: *, -, +, •
+                const ulMatch = line.match(/^([*•\-+]|&bull;)\s+(.+)$/);
                 if (ulMatch) {
                     if (!inList || listType !== 'ul') {
-                        if (inList) processed.push(listType === 'ul' ? '</ul>' : '</ol>');
-                        processed.push('<ul class="list-disc pl-5 space-y-1.5 my-2 text-slate-700">');
+                        closeList();
+                        processed.push('<ul class="list-disc pl-5 space-y-1.5 my-2 text-slate-700 text-sm">');
                         inList = true;
                         listType = 'ul';
                     }
-                    processed.push(`<li>${ulMatch[2]}</li>`);
+                    processed.push(`<li>${formatInlineMarkdown(ulMatch[2])}</li>`);
                     continue;
                 }
 
@@ -435,29 +582,55 @@ async def embed_widget(
                 const olMatch = line.match(/^(\d+)\.\s+(.+)$/);
                 if (olMatch) {
                     if (!inList || listType !== 'ol') {
-                        if (inList) processed.push(listType === 'ul' ? '</ul>' : '</ol>');
-                        processed.push('<ol class="list-decimal pl-5 space-y-1.5 my-2 text-slate-700">');
+                        closeList();
+                        processed.push('<ol class="list-decimal pl-5 space-y-1.5 my-2 text-slate-700 text-sm">');
                         inList = true;
                         listType = 'ol';
                     }
-                    processed.push(`<li>${olMatch[2]}</li>`);
+                    processed.push(`<li>${formatInlineMarkdown(olMatch[2])}</li>`);
+                    continue;
+                }
+
+                // Check if line is a code block placeholder
+                const trimmedLine = line.trim();
+                if (trimmedLine.startsWith('@@CODEBLOCK_') && trimmedLine.endsWith('@@')) {
+                    closeList();
+                    processed.push(trimmedLine);
                     continue;
                 }
 
                 // Standard paragraph text
-                if (inList) {
-                    processed.push(listType === 'ul' ? '</ul>' : '</ol>');
-                    inList = false;
-                    listType = null;
-                }
-                processed.push(`<p class="leading-relaxed mb-2 last:mb-0">${line}</p>`);
+                closeList();
+                processed.push(`<p class="leading-relaxed mb-2 last:mb-0">${formatInlineMarkdown(line)}</p>`);
             }
 
-            if (inList) {
-                processed.push(listType === 'ul' ? '</ul>' : '</ol>');
-            }
+            closeList();
+            flushTable();
 
-            return processed.join('');
+            let resultHtml = processed.join('');
+
+            // 7. Restore Code Blocks
+            resultHtml = resultHtml.replace(/@@CODEBLOCK_(\d+)@@/g, (match, idx) => {
+                const item = codeBlocks[parseInt(idx, 10)];
+                if (!item) return '';
+                return `
+                    <div class="my-2.5 rounded-xl bg-slate-900 text-slate-100 overflow-hidden text-xs border border-slate-800 shadow-sm">
+                        <div class="px-3 py-1.5 bg-slate-950/80 text-[10px] font-mono text-slate-400 flex justify-between items-center border-b border-slate-800/80">
+                            <span class="font-semibold uppercase tracking-wider text-slate-400">${item.lang}</span>
+                            <button type="button" onclick="navigator.clipboard.writeText(decodeURIComponent('${item.rawCode}'))" class="hover:text-white transition px-1.5 py-0.5 rounded hover:bg-slate-800 font-mono text-[10px] cursor-pointer">Copy</button>
+                        </div>
+                        <pre class="p-3 overflow-x-auto font-mono text-xs leading-relaxed text-emerald-300 bg-slate-900/90 m-0"><code>${item.codeEscaped}</code></pre>
+                    </div>
+                `;
+            });
+
+            // 8. Restore Inline Codes
+            resultHtml = resultHtml.replace(/@@INLINECODE_(\d+)@@/g, (match, idx) => {
+                const code = inlineCodes[parseInt(idx, 10)];
+                return `<code class="bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded font-mono text-xs border border-indigo-100 font-medium">${code || ''}</code>`;
+            });
+
+            return resultHtml;
         }
 
         function escapeHtml(str) {
@@ -519,66 +692,131 @@ async def embed_widget(
         function renderProvenanceBadge(metadata) {
             if (!metadata) return '';
             const prov = metadata.provenance || metadata;
-            const sourceType = prov.source_type;
-            const isGrounded = Boolean(prov.is_grounded || (prov.retrieved_chunks_count > 0));
-            const chunksCount = prov.retrieved_chunks_count || (prov.detailed_sources ? prov.detailed_sources.length : (prov.sources ? prov.sources.length : 0));
-            const sources = prov.detailed_sources || [];
-            const ragMs = prov.rag_latency_ms ? (prov.rag_latency_ms + "ms") : "";
-            const llmMs = prov.llm_latency_ms ? (prov.llm_latency_ms + "ms") : "";
+            const sourceType = prov.source_type || metadata.source_type;
 
             if (sourceType === 'private_resident_data' || sourceType === 'carrier_tracking' || prov.refusal_type) {
                 return `
                     <div class="mt-2.5 pt-1.5 border-t border-slate-100 flex items-center space-x-1.5 text-[11px] text-slate-400 select-none">
-                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
                             🛡️ Privacy Policy Boundary
                         </span>
                     </div>
                 `;
             }
 
-            if (isGrounded && chunksCount > 0) {
-                let sourcesListHtml = '';
-                if (sources.length > 0) {
-                    sourcesListHtml = sources.map(s => {
-                        const title = s.title || 'Document';
-                        const scorePct = s.score ? Math.round(s.score * 100) + '%' : '';
-                        const url = s.url || '';
-                        const linkHtml = url 
-                            ? `<a href="${url}" target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:underline font-medium">${title}</a>`
-                            : `<span class="font-medium text-slate-700">${title}</span>`;
-                        return `<div class="flex items-center justify-between text-[10px] text-slate-600 py-0.5">
-                            <span class="truncate mr-2">• ${linkHtml}</span>
-                            ${scorePct ? `<span class="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 font-mono rounded text-[9px] border border-emerald-200 shrink-0">Match ${scorePct}</span>` : ''}
-                        </div>`;
-                    }).join('');
-                } else if (prov.sources && prov.sources.length > 0) {
-                    sourcesListHtml = prov.sources.map(url => {
-                        return `<div class="text-[10px] text-slate-600 py-0.5 truncate">• <a href="${url}" target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:underline">${url}</a></div>`;
-                    }).join('');
+            // Extract structured sources list (checking structured_sources, detailed_sources, sources)
+            let sources = prov.structured_sources || metadata.structured_sources || prov.detailed_sources || metadata.detailed_sources || [];
+            if (!sources || sources.length === 0) {
+                const rawSources = prov.sources || metadata.sources || [];
+                if (Array.isArray(rawSources) && rawSources.length > 0) {
+                    sources = rawSources.map(s => {
+                        if (typeof s === 'string') {
+                            return { title: 'Smiota Documentation', url: s, source_type: 'website' };
+                        }
+                        return s;
+                    });
                 }
+            }
+
+            const chunksCount = sources.length || prov.retrieved_chunks_count || 0;
+            const isGrounded = Boolean(prov.is_grounded || (chunksCount > 0));
+            const ragMs = prov.rag_latency_ms ? (prov.rag_latency_ms + "ms") : "";
+            const llmMs = prov.llm_latency_ms ? (prov.llm_latency_ms + "ms") : "";
+
+            if (isGrounded && sources.length > 0) {
+                const cardsHtml = sources.map(s => {
+                    const rawTitle = s.title || 'Smiota Documentation';
+                    const cleanTitle = escapeHtml(rawTitle.replace(/\s*\(part\s+\d+\)\s*$/i, '').trim());
+                    const rawUrl = s.url || '';
+                    const safeUrl = sanitizeUrl(rawUrl);
+                    let domain = 'smiota.com';
+                    if (s.domain) {
+                        domain = escapeHtml(s.domain);
+                    } else if (safeUrl) {
+                        try {
+                            domain = escapeHtml(new URL(rawUrl).hostname.replace(/^www\./, ''));
+                        } catch(e) {
+                            domain = 'smiota.com';
+                        }
+                    }
+
+                    const type = String(s.source_type || 'website').toLowerCase();
+                    let typeIcon = '🌐';
+                    let typeBadge = 'Website';
+                    let badgeClass = 'bg-sky-50 text-sky-700 border-sky-200';
+
+                    if (type === 'pdf') {
+                        typeIcon = '📄';
+                        typeBadge = 'PDF Document';
+                        badgeClass = 'bg-rose-50 text-rose-700 border-rose-200';
+                    } else if (type === 'runbook') {
+                        typeIcon = '📖';
+                        typeBadge = 'Runbook';
+                        badgeClass = 'bg-amber-50 text-amber-700 border-amber-200';
+                    } else if (type === 'internal_docs') {
+                        typeIcon = '📑';
+                        typeBadge = 'Internal Docs';
+                        badgeClass = 'bg-purple-50 text-purple-700 border-purple-200';
+                    }
+
+                    const linkButton = safeUrl
+                        ? `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 bg-white hover:bg-indigo-50/90 border border-slate-200 hover:border-indigo-200 px-2.5 py-1 rounded-lg transition-colors shadow-2xs shrink-0">
+                            <span>Open source</span>
+                            <svg class="w-3 h-3 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                           </a>`
+                        : `<span class="text-[10px] text-slate-400 font-mono italic">Verified reference</span>`;
+
+                    return `
+                        <div class="bg-slate-50/90 hover:bg-slate-100/80 border border-slate-200/80 rounded-xl p-2.5 transition flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-2xs">
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-center gap-1.5 mb-1">
+                                    <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border ${badgeClass}">
+                                        <span>${typeIcon}</span>
+                                        <span>${typeBadge}</span>
+                                    </span>
+                                    <span class="text-[10px] text-slate-400 font-mono truncate">${domain}</span>
+                                </div>
+                                <div class="text-xs font-semibold text-slate-800 truncate" title="${cleanTitle}">
+                                    ${cleanTitle}
+                                </div>
+                            </div>
+                            <div class="shrink-0 flex items-center justify-end">
+                                ${linkButton}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
 
                 return `
-                    <div class="mt-2.5 pt-1.5 border-t border-slate-100 text-[11px]">
-                        <div class="flex items-center justify-between text-slate-500">
+                    <div class="mt-3 pt-2 border-t border-slate-100 text-xs">
+                        <!-- Grounding telemetry banner -->
+                        <div class="flex items-center justify-between text-slate-500 mb-1.5">
                             <span class="inline-flex items-center space-x-1 text-[10px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
                                 <svg class="w-3 h-3 text-emerald-600 mr-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                                <span>Grounded via RAG (${chunksCount} source${chunksCount > 1 ? 's' : ''})</span>
+                                <span>Grounded via RAG (${sources.length} source${sources.length > 1 ? 's' : ''})</span>
                             </span>
                             <span class="text-[10px] text-slate-400 font-mono select-none">
                                 ${ragMs ? `RAG: ${ragMs}` : 'RAG'} + ${llmMs ? `LLM: ${llmMs}` : 'Gemini'}
                             </span>
                         </div>
-                        ${sourcesListHtml ? `
-                            <details class="mt-1 group">
-                                <summary class="cursor-pointer select-none text-[10px] font-medium text-slate-400 hover:text-indigo-600 inline-flex items-center space-x-1">
-                                    <span>View verified sources (${chunksCount})</span>
-                                    <svg class="w-3 h-3 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                                </summary>
-                                <div class="mt-1 pl-2 border-l-2 border-emerald-300 space-y-0.5 bg-slate-50/70 p-1.5 rounded-r">
-                                    ${sourcesListHtml}
-                                </div>
-                            </details>
-                        ` : ''}
+
+                        <!-- Collapsible Sources Section -->
+                        <details class="group mt-1 rounded-xl border border-slate-200/80 bg-white/80 overflow-hidden shadow-2xs">
+                            <summary class="cursor-pointer select-none text-xs font-semibold text-slate-700 hover:text-indigo-600 flex items-center justify-between px-3 py-2 bg-slate-50/70 hover:bg-slate-100/70 transition-colors">
+                                <span class="inline-flex items-center gap-1.5">
+                                    <svg class="w-3.5 h-3.5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
+                                    <span>Sources (${sources.length})</span>
+                                </span>
+                                <span class="inline-flex items-center gap-1 text-[11px] text-slate-400 group-hover:text-indigo-600 font-normal">
+                                    <span class="group-open:hidden">Show</span>
+                                    <span class="hidden group-open:inline">Hide</span>
+                                    <svg class="w-3.5 h-3.5 transition-transform duration-200 group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                </span>
+                            </summary>
+                            <div class="p-2 space-y-1.5 border-t border-slate-100 bg-white">
+                                ${cardsHtml}
+                            </div>
+                        </details>
                     </div>
                 `;
             }

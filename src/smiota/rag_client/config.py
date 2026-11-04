@@ -163,6 +163,16 @@ class RAGConfig:
     # Backward-compatible file path for single JSONL ingestion workflows.
     default_jsonl_path: str = "rag-service/data/knowledge/public/website_content.jsonl"
 
+    # --------------------------------------------------------------------------
+    # 9. Source Citation & Provenance
+    # --------------------------------------------------------------------------
+    sources_enabled: bool = True
+    max_displayed_sources: int = 5
+    allowed_source_domains: list[str] = field(
+        default_factory=lambda: ["smiota.com", "dev.smiotaapps.com", "smiotaapps.com"]
+    )
+    min_relevance_threshold: float | None = None
+
     @classmethod
     def from_settings(cls, **overrides: Any) -> "RAGConfig":
         """Construct a RAGConfig instance using application settings with optional overrides.
@@ -194,10 +204,34 @@ class RAGConfig:
             "auto_index_on_startup",
             getattr(settings, "RAG_AUTO_INDEX_ON_STARTUP", True),
         )
+        sources_enabled = overrides.get(
+            "sources_enabled",
+            getattr(settings, "RAG_SOURCES_ENABLED", True),
+        )
+        max_displayed_sources = overrides.get(
+            "max_displayed_sources",
+            getattr(settings, "RAG_MAX_DISPLAYED_SOURCES", 5),
+        )
+        allowed_source_domains = overrides.get(
+            "allowed_source_domains",
+            getattr(
+                settings,
+                "RAG_ALLOWED_SOURCE_DOMAINS",
+                ["smiota.com", "dev.smiotaapps.com", "smiotaapps.com"],
+            ),
+        )
+        min_relevance_threshold = overrides.get(
+            "min_relevance_threshold",
+            getattr(settings, "RAG_MIN_RELEVANCE_THRESHOLD", None),
+        )
         return cls(
             vector_store_backend=backend,
             knowledge_dir=knowledge_dir,
             embedding_provider=embedding_provider,
             auto_index_on_startup=auto_index_on_startup,
+            sources_enabled=sources_enabled,
+            max_displayed_sources=max_displayed_sources,
+            allowed_source_domains=allowed_source_domains,
+            min_relevance_threshold=min_relevance_threshold,
             **overrides,
         )

@@ -11,7 +11,7 @@ from smiota.api.v1.websocket_handler import WebSocketChatHandler
 from smiota.core.exceptions import AuthorizationError
 from smiota.core.security import AuthenticatedUser
 from smiota.repositories.chat_repository import BaseChatRepository
-from smiota.schemas.chat import ChatMessageRequest, ChatMessageResponse
+from smiota.schemas.chat import ChatMessageRequest, ChatMessageResponse, SourceReference
 from smiota.schemas.chat_session import ChatHistoryResponse
 
 router = APIRouter(prefix="/chat", tags=["Agent Chat & Task Planning"])
@@ -77,6 +77,16 @@ async def send_message(
     return ChatMessageResponse(
         session_id=session_id,
         response=result.content,
+        answer=result.content,
+        sources=[
+            s if isinstance(s, SourceReference) else SourceReference(**s)
+            for s in (
+                result.metadata.get("structured_sources")
+                or result.metadata.get("detailed_sources")
+                or []
+            )
+            if isinstance(s, (SourceReference, dict)) and (getattr(s, "url", None) or (isinstance(s, dict) and s.get("url")))
+        ],
         agent_used=result.agent_name,
         requires_approval=result.requires_approval,
         suggested_actions=suggested_actions,

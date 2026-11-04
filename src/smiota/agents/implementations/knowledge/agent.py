@@ -14,6 +14,7 @@ from smiota.rag_client.prompts import (
     build_rag_prompt,
 )
 from smiota.schemas.agents import AgentCapability
+from smiota.services.source_processor import SourceProcessor, get_source_processor
 
 
 class KnowledgeAssistantAgent(BaseAgent):
@@ -48,6 +49,7 @@ class KnowledgeAssistantAgent(BaseAgent):
         llm_provider: GeminiProvider | None = None,
         config: RAGConfig | None = None,
         rag_client: RAGServiceClient | None = None,
+        source_processor: SourceProcessor | None = None,
     ):
         super().__init__(
             name="KnowledgeAssistant",
@@ -65,10 +67,11 @@ class KnowledgeAssistantAgent(BaseAgent):
             system_prompt=SMIOTA_KNOWLEDGE_ASSISTANT_SYSTEM_PROMPT,
             bound_tools=[],  # Strictly read-only, ZERO execution tools
         )
-        self.config = config or RAGConfig()
+        self.config = config or RAGConfig.from_settings()
         self.retrieval_service = retrieval_service
         self.rag_client = rag_client or RAGServiceClient()
         self.llm_provider = llm_provider or GeminiProvider()
+        self.source_processor = source_processor or get_source_processor()
 
     def _is_private_data_query(self, query: str) -> bool:
         """Detect attempts to query live resident/package/door controls."""
@@ -154,39 +157,41 @@ class KnowledgeAssistantAgent(BaseAgent):
         )
         scored_chunks = await self.rag_client.search(
             query=query,
-            top_k=5,
+            top_k=getattr(self.config, "final_result_count", 5),
         )
         if not scored_chunks and self.retrieval_service:
             scored_chunks = await self.retrieval_service.retrieve(
                 query=query,
-                top_k=5,
+                top_k=getattr(self.config, "final_result_count", 5),
                 enable_mmr=True,
             )
         rag_latency_ms = (time.perf_counter() - start_rag) * 1000
 
-        detailed_sources = []
-        for idx, sc in enumerate(scored_chunks, start=1):
-            meta = sc.chunk.metadata or {}
-            canonical = meta.get("canonical_url") or meta.get("source_url") or ""
-            detailed_sources.append({
-                "rank": idx,
-                "title": sc.chunk.title,
-                "score": round(float(sc.score), 4),
-                "url": canonical,
-                "category": sc.chunk.category,
-            })
+        # Process, validate, deduplicate, and limit sources via SourceProcessor
+        structured_sources = []
+        if getattr(self.config, "sources_enabled", True):
+            structured_sources = self.source_processor.process_sources(
+                scored_chunks,
+                max_sources=getattr(self.config, "max_displayed_sources", 5),
+                min_relevance=getattr(self.config, "min_relevance_threshold", None),
+                allowed_domains=getattr(self.config, "allowed_source_domains", None),
+            )
+
+        structured_sources_dicts = [s.model_dump() for s in structured_sources]
+        legacy_sources = [s.url for s in structured_sources if s.url]
 
         if scored_chunks:
             logger.info(
-                f"[TRACE - Step 1: RAG Search] Found {len(scored_chunks)} matching chunks in {rag_latency_ms:.1f}ms:",
+                f"[TRACE - Step 1: RAG Search] Found {len(scored_chunks)} matching chunks ({len(structured_sources)} curated sources) in {rag_latency_ms:.1f}ms:",
                 extra={
                     "event": "rag.search.completed",
                     "chunks_count": len(scored_chunks),
+                    "sources_count": len(structured_sources),
                     "duration_ms": rag_latency_ms,
                 },
             )
-            for s in detailed_sources:
-                logger.info(f"  -> Match #{s['rank']}: score={s['score']:.4f} | title='{s['title']}' | url={s['url']}")
+            for s in structured_sources:
+                logger.info(f"  -> Curated Source: [{s.source_type}] title='{s.title}' | url={s.url} | domain={s.domain}")
         else:
             logger.warning(
                 f"[TRACE - Step 1: RAG Search] 0 chunks matched in {rag_latency_ms:.1f}ms for query: '{query}'. Proceeding with baseline LLM generation.",
@@ -223,6 +228,7 @@ class KnowledgeAssistantAgent(BaseAgent):
                 "session_id": context.session_id,
                 "source_type": source_type,
                 "chunks_retrieved": len(scored_chunks),
+                "sources_count": len(structured_sources),
                 "rag_latency_ms": rag_latency_ms,
                 "llm_latency_ms": llm_latency_ms,
             },
@@ -247,8 +253,9 @@ class KnowledgeAssistantAgent(BaseAgent):
                 "source_type": source_type,
                 "is_grounded": is_grounded,
                 "retrieved_chunks_count": len(scored_chunks),
-                "sources": [s["url"] or s["title"] for s in detailed_sources],
-                "detailed_sources": detailed_sources,
+                "sources": legacy_sources,
+                "detailed_sources": structured_sources_dicts,
+                "structured_sources": structured_sources_dicts,
                 "rag_service_url": rag_url,
                 "rag_latency_ms": round(rag_latency_ms, 1),
                 "llm_latency_ms": round(llm_latency_ms, 1),
@@ -256,7 +263,9 @@ class KnowledgeAssistantAgent(BaseAgent):
                     "source_type": source_type,
                     "is_grounded": is_grounded,
                     "retrieved_chunks_count": len(scored_chunks),
-                    "detailed_sources": detailed_sources,
+                    "sources": structured_sources_dicts,
+                    "detailed_sources": structured_sources_dicts,
+                    "structured_sources": structured_sources_dicts,
                     "rag_latency_ms": round(rag_latency_ms, 1),
                     "llm_latency_ms": round(llm_latency_ms, 1),
                 },
