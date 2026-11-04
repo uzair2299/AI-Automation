@@ -1,6 +1,7 @@
 """HTTP routes and API endpoints for RAG Knowledge Service."""
 
 import logging
+import time
 from typing import Any, Dict
 
 from fastapi import APIRouter, HTTPException
@@ -32,6 +33,13 @@ async def health_check() -> Dict[str, Any]:
     try:
         vector_store = get_vector_store()
         count = await vector_store.count()
+        backend_name = type(vector_store).__name__
+        logger.info(
+            "health_check: backend=%s (%s), indexed_chunks=%d, status=ok",
+            settings.VECTOR_STORE_BACKEND,
+            backend_name,
+            count,
+        )
         logger.info("Exiting health_check endpoint")
         return {
             "status": "ok",
@@ -51,7 +59,14 @@ async def health_check() -> Dict[str, Any]:
 )
 async def search_knowledge(payload: VectorSearchRequest):
     """Retrieve semantically relevant document chunks matching user query."""
+    start_time = time.perf_counter()
     logger.info("Entering search_knowledge endpoint")
+    logger.info(
+        "search_knowledge: Request received -> query='%s', top_k=%d, category=%s",
+        payload.query,
+        payload.top_k,
+        payload.category or "all",
+    )
     try:
         retriever = get_retriever()
         results = await retriever.retrieve(
@@ -63,6 +78,13 @@ async def search_knowledge(payload: VectorSearchRequest):
             query=payload.query,
             results=results,
             total_found=len(results),
+        )
+        elapsed_ms = (time.perf_counter() - start_time) * 1000
+        logger.info(
+            "search_knowledge: Completed in %.2fms. Returning %d matched chunks to client for query='%s'",
+            elapsed_ms,
+            len(results),
+            payload.query,
         )
         logger.info("Exiting search_knowledge endpoint")
         return APIResponse(data=data, message="Search completed successfully.")
@@ -80,13 +102,25 @@ async def search_knowledge(payload: VectorSearchRequest):
 )
 async def ingest_document(payload: DocumentIngestionRequest):
     """Chunk, embed, and store document in vector storage."""
+    start_time = time.perf_counter()
     logger.info("Entering ingest_document endpoint")
+    logger.info(
+        "ingest_document: Request received -> title='%s', category=%s, content_length=%d chars",
+        payload.title,
+        payload.category,
+        len(payload.content),
+    )
     try:
         chunker = get_chunker()
         embedding_service = get_embedding_service()
         vector_store = get_vector_store()
 
         chunks = chunker.split_text(payload.content)
+        logger.info(
+            "ingest_document: Document split into %d chunks. Generating embeddings and storing into %s...",
+            len(chunks),
+            type(vector_store).__name__,
+        )
         first_doc_id = ""
 
         for idx, chunk in enumerate(chunks):
@@ -110,6 +144,14 @@ async def ingest_document(payload: DocumentIngestionRequest):
             chunks_created=len(chunks),
             status="indexed",
         )
+        elapsed_ms = (time.perf_counter() - start_time) * 1000
+        logger.info(
+            "ingest_document: Completed in %.2fms. Ingested %d chunks (primary_id=%s) for title='%s'",
+            elapsed_ms,
+            len(chunks),
+            first_doc_id[:8],
+            payload.title,
+        )
         logger.info("Exiting ingest_document endpoint")
         return APIResponse(data=data, message="Document indexed successfully.")
     except HTTPException:
@@ -117,5 +159,6 @@ async def ingest_document(payload: DocumentIngestionRequest):
     except Exception as exc:
         logger.error("Error during ingest_document endpoint: %s", exc, exc_info=True)
         raise HTTPException(status_code=500, detail="Document ingestion failed")
+
 
 

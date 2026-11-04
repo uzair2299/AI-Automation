@@ -96,6 +96,13 @@ class VectorStoreClient:
         """Perform nearest-neighbor search based on cosine similarity."""
         logger.info("Entering VectorStoreClient.search")
         try:
+            total_stored = len(self._storage)
+            logger.info(
+                "VectorStoreClient.search: Scanning %d in-memory documents (filter category=%s, top_k=%d)",
+                total_stored,
+                category or "all",
+                top_k,
+            )
             scored: List[DocumentSearchResult] = []
 
             for doc_id, entry in self._storage.items():
@@ -114,6 +121,13 @@ class VectorStoreClient:
 
             scored.sort(key=lambda x: x.similarity_score, reverse=True)
             results = scored[:top_k]
+            top_score = results[0].similarity_score if results else 0.0
+            logger.info(
+                "VectorStoreClient.search: Evaluated %d candidates. Returning top %d (top similarity score: %.4f)",
+                len(scored),
+                len(results),
+                top_score,
+            )
             logger.info("Exiting VectorStoreClient.search")
             return results
         except Exception as exc:

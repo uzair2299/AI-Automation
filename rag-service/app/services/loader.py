@@ -145,6 +145,13 @@ async def load_real_knowledge_base(
                         try:
                             await vector_store.insert_documents_batch(docs_batch)
                             total_chunks += len(docs_batch)
+                            logger.info(
+                                "load_real_knowledge_base: Ingested batch of %d chunks into %s (cumulative total: %d chunks across %d pages)",
+                                len(docs_batch),
+                                type(vector_store).__name__,
+                                total_chunks,
+                                pages_processed,
+                            )
                         except Exception as exc:
                             logger.error(
                                 "Failed to insert documents batch into vector store: %s", exc, exc_info=True

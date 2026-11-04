@@ -159,6 +159,11 @@ class PgVectorStoreClient:
         """Nearest-neighbor cosine distance search using pgvector (<=> operator)."""
         logger.info("Entering PgVectorStoreClient.search")
         try:
+            logger.info(
+                "PgVectorStoreClient.search: Executing pgvector <=> KNN search (top_k=%d, category=%s)",
+                top_k,
+                category or "all",
+            )
             pool = await self.get_pool()
             vector_str = f"[{','.join(str(x) for x in query_embedding)}]"
 
@@ -207,6 +212,12 @@ class PgVectorStoreClient:
                             document=doc_meta,
                         )
                     )
+                top_score = results[0].similarity_score if results else 0.0
+                logger.info(
+                    "PgVectorStoreClient.search: Retrieved %d rows from PostgreSQL pgvector (top similarity score: %.4f)",
+                    len(results),
+                    top_score,
+                )
                 logger.info("Exiting PgVectorStoreClient.search")
                 return results
         except Exception as exc:
