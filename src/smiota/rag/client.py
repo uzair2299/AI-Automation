@@ -27,13 +27,7 @@ class RAGServiceClient:
         self._local_retriever = None
 
     def _get_local_retriever(self):
-        """Lazy load local retrieval service for zero-downtime offline fallback."""
-        if self._local_retriever is None:
-            try:
-                from smiota.rag.retrieval.retrieval_service import RetrievalService
-                self._local_retriever = RetrievalService()
-            except Exception as e:
-                logger.warning(f"Could not initialize local RetrievalService fallback: {e}")
+        """Offline fallback retriever hook (if injected)."""
         return self._local_retriever
 
     async def search(

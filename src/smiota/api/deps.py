@@ -4,7 +4,7 @@ from smiota.agents.orchestrator import AgentOrchestrator
 from smiota.core.exceptions import AuthenticationError
 from smiota.core.security import AuthenticatedUser, verify_session_token
 from smiota.mcp.client import MCPClient
-from smiota.rag.retriever import KnowledgeRetriever
+from smiota.rag.client import RAGServiceClient
 from smiota.services.auth_service import SmiotaBackendAuthService, backend_auth_service
 
 
@@ -68,9 +68,9 @@ def get_mcp_client() -> MCPClient:
     return MCPClient()
 
 
-def get_knowledge_retriever() -> KnowledgeRetriever:
-    """Dependency returning the RAG KnowledgeRetriever instance."""
-    return KnowledgeRetriever()
+def get_knowledge_retriever() -> RAGServiceClient:
+    """Dependency returning the RAGServiceClient instance."""
+    return RAGServiceClient()
 
 
 from smiota.repositories.chat_repository import BaseChatRepository, get_chat_repository

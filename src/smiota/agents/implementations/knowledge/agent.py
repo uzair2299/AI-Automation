@@ -1,7 +1,7 @@
 """Knowledge Assistant Agent: Grounded Smiota Product, Hardware, Solution & Integration QA."""
 
 import re
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from smiota.agents.base import AgentContext, AgentResult, BaseAgent
 from smiota.core.logging import logger
@@ -12,7 +12,6 @@ from smiota.rag.prompts import (
     SMIOTA_KNOWLEDGE_ASSISTANT_SYSTEM_PROMPT,
     build_rag_prompt,
 )
-from smiota.rag.retrieval.retrieval_service import RetrievalService
 from smiota.schemas.agents import AgentCapability
 
 
@@ -44,7 +43,7 @@ class KnowledgeAssistantAgent(BaseAgent):
 
     def __init__(
         self,
-        retrieval_service: RetrievalService | None = None,
+        retrieval_service: Any | None = None,
         llm_provider: GeminiProvider | None = None,
         config: RAGConfig | None = None,
         rag_client: RAGServiceClient | None = None,
@@ -66,7 +65,7 @@ class KnowledgeAssistantAgent(BaseAgent):
             bound_tools=[],  # Strictly read-only, ZERO execution tools
         )
         self.config = config or RAGConfig()
-        self.retrieval_service = retrieval_service or RetrievalService(config=self.config)
+        self.retrieval_service = retrieval_service
         self.rag_client = rag_client or RAGServiceClient()
         self.llm_provider = llm_provider or GeminiProvider()
 
