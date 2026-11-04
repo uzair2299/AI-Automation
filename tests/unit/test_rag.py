@@ -63,6 +63,7 @@ def test_dynamic_chunk_context_prompt_injection():
     assert f"User: {user_query}" in prompt
     assert "RESPONSE FORMATTING & FAST SCANNING GUIDELINES" in SMIOTA_KNOWLEDGE_ASSISTANT_SYSTEM_PROMPT
     assert "FORMAT SELECTION" in SMIOTA_KNOWLEDGE_ASSISTANT_SYSTEM_PROMPT
+    assert "You are Smiota SI" in SMIOTA_KNOWLEDGE_ASSISTANT_SYSTEM_PROMPT
 
 
 def test_format_retrieved_chunks_formats_multiple_types():

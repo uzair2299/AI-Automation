@@ -48,7 +48,7 @@ class BaseAppSettings(BaseSettings):
     RABBITMQ_EXCHANGE: str = "smiota.events"
 
     # Web Chat & Concierge Customization (Configurable via Environment)
-    WEBCHAT_ASSISTANT_NAME: str = "Smiota Assistant"
+    WEBCHAT_ASSISTANT_NAME: str = "Smiota SI"
     WEBCHAT_SUBTITLE: str = "Smart Locker & Parcel Concierge"
     WEBCHAT_WELCOME_TITLE: str = "Welcome to Smiota!"
     WEBCHAT_WELCOME_MESSAGE: str = "Hi there! Welcome to Smiota. How can I help you today?"
