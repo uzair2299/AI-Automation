@@ -1,6 +1,7 @@
 """Knowledge Assistant Agent: Grounded Smiota Product, Hardware, Solution & Integration QA."""
 
 import re
+import time
 from typing import Any, ClassVar
 
 from smiota.agents.base import AgentContext, AgentResult, BaseAgent
@@ -145,6 +146,12 @@ class KnowledgeAssistantAgent(BaseAgent):
             )
 
         # 3. Retrieve relevant public knowledge context via RAG Service
+        start_rag = time.perf_counter()
+        rag_url = getattr(self.rag_client, "service_url", "http://rag-service:8001")
+        logger.info(
+            f"[TRACE - Step 1: RAG Search] Querying RAG Service ({rag_url}) for: '{query}'",
+            extra={"event": "rag.search.started", "query": query},
+        )
         scored_chunks = await self.rag_client.search(
             query=query,
             top_k=5,
@@ -155,6 +162,36 @@ class KnowledgeAssistantAgent(BaseAgent):
                 top_k=5,
                 enable_mmr=True,
             )
+        rag_latency_ms = (time.perf_counter() - start_rag) * 1000
+
+        detailed_sources = []
+        for idx, sc in enumerate(scored_chunks, start=1):
+            meta = sc.chunk.metadata or {}
+            canonical = meta.get("canonical_url") or meta.get("source_url") or ""
+            detailed_sources.append({
+                "rank": idx,
+                "title": sc.chunk.title,
+                "score": round(float(sc.score), 4),
+                "url": canonical,
+                "category": sc.chunk.category,
+            })
+
+        if scored_chunks:
+            logger.info(
+                f"[TRACE - Step 1: RAG Search] Found {len(scored_chunks)} matching chunks in {rag_latency_ms:.1f}ms:",
+                extra={
+                    "event": "rag.search.completed",
+                    "chunks_count": len(scored_chunks),
+                    "duration_ms": rag_latency_ms,
+                },
+            )
+            for s in detailed_sources:
+                logger.info(f"  -> Match #{s['rank']}: score={s['score']:.4f} | title='{s['title']}' | url={s['url']}")
+        else:
+            logger.warning(
+                f"[TRACE - Step 1: RAG Search] 0 chunks matched in {rag_latency_ms:.1f}ms for query: '{query}'. Proceeding with baseline LLM generation.",
+                extra={"event": "rag.search.empty", "duration_ms": rag_latency_ms},
+            )
 
         # 4. Construct prompt with dynamic retrieved chunks
         full_prompt = build_rag_prompt(
@@ -164,26 +201,33 @@ class KnowledgeAssistantAgent(BaseAgent):
         )
 
         # 5. Synthesize response via LLM
+        start_llm = time.perf_counter()
+        logger.info(
+            f"[TRACE - Step 2: LLM Synthesis] Prompting Gemini with {len(scored_chunks)} RAG chunks...",
+            extra={"event": "llm.generation.started", "chunks_provided": len(scored_chunks)},
+        )
         response_text = await self.llm_provider.generate_completion(
             prompt=full_prompt,
             temperature=0.2,
         )
+        llm_latency_ms = (time.perf_counter() - start_llm) * 1000
+
+        is_grounded = len(scored_chunks) > 0
+        source_type = "rag_grounded" if is_grounded else "llm_direct"
 
         logger.info(
-            f"KnowledgeAssistant generated answer (chunks: {len(scored_chunks)})",
+            f"[TRACE - Step 3: Response Ready] Mode={source_type} | Chunks={len(scored_chunks)} | "
+            f"Latency: RAG={rag_latency_ms:.1f}ms, LLM={llm_latency_ms:.1f}ms | Length={len(response_text)} chars",
             extra={
                 "event": "agent.knowledge.completed",
                 "session_id": context.session_id,
+                "source_type": source_type,
                 "chunks_retrieved": len(scored_chunks),
+                "rag_latency_ms": rag_latency_ms,
+                "llm_latency_ms": llm_latency_ms,
             },
         )
 
-        # Suggested action pills (commented out for webchat channel)
-        # suggested_actions = [
-        #     "Book a Demo (https://smiota.com/contact/)",
-        #     "Get a Quote (https://smiota.com/get-quote/)",
-        #     "Contact Sales (sales@smiota.com)",
-        # ]
         suggested_actions = (
             []
             if context.channel == "webchat"
@@ -200,13 +244,21 @@ class KnowledgeAssistantAgent(BaseAgent):
             requires_approval=False,
             suggested_actions=suggested_actions,
             metadata={
-                "is_grounded": True,
+                "source_type": source_type,
+                "is_grounded": is_grounded,
                 "retrieved_chunks_count": len(scored_chunks),
-                "sources": [
-                    c.chunk.metadata.get("canonical_url")
-                    or c.chunk.metadata.get("source_url")
-                    or c.chunk.title
-                    for c in scored_chunks
-                ],
+                "sources": [s["url"] or s["title"] for s in detailed_sources],
+                "detailed_sources": detailed_sources,
+                "rag_service_url": rag_url,
+                "rag_latency_ms": round(rag_latency_ms, 1),
+                "llm_latency_ms": round(llm_latency_ms, 1),
+                "provenance": {
+                    "source_type": source_type,
+                    "is_grounded": is_grounded,
+                    "retrieved_chunks_count": len(scored_chunks),
+                    "detailed_sources": detailed_sources,
+                    "rag_latency_ms": round(rag_latency_ms, 1),
+                    "llm_latency_ms": round(llm_latency_ms, 1),
+                },
             },
         )

@@ -241,12 +241,14 @@ async def embed_widget(
                             const isApproval = msg.type === 'approval_gate' || msg.message_type === 'approval_gate';
                             // Action and suggestion pills commented out for now for webchat channel
                             // const actions = (typeof msg.content === 'object' && msg.content !== null && msg.content.suggested_actions) ? msg.content.suggested_actions : (msg.suggested_actions || []);
+                            const meta = msg.metadata || (typeof msg.content === 'object' ? msg.content?.metadata : null) || {};
                             appendMessage(
                                 senderRole === 'user' ? 'user' : 'bot',
                                 textContent,
                                 senderName,
                                 isApproval,
-                                []
+                                [],
+                                meta
                             );
                         }
                     }
@@ -483,7 +485,90 @@ async def embed_widget(
             `;
         }
 
-        function appendMessage(sender, text, agentName = 'AI', requiresApproval = false, suggestedActions = []) {
+        
+        function renderProvenanceBadge(metadata) {
+            if (!metadata) return '';
+            const prov = metadata.provenance || metadata;
+            const sourceType = prov.source_type;
+            const isGrounded = Boolean(prov.is_grounded || (prov.retrieved_chunks_count > 0));
+            const chunksCount = prov.retrieved_chunks_count || (prov.detailed_sources ? prov.detailed_sources.length : (prov.sources ? prov.sources.length : 0));
+            const sources = prov.detailed_sources || [];
+            const ragMs = prov.rag_latency_ms ? (prov.rag_latency_ms + "ms") : "";
+            const llmMs = prov.llm_latency_ms ? (prov.llm_latency_ms + "ms") : "";
+
+            if (sourceType === 'private_resident_data' || sourceType === 'carrier_tracking' || prov.refusal_type) {
+                return `
+                    <div class="mt-2.5 pt-1.5 border-t border-slate-100 flex items-center space-x-1.5 text-[11px] text-slate-400 select-none">
+                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                            🛡️ Privacy Policy Boundary
+                        </span>
+                    </div>
+                `;
+            }
+
+            if (isGrounded && chunksCount > 0) {
+                let sourcesListHtml = '';
+                if (sources.length > 0) {
+                    sourcesListHtml = sources.map(s => {
+                        const title = s.title || 'Document';
+                        const scorePct = s.score ? Math.round(s.score * 100) + '%' : '';
+                        const url = s.url || '';
+                        const linkHtml = url 
+                            ? `<a href="${url}" target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:underline font-medium">${title}</a>`
+                            : `<span class="font-medium text-slate-700">${title}</span>`;
+                        return `<div class="flex items-center justify-between text-[10px] text-slate-600 py-0.5">
+                            <span class="truncate mr-2">• ${linkHtml}</span>
+                            ${scorePct ? `<span class="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 font-mono rounded text-[9px] border border-emerald-200 shrink-0">Match ${scorePct}</span>` : ''}
+                        </div>`;
+                    }).join('');
+                } else if (prov.sources && prov.sources.length > 0) {
+                    sourcesListHtml = prov.sources.map(url => {
+                        return `<div class="text-[10px] text-slate-600 py-0.5 truncate">• <a href="${url}" target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:underline">${url}</a></div>`;
+                    }).join('');
+                }
+
+                return `
+                    <div class="mt-2.5 pt-1.5 border-t border-slate-100 text-[11px]">
+                        <div class="flex items-center justify-between text-slate-500">
+                            <span class="inline-flex items-center space-x-1 text-[10px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                                <svg class="w-3 h-3 text-emerald-600 mr-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                <span>Grounded via RAG (${chunksCount} source${chunksCount > 1 ? 's' : ''})</span>
+                            </span>
+                            <span class="text-[10px] text-slate-400 font-mono select-none">
+                                ${ragMs ? `RAG: ${ragMs}` : 'RAG'} + ${llmMs ? `LLM: ${llmMs}` : 'Gemini'}
+                            </span>
+                        </div>
+                        ${sourcesListHtml ? `
+                            <details class="mt-1 group">
+                                <summary class="cursor-pointer select-none text-[10px] font-medium text-slate-400 hover:text-indigo-600 inline-flex items-center space-x-1">
+                                    <span>View verified sources (${chunksCount})</span>
+                                    <svg class="w-3 h-3 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                </summary>
+                                <div class="mt-1 pl-2 border-l-2 border-emerald-300 space-y-0.5 bg-slate-50/70 p-1.5 rounded-r">
+                                    ${sourcesListHtml}
+                                </div>
+                            </details>
+                        ` : ''}
+                    </div>
+                `;
+            }
+
+            if (sourceType === 'llm_direct' || (chunksCount === 0 && !isGrounded)) {
+                return `
+                    <div class="mt-2.5 pt-1.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400 select-none">
+                        <span class="inline-flex items-center space-x-1 text-[10px] font-medium text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                            <svg class="w-3 h-3 text-amber-600 mr-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                            <span>Direct LLM (0 RAG matches)</span>
+                        </span>
+                        <span class="text-[10px] text-slate-400 font-mono">${llmMs ? `LLM: ${llmMs}` : 'Gemini'}</span>
+                    </div>
+                `;
+            }
+
+            return '';
+        }
+
+        function appendMessage(sender, text, agentName = 'AI', requiresApproval = false, suggestedActions = [], metadata = null) {
             const isUser = sender === 'user';
             const timeStr = getFormattedTime();
             const div = document.createElement('div');
@@ -509,6 +594,7 @@ async def embed_widget(
                         </div>
                         <div class="bot-text-body text-slate-700 text-sm leading-relaxed space-y-1">${formatMarkdown(text)}</div>
                         ${approvalBadge}
+                        ${renderProvenanceBadge(metadata)}
                     </div>
                 `;
             } else {
@@ -715,12 +801,20 @@ async def embed_widget(
                 const requiresApproval = Boolean(msg.metadata?.requires_approval);
                 const actions = (typeof msg.content === 'object' && msg.content !== null) ? msg.content.suggested_actions : null;
 
+                const meta = msg.metadata || (typeof msg.content === 'object' ? msg.content?.metadata : null) || {};
                 if (currentStreamBody) {
                     if (textContent) {
                         currentStreamBody.innerHTML = formatMarkdown(textContent);
                     }
+                    const badgeHtml = renderProvenanceBadge(meta);
+                    if (badgeHtml) {
+                        const badgeContainer = document.createElement('div');
+                        badgeContainer.className = 'provenance-wrapper';
+                        badgeContainer.innerHTML = badgeHtml;
+                        currentStreamBody.parentElement.appendChild(badgeContainer);
+                    }
                 } else if (textContent) {
-                    appendMessage('bot', textContent, agentName, requiresApproval, []);
+                    appendMessage('bot', textContent, agentName, requiresApproval, [], meta);
                 }
                 // Dynamic suggested action pills (Commented out for now for webchat channel)
                 /*
@@ -790,7 +884,7 @@ async def embed_widget(
                     const data = await response.json();
                     removeTypingIndicator();
                     markLastUserMessageDelivered();
-                    appendMessage('bot', data.response, data.agent_used, data.requires_approval, []);
+                    appendMessage('bot', data.response, data.agent_used, data.requires_approval, [], data.metadata);
                 } catch (err) {
                     removeTypingIndicator();
                     appendMessage('bot', "I apologize, I'm taking a bit longer than expected to look that up. Please try again.", 'Concierge', false, []);

@@ -340,10 +340,13 @@ class WebSocketChatHandler:
 
         user_info = result.metadata.get("user") or {}
         completion_metadata: dict[str, Any] = {
+            **result.metadata,
             "requires_approval": result.requires_approval,
+            "agent_used": agent_display,
         }
         if user_info:
             completion_metadata["user"] = user_info
+        content_payload["metadata"] = completion_metadata
 
         completion_payload: dict[str, Any] = {
             "message_id": resp_msg_id,
