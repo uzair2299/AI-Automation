@@ -13,6 +13,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
+# Install shared internal common package
+COPY packages/common /tmp/packages/common
+RUN pip install --no-cache-dir /tmp/packages/common
+
 COPY pyproject.toml ./
 RUN pip install --no-cache-dir .
 

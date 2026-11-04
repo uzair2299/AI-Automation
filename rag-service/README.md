@@ -87,7 +87,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
 
 ### Run with Docker:
 ```bash
-docker build -t smiota-rag-service:latest -f rag-service/Dockerfile rag-service/
+docker build -t smiota-rag-service:latest -f rag-service/Dockerfile .
 docker run -p 8001:8001 smiota-rag-service:latest
 ```
 

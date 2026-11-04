@@ -115,8 +115,8 @@ services:
   # ============================================================================
   rag-service:
     build:
-      context: ./rag-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: rag-service/Dockerfile
     container_name: rag-service
     restart: unless-stopped
     ports:
