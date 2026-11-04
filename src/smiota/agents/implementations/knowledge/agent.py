@@ -6,9 +6,9 @@ from typing import Any, ClassVar
 from smiota.agents.base import AgentContext, AgentResult, BaseAgent
 from smiota.core.logging import logger
 from smiota.llm.provider import GeminiProvider
-from smiota.rag.client import RAGServiceClient
-from smiota.rag.config import RAGConfig
-from smiota.rag.prompts import (
+from smiota.rag_client.client import RAGServiceClient
+from smiota.rag_client.config import RAGConfig
+from smiota.rag_client.prompts import (
     SMIOTA_KNOWLEDGE_ASSISTANT_SYSTEM_PROMPT,
     build_rag_prompt,
 )

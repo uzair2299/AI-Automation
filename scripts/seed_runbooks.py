@@ -1,9 +1,7 @@
 """Utility script to seed vector database with baseline engineering runbooks."""
 import asyncio
-from smiota.rag.vector_store import VectorStoreClient
-from smiota.rag.embeddings import EmbeddingService
-from smiota.rag.chunking import DocumentChunker
 from smiota.core.logging import logger
+from smiota.rag_client.client import RAGServiceClient
 
 SAMPLE_RUNBOOKS = [
     {
@@ -29,65 +27,51 @@ SAMPLE_RUNBOOKS = [
     {
         "title": "Wazuh SIEM Intrusion & Brute Force Containment Runbook",
         "category": "runbook",
-        "content": """# Wazuh SIEM Intrusion Containment Runbook
+        "content": """# Wazuh SIEM Security Containment Runbook
 ## Symptoms:
-- Repeated Rule 5710 alerts (sshd failed login attempts).
-- Unusual outbound network egress to unclassified external IP.
+- Repeated SSH authentication failures alert triggered.
+- Multiple 401/403 brute force spikes detected by Cloud Armor.
 
-## Investigation Steps:
-1. Query Wazuh SIEM for source IP addresses and targeted usernames.
-2. Cross-reference source IP against threat intelligence feeds.
-3. Check GCP Cloud Armor security policy logs.
-
-## Containment:
-- Revoke compromised service account keys immediately.
-- Block offender CIDR at Cloud Armor perimeter (Requires SecOps Approval).
+## Safe Remediation:
+- Temporarily block offending source IP at Cloud Armor security policy level.
+- Rotate service account keys if compromised.
 """,
-        "tags": ["security", "siem", "wazuh", "iam"],
+        "tags": ["security", "siem", "wazuh", "brute-force", "soc"],
     },
     {
-        "title": "Smart Locker Solenoid Hardware Diagnostic Runbook",
-        "category": "runbook",
-        "content": """# Smart Locker Solenoid Hardware Runbook
+        "title": "Smart Locker Solenoid Bus Communication Timeout Runbook",
+        "category": "hardware",
+        "content": """# Smart Locker Hardware & Solenoid Diagnostics
 ## Symptoms:
-- Resident reports locker compartment door fails to click open upon barcode scan.
-- IoT telemetry reports door state 'closed' despite unlock trigger.
+- Touchscreen reports 'Door actuation timed out'.
+- Solenoid controller fails to respond over internal RS-485 bus.
 
-## Diagnostic Steps:
-1. Check battery percentage (>15% required for solenoid pulse).
-2. Inspect hardware controller ping and MQTT connection status.
-3. Verify if package pickup code was already redeemed.
+## Investigation Steps:
+1. Query door status via IoT sensor telemetry API.
+2. Check 12V DC power rail output from 1500VA UPS battery.
+3. Verify RS-485 bus termination resistor and wiring continuity.
 
-## Remediation:
-- Dispatch remote electronic pulse test.
-- If mechanical lock is physically jammed, dispatch on-site technician.
+## Safe Remediation:
+- Issue remote controller reset command.
+- If hardware solenoid is stuck, dispatch local field technician with master override key.
 """,
         "tags": ["iot", "smart-locker", "hardware", "customer"],
     },
 ]
 
-
 async def seed():
-    logger.info("Seeding knowledge base with engineering runbooks...")
-    store = VectorStoreClient()
-    embedder = EmbeddingService()
-    chunker = DocumentChunker()
-
+    logger.info("Seeding knowledge base via RAG service client...")
+    client = RAGServiceClient()
     for rb in SAMPLE_RUNBOOKS:
-        chunks = chunker.split_text(rb["content"])
-        for idx, chunk in enumerate(chunks):
-            emb = await embedder.get_embedding(chunk)
-            doc_id = await store.insert_document(
-                title=f"{rb['title']} (Part {idx+1})" if len(chunks) > 1 else rb["title"],
-                content=chunk,
-                embedding=emb,
-                category=rb["category"],
-                metadata={"tags": rb["tags"]},
-            )
-            logger.info(f"Seeded: '{rb['title']}' chunk {idx+1} -> {doc_id}")
+        res = await client.ingest(
+            title=rb["title"],
+            content=rb["content"],
+            category=rb["category"],
+            tags=rb["tags"],
+        )
+        logger.info(f"Seeded: '{rb['title']}' -> {res.get('data', {}).get('document_id', 'indexed')}")
 
     logger.info("Knowledge base seeding completed successfully.")
-
 
 if __name__ == "__main__":
     asyncio.run(seed())

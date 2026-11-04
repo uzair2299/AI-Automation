@@ -4,7 +4,7 @@ from smiota.agents.orchestrator import AgentOrchestrator
 from smiota.core.exceptions import AuthenticationError
 from smiota.core.security import AuthenticatedUser, verify_session_token
 from smiota.mcp.client import MCPClient
-from smiota.rag.client import RAGServiceClient
+from smiota.rag_client.client import RAGServiceClient
 from smiota.services.auth_service import SmiotaBackendAuthService, backend_auth_service
 
 

@@ -1,6 +1,6 @@
 """RAG Knowledge base ingestion and retrieval API endpoints (proxied to standalone RAG service)."""
 from fastapi import APIRouter
-from smiota.rag.client import RAGServiceClient
+from smiota.rag_client.client import RAGServiceClient
 from smiota.schemas.rag import (
     VectorSearchRequest,
     VectorSearchResponse,

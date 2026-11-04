@@ -8,7 +8,7 @@ import httpx
 
 from smiota.core.config import get_settings
 from smiota.core.logging import logger
-from smiota.rag.models import DocumentChunk, ScoredChunk
+from smiota.rag_client.models import DocumentChunk, ScoredChunk
 
 
 class RAGServiceClient:

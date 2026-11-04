@@ -1,12 +1,12 @@
 """Smiota RAG subsystem client and prompt context utilities."""
-from smiota.rag.client import RAGServiceClient
-from smiota.rag.config import RAGConfig
-from smiota.rag.models import (
+from smiota.rag_client.client import RAGServiceClient
+from smiota.rag_client.config import RAGConfig
+from smiota.rag_client.models import (
     DocumentChunk,
     RetrievalQuery,
     ScoredChunk,
 )
-from smiota.rag.prompts import (
+from smiota.rag_client.prompts import (
     SMIOTA_KNOWLEDGE_ASSISTANT_SYSTEM_PROMPT,
     build_rag_prompt,
     format_retrieved_chunks,

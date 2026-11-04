@@ -2,8 +2,8 @@
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 
-from smiota.rag.client import RAGServiceClient
-from smiota.rag.models import ScoredChunk
+from smiota.rag_client.client import RAGServiceClient
+from smiota.rag_client.models import ScoredChunk
 
 
 @pytest.mark.asyncio
