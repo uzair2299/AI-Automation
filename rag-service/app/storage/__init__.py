@@ -11,7 +11,7 @@ def get_vector_store():
     """Retrieve or initialize the active vector store singleton."""
     global _vector_store_instance
     if _vector_store_instance is None:
-        if getattr(settings, "VECTOR_STORE_BACKEND", "memory").lower() == "pgvector":
+        if settings.is_pgvector:
             _vector_store_instance = PgVectorStoreClient()
         else:
             _vector_store_instance = VectorStoreClient()

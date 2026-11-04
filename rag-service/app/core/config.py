@@ -1,6 +1,9 @@
 """Configuration settings for Standalone RAG Knowledge Service."""
+from enum import Enum
 import os
 from pathlib import Path
+from typing import Any
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _BASE_DIR = Path(__file__).resolve().parent.parent.parent  # rag-service/
@@ -43,6 +46,14 @@ for p in _candidates:
 _env_files = tuple(_env_files_list) or (".env",)
 
 
+class VectorStoreBackend(str, Enum):
+    """Supported vector storage backends."""
+
+    MEMORY = "memory"
+    PGVECTOR = "pgvector"
+    QDRANT = "qdrant"
+
+
 class RAGServiceSettings(BaseSettings):
     """Environment configuration for the RAG service."""
 
@@ -76,7 +87,7 @@ class RAGServiceSettings(BaseSettings):
     CHUNK_OVERLAP: int = 40
 
     # Vector store settings
-    VECTOR_STORE_BACKEND: str = "memory"  # "memory", "pgvector", or "qdrant"
+    VECTOR_STORE_BACKEND: str = VectorStoreBackend.MEMORY.value
     DATABASE_URL: str = "postgresql+asyncpg://smiota_user:password@localhost:5432/smiota_ai_dev"
     POSTGRES_HOST: str = "localhost"
     POSTGRES_PORT: int = 5432
@@ -89,5 +100,35 @@ class RAGServiceSettings(BaseSettings):
     # Seeding settings
     SEED_MAX_PAGES: int = 50
 
+    @field_validator("VECTOR_STORE_BACKEND", mode="before")
+    @classmethod
+    def normalize_vector_store_backend(cls, v: Any) -> str:
+        """Normalize vector store backend string to lowercase and validate."""
+        if isinstance(v, str):
+            clean = v.strip().lower()
+            if clean in {b.value for b in VectorStoreBackend}:
+                return clean
+        elif isinstance(v, VectorStoreBackend):
+            return v.value
+        return VectorStoreBackend.MEMORY.value
+
+    @property
+    def is_pgvector(self) -> bool:
+        """Whether pgvector storage backend is active."""
+        return self.VECTOR_STORE_BACKEND == VectorStoreBackend.PGVECTOR.value
+
+    @property
+    def is_memory(self) -> bool:
+        """Whether in-memory storage backend is active."""
+        return self.VECTOR_STORE_BACKEND == VectorStoreBackend.MEMORY.value
+
+    @property
+    def is_qdrant(self) -> bool:
+        """Whether Qdrant storage backend is active."""
+        return self.VECTOR_STORE_BACKEND == VectorStoreBackend.QDRANT.value
+
 
 settings = RAGServiceSettings()
+
+__all__ = ["RAGServiceSettings", "VectorStoreBackend", "settings"]
+
