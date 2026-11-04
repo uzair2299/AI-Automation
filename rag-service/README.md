@@ -81,6 +81,7 @@
 ### Run with Python:
 ```bash
 cd rag-service
+pip install -e ../packages/common
 pip install -r requirements.txt
 uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
 ```

@@ -124,6 +124,11 @@ log_info "Step 2/5: Synchronizing codebase from repository..."
 if [ -f "./docker-compose.yml" ] && [ -d "./rag-service" ]; then
     TARGET_DIR="$(pwd)"
     log_info "Running inside existing repository at ${TARGET_DIR}."
+    if [ -d ".git" ]; then
+        log_info "Pulling latest changes for branch ${BRANCH}..."
+        git fetch origin "${BRANCH}" 2>/dev/null || true
+        git pull --ff-only origin "${BRANCH}" 2>/dev/null || true
+    fi
 else
     if [ -d "${INSTALL_DIR}/.git" ]; then
         log_info "Updating repository in ${INSTALL_DIR}..."
@@ -215,6 +220,12 @@ else
     if ! grep -q "RAG_EMBEDDING_PROVIDER" "${ENV_FILE}"; then
         echo "RAG_EMBEDDING_PROVIDER=deterministic" >> "${ENV_FILE}"
     fi
+    if ! grep -q "RAG_SERVICE_URL" "${ENV_FILE}"; then
+        echo "RAG_SERVICE_URL=http://rag-service:8001" >> "${ENV_FILE}"
+    fi
+    if ! grep -q "VECTOR_STORE_BACKEND" "${ENV_FILE}"; then
+        echo "VECTOR_STORE_BACKEND=pgvector" >> "${ENV_FILE}"
+    fi
 fi
 
 # ------------------------------------------------------------------------------
@@ -265,8 +276,12 @@ SEARCH_RESULT=$(curl -s -X POST "http://localhost:8001/api/v1/rag/search" \
     -H "Content-Type: application/json" \
     -d '{"query": "refrigerated cold storage smart lockers", "top_k": 2}' || echo "{}")
 
-if echo "$SEARCH_RESULT" | grep -q "status"; then
+if echo "$SEARCH_RESULT" | grep -q '"status".*"success"'; then
     log_success "RAG pgvector search test passed!"
+elif echo "$SEARCH_RESULT" | grep -q "status"; then
+    log_success "RAG search endpoint responded (${SEARCH_RESULT})"
+else
+    log_warn "RAG search response: ${SEARCH_RESULT}"
 fi
 
 # ------------------------------------------------------------------------------

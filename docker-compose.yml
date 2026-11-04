@@ -128,15 +128,17 @@ services:
     environment:
       - HOST=0.0.0.0
       - PORT=8001
-      - EMBEDDING_PROVIDER=deterministic
+      - EMBEDDING_PROVIDER=${RAG_EMBEDDING_PROVIDER:-${EMBEDDING_PROVIDER:-deterministic}}
       - EMBEDDING_DIMENSION=768
-      - VECTOR_STORE_BACKEND=pgvector
+      - VECTOR_STORE_BACKEND=${VECTOR_STORE_BACKEND:-pgvector}
       - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://smiota_user:smaiops26devdb@host.docker.internal:5432/smiota_ai_dev}
-      - POSTGRES_HOST=host.docker.internal
-      - POSTGRES_PORT=5432
-      - POSTGRES_USER=smiota_user
-      - POSTGRES_PASSWORD=smaiops26devdb
-      - POSTGRES_DB=smiota_ai_dev
+      - POSTGRES_HOST=${POSTGRES_HOST:-host.docker.internal}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_USER=${POSTGRES_USER:-smiota_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-smaiops26devdb}
+      - POSTGRES_DB=${POSTGRES_DB:-smiota_ai_dev}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID:-}
     networks:
       - smiota-mesh
 
