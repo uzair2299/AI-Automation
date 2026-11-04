@@ -175,13 +175,13 @@ async def embed_widget(
 
         // SVG Ticks (WhatsApp / Modern Chat style)
         const singleTickSvg = `
-            <svg class="w-3.5 h-3.5 inline-block text-indigo-200/80" viewBox="0 0 18 18" fill="none" stroke="currentColor" title="Sent">
+            <svg class="w-3.5 h-3.5 inline-block text-slate-400" viewBox="0 0 18 18" fill="none" stroke="currentColor" title="Sent">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M3 9l4 4L16 4" />
             </svg>
         `;
 
         const doubleTickSvg = `
-            <svg class="w-3.5 h-3.5 inline-block text-sky-200" viewBox="0 0 18 18" fill="none" stroke="currentColor" title="Delivered & Read">
+            <svg class="w-3.5 h-3.5 inline-block text-indigo-600" viewBox="0 0 18 18" fill="none" stroke="currentColor" title="Delivered & Read">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M1 9l4 4L14 4" />
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M5 9l4 4L18 4" />
             </svg>
@@ -460,9 +460,39 @@ async def embed_widget(
             return processed.join('');
         }
 
-        function getUserAvatarHtml() {
-            const displayName = authenticatedUser?.name || (authenticatedUser?.first_name ? (authenticatedUser.first_name + " " + (authenticatedUser.last_name || "")) : "");
-            if (displayName && displayName.trim()) {
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function getUserDisplayName(fallbackSenderName = null) {
+            if (authenticatedUser) {
+                const name = authenticatedUser.name || 
+                    (authenticatedUser.first_name ? (authenticatedUser.first_name + " " + (authenticatedUser.last_name || "")).trim() : "");
+                if (name && name.trim()) {
+                    return name.trim();
+                }
+                if (authenticatedUser.email) {
+                    return authenticatedUser.email.split('@')[0];
+                }
+            }
+            if (fallbackSenderName && fallbackSenderName !== 'AI' && fallbackSenderName !== 'user' && fallbackSenderName.trim()) {
+                const lower = fallbackSenderName.trim().toLowerCase();
+                if (lower !== 'guest' && lower !== 'user') {
+                    return fallbackSenderName.trim();
+                }
+            }
+            return "Guest User";
+        }
+
+        function getUserAvatarHtml(customDisplayName = null) {
+            const displayName = getUserDisplayName(customDisplayName);
+            if (displayName && displayName !== "Guest User") {
                 const parts = displayName.trim().split(/\s+/);
                 let initials = "";
                 if (parts.length >= 2) {
@@ -471,13 +501,13 @@ async def embed_widget(
                     initials = parts[0].substring(0, 2).toUpperCase();
                 }
                 return `
-                    <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-violet-600 to-indigo-600 text-white flex items-center justify-center text-[11px] font-bold tracking-tight shadow-sm shrink-0 border border-white/80 select-none" title="${displayName.trim()}">
+                    <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-violet-600 to-indigo-600 text-white flex items-center justify-center text-[11px] font-bold tracking-tight shadow-sm shrink-0 border border-white/80 select-none" title="${escapeHtml(displayName)}">
                         ${initials}
                     </div>
                 `;
             }
             return `
-                <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-slate-200 to-indigo-100 text-indigo-600 flex items-center justify-center shadow-xs shrink-0 border border-white/80 select-none" title="User">
+                <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-slate-200 to-indigo-100 text-indigo-600 flex items-center justify-center shadow-xs shrink-0 border border-white/80 select-none" title="Guest User">
                     <svg class="w-4 h-4 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
                         <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/>
                     </svg>
@@ -598,15 +628,19 @@ async def embed_widget(
                     </div>
                 `;
             } else {
+                const userName = getUserDisplayName(agentName);
                 div.innerHTML = `
-                    <div class="bg-gradient-to-r from-violet-600 via-indigo-600 to-indigo-700 text-white px-4 py-2.5 rounded-[18px] rounded-br-[4px] max-w-[80%] text-sm shadow-sm shadow-indigo-500/15 leading-relaxed">
-                        <div class="break-words font-normal text-sm leading-relaxed">${text}</div>
-                        <div class="flex items-center justify-end space-x-1.5 mt-1 text-[11px] text-indigo-200/90 font-medium select-none">
-                            <span>${timeStr}</span>
-                            <span class="user-tick-status inline-flex items-center">${singleTickSvg}</span>
+                    <div class="bg-white text-slate-800 px-4 py-3 rounded-[18px] rounded-br-[4px] max-w-[82%] text-sm border border-slate-200/80 shadow-[0_2px_8px_rgba(0,0,0,0.03)] leading-relaxed">
+                        <div class="flex items-center justify-between space-x-3 mb-1.5 pb-1 border-b border-slate-100/90">
+                            <span class="text-[11px] font-bold uppercase tracking-wider text-indigo-600">${escapeHtml(userName)}</span>
+                            <div class="flex items-center space-x-1.5 text-[11px] text-slate-400 font-medium select-none">
+                                <span>${timeStr}</span>
+                                <span class="user-tick-status inline-flex items-center text-slate-400">${singleTickSvg}</span>
+                            </div>
                         </div>
+                        <div class="text-slate-700 text-sm leading-relaxed break-words whitespace-pre-wrap">${escapeHtml(text)}</div>
                     </div>
-                    ${getUserAvatarHtml()}
+                    ${getUserAvatarHtml(userName)}
                 `;
             }
 
@@ -848,7 +882,7 @@ async def embed_widget(
                     type: "user_message",
                     sender: {
                         role: "user",
-                        name: authenticatedUser?.name || (residentId ? ("Resident " + residentId) : "Guest"),
+                        name: getUserDisplayName(),
                         id: residentId || authenticatedUser?.user_id || "guest"
                     },
                     content: {
