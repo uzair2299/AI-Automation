@@ -1,0 +1,93 @@
+package com.smiota.common.entity;
+
+import jakarta.persistence.*;
+import java.io.Serializable;
+import java.util.Objects;
+
+@Entity
+@Table(name = "package_priority_types")
+public class PackagePriorityTypesEntity implements Serializable {
+    private static final long serialVersionUID = 1L;
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "id")
+    private Integer id;
+
+    @Column(name = "location_properties_id", nullable = false)
+    private Long locationPropertiesId;
+
+    @Column(name = "name", nullable = false, length = 45)
+    private String name;
+
+    @Column(name = "description", length = 250)
+    private String description;
+
+    @Column(name = "flag")
+    private Boolean flag;
+
+    @Column(name = "is_selected")
+    private Boolean isSelected;
+
+    @Column(name = "order_display", nullable = false)
+    private Integer orderDisplay;
+
+    public PackagePriorityTypesEntity() {}
+
+    public Integer getId() {
+        return this.id;
+    }
+
+    public void setId(Integer id) {
+        this.id = id;
+    }
+
+    public Long getLocationPropertiesId() {
+        return this.locationPropertiesId;
+    }
+
+    public void setLocationPropertiesId(Long locationPropertiesId) {
+        this.locationPropertiesId = locationPropertiesId;
+    }
+
+    public String getName() {
+        return this.name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getDescription() {
+        return this.description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public Boolean getFlag() {
+        return this.flag;
+    }
+
+    public void setFlag(Boolean flag) {
+        this.flag = flag;
+    }
+
+    public Boolean isSelected() {
+        return this.isSelected;
+    }
+
+    public void setIsSelected(Boolean isSelected) {
+        this.isSelected = isSelected;
+    }
+
+    public Integer getOrderDisplay() {
+        return this.orderDisplay;
+    }
+
+    public void setOrderDisplay(Integer orderDisplay) {
+        this.orderDisplay = orderDisplay;
+    }
+
+}

@@ -1,0 +1,127 @@
+package com.smiota.common.entity;
+
+import jakarta.persistence.*;
+import java.io.Serializable;
+import java.sql.Timestamp;
+import java.util.Objects;
+
+@Entity
+@Table(name = "product")
+public class ProductEntity implements Serializable {
+    private static final long serialVersionUID = 1L;
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "id")
+    private Long id;
+
+    @Column(name = "model_name", nullable = false, length = 128)
+    private String modelName;
+
+    @Column(name = "brand_name", length = 256)
+    private String brandName;
+
+    @Column(name = "min_count")
+    private Integer minCount;
+
+    @Column(name = "location_id", nullable = false)
+    private Long locationId;
+
+    @Column(name = "customer_id", nullable = false)
+    private Long customerId;
+
+    @Column(name = "created_time", nullable = false)
+    private Timestamp createdTime;
+
+    @Column(name = "created_by_user_id", nullable = false)
+    private Long createdByUserId;
+
+    @Column(name = "last_modified_by_user_id", nullable = false)
+    private Long lastModifiedByUserId;
+
+    @Column(name = "last_modified_time", nullable = false)
+    private Timestamp lastModifiedTime;
+
+    public ProductEntity() {}
+
+    public Long getId() {
+        return this.id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getModelName() {
+        return this.modelName;
+    }
+
+    public void setModelName(String modelName) {
+        this.modelName = modelName;
+    }
+
+    public String getBrandName() {
+        return this.brandName;
+    }
+
+    public void setBrandName(String brandName) {
+        this.brandName = brandName;
+    }
+
+    public Integer getMinCount() {
+        return this.minCount;
+    }
+
+    public void setMinCount(Integer minCount) {
+        this.minCount = minCount;
+    }
+
+    public Long getLocationId() {
+        return this.locationId;
+    }
+
+    public void setLocationId(Long locationId) {
+        this.locationId = locationId;
+    }
+
+    public Long getCustomerId() {
+        return this.customerId;
+    }
+
+    public void setCustomerId(Long customerId) {
+        this.customerId = customerId;
+    }
+
+    public Timestamp getCreatedTime() {
+        return this.createdTime;
+    }
+
+    public void setCreatedTime(Timestamp createdTime) {
+        this.createdTime = createdTime;
+    }
+
+    public Long getCreatedByUserId() {
+        return this.createdByUserId;
+    }
+
+    public void setCreatedByUserId(Long createdByUserId) {
+        this.createdByUserId = createdByUserId;
+    }
+
+    public Long getLastModifiedByUserId() {
+        return this.lastModifiedByUserId;
+    }
+
+    public void setLastModifiedByUserId(Long lastModifiedByUserId) {
+        this.lastModifiedByUserId = lastModifiedByUserId;
+    }
+
+    public Timestamp getLastModifiedTime() {
+        return this.lastModifiedTime;
+    }
+
+    public void setLastModifiedTime(Timestamp lastModifiedTime) {
+        this.lastModifiedTime = lastModifiedTime;
+    }
+
+}
