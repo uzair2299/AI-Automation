@@ -78,6 +78,19 @@ if ! docker compose version >/dev/null 2>&1; then
     fi
 fi
 
+# Check host PostgreSQL and Redis status
+if systemctl is-active --quiet postgresql 2>/dev/null; then
+    log_success "Host PostgreSQL service is ACTIVE."
+else
+    log_warn "Host PostgreSQL service is not detected as systemd active (ensure it is running on port 5432)."
+fi
+
+if systemctl is-active --quiet redis 2>/dev/null || systemctl is-active --quiet redis-server 2>/dev/null; then
+    log_success "Host Redis service is ACTIVE."
+else
+    log_warn "Host Redis service is not detected as systemd active (ensure it is running on port 6379)."
+fi
+
 # ------------------------------------------------------------------------------
 # 3. Synchronize Codebase
 # ------------------------------------------------------------------------------

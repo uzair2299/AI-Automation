@@ -28,9 +28,9 @@ smiota/
 | **smiota-agent-gateway** | Python 3.11 / FastAPI | `8000` | Agent orchestration, WebChat & Teams channels |
 | **rag-service** | Python / pgvector | `8001` | Semantic search, vector embeddings & runbooks |
 | **smart-locker-mcp** | Python / FastMCP | `8082` | MCP tools for locker telemetry & state inspection |
-| **MySQL** | MySQL 8.0 | `3306` | Shared enterprise locker & package database |
-| **PostgreSQL** | pgvector 16 | `5432` | Vector store for AI embeddings & chat sessions |
-| **Redis** | Redis 7 | `6379` | Session caching & rate-limiting |
+| **MySQL** | MySQL 8.0 (Container) | `3306` | Shared enterprise locker & package database |
+| **PostgreSQL** | pgvector 16 (VM Host Service) | `5432` | Vector store for AI embeddings & chat sessions |
+| **Redis** | Redis 7 (VM Host Service) | `6379` | Session caching & rate-limiting |
 
 ---
 
