@@ -261,8 +261,9 @@ echo ""
 log_info "Probing microservices..."
 check_endpoint "http://localhost:8000/health" "Client Gateway (Port 8000)" || true
 check_endpoint "http://localhost:8001/health" "RAG REST Service (Port 8001)" || true
-check_endpoint "http://localhost:8080/health" "K8s SRE MCP Server (Port 8080)" || true
-check_endpoint "http://localhost:8081/health" "Observability MCP Server (Port 8081)" || true
+# check_endpoint "http://localhost:8080/health" "K8s SRE MCP Server (Port 8080)" || true
+# check_endpoint "http://localhost:8081/health" "Observability MCP Server (Port 8081)" || true
+check_endpoint "http://localhost:8082/health" "Smart Locker MCP Server (Port 8082)" || true
 
 # Run Alembic Database Migrations
 echo ""
@@ -299,8 +300,9 @@ echo -e "  • WebChat Widget:        ${BLUE}http://${EXTERNAL_IP}:8000/api/v1/c
 echo -e "  • WebChat Interactive:   ${BLUE}http://${EXTERNAL_IP}:8000/api/v1/channels/webchat/demo${RESET}"
 echo -e "  • Gateway API Docs:      ${BLUE}http://${EXTERNAL_IP}:8000/docs${RESET}"
 echo -e "  • Standalone RAG Health: ${BLUE}http://${EXTERNAL_IP}:8001/health${RESET}"
-echo -e "  • K8s SRE MCP:           ${BLUE}http://${EXTERNAL_IP}:8080/health${RESET}"
-echo -e "  • Observability MCP:     ${BLUE}http://${EXTERNAL_IP}:8081/health${RESET}"
+echo -e "  • Smart Locker MCP:      ${BLUE}http://${EXTERNAL_IP}:8082/health${RESET}"
+# echo -e "  • K8s SRE MCP:           ${BLUE}http://${EXTERNAL_IP}:8080/health${RESET}"
+# echo -e "  • Observability MCP:     ${BLUE}http://${EXTERNAL_IP}:8081/health${RESET}"
 echo ""
 echo -e "${BOLD}Management Commands:${RESET}"
 echo -e "  • View Live Gateway Logs: ${YELLOW}docker compose logs -f smiota-agent-gateway${RESET}"

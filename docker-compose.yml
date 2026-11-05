@@ -42,51 +42,52 @@ services:
       - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://smiota_user:smaiops26devdb@host.docker.internal:5432/smiota_ai_dev}
     depends_on:
       - rag-service
-      - k8s-sre-mcp
-      - observability-mcp
+      - smart-locker-mcp
+      # - k8s-sre-mcp
+      # - observability-mcp
     networks:
       - smiota-mesh
 
   # ============================================================================
-  # Service 2: Kubernetes SRE MCP Server (Port 8080)
+  # Service 2: Kubernetes SRE MCP Server (Port 8080) [Temporarily commented out]
   # 37 Read-Only K8s inventory and troubleshooting tools with cluster RBAC.
   # ============================================================================
-  k8s-sre-mcp:
-    build:
-      context: ./mcp-servers/k8s-sre
-      dockerfile: Dockerfile
-    container_name: k8s-sre-mcp
-    restart: unless-stopped
-    ports:
-      - "8080:8080"
-    environment:
-      - MCP_HOST=0.0.0.0
-      - MCP_PORT=8080
-      - MCP_TRANSPORT=streamable-http
-      - LOG_LEVEL=INFO
-    networks:
-      - smiota-mesh
+  # k8s-sre-mcp:
+  #   build:
+  #     context: ./mcp-servers/k8s-sre
+  #     dockerfile: Dockerfile
+  #   container_name: k8s-sre-mcp
+  #   restart: unless-stopped
+  #   ports:
+  #     - "8080:8080"
+  #   environment:
+  #     - MCP_HOST=0.0.0.0
+  #     - MCP_PORT=8080
+  #     - MCP_TRANSPORT=streamable-http
+  #     - LOG_LEVEL=INFO
+  #   networks:
+  #     - smiota-mesh
 
   # ============================================================================
-  # Service 3: Observability MCP Server (Port 8081)
+  # Service 3: Observability MCP Server (Port 8081) [Temporarily commented out]
   # FastMCP server for Prometheus PromQL metrics & OpenSearch logs.
   # ============================================================================
-  observability-mcp:
-    build:
-      context: ./mcp-servers/observability
-      dockerfile: Dockerfile
-    container_name: observability-mcp
-    restart: unless-stopped
-    ports:
-      - "8081:8081"
-    environment:
-      - MCP_HOST=0.0.0.0
-      - MCP_PORT=8081
-      - MCP_TRANSPORT=streamable-http
-      - PROMETHEUS_URL=https://prometheus.int.smiotaapps.com
-      - OPENSEARCH_URL=https://opensearch.int.smiotaapps.com:9200
-    networks:
-      - smiota-mesh
+  # observability-mcp:
+  #   build:
+  #     context: ./mcp-servers/observability
+  #     dockerfile: Dockerfile
+  #   container_name: observability-mcp
+  #   restart: unless-stopped
+  #   ports:
+  #     - "8081:8081"
+  #   environment:
+  #     - MCP_HOST=0.0.0.0
+  #     - MCP_PORT=8081
+  #     - MCP_TRANSPORT=streamable-http
+  #     - PROMETHEUS_URL=https://prometheus.int.smiotaapps.com
+  #     - OPENSEARCH_URL=https://opensearch.int.smiotaapps.com:9200
+  #   networks:
+  #     - smiota-mesh
 
   # ============================================================================
   # Service 4: Smart Locker MCP Server (Port 8082)
