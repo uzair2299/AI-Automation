@@ -422,12 +422,11 @@ def main() -> None:
     if transport == "stdio":
         mcp.run(transport="stdio")
     elif transport in ("streamable-http", "sse", "http"):
-        mcp.settings.host = settings.MCP_HOST
-        mcp.settings.port = settings.MCP_PORT
+        run_transport = "streamable-http" if transport in ("streamable-http", "http") else "sse"
         try:
-            mcp.run(transport="streamable-http")
+            mcp.run(transport=run_transport, host=settings.MCP_HOST, port=settings.MCP_PORT)
         except Exception:
-            mcp.run(transport="sse")
+            mcp.run(transport="sse", host=settings.MCP_HOST, port=settings.MCP_PORT)
     else:
         logger.error(f"Unsupported transport '{transport}'. Use 'stdio' or 'streamable-http'.")
         sys.exit(1)
