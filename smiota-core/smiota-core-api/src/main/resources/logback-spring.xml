@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <springProperty name="springApplicationName" scope="context" source="application.name"/>
+    <springProperty name="appRollingFileName" scope="context" source="logging.rolling.file"/>
+    <springProperty name="rollingFileMaxHistory" scope="context" source="logging.rolling.file.max.history"/>
+    <springProperty name="rollingFileMaxSize" scope="context" source="logging.rolling.file.max.size"/>
+
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+    <springProfile name="dev,staging,uat,prod,mock">
+
+        <!-- Console appender WITHOUT masking -->
+        <appender name="stdout" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder>
+                <Pattern> %highlight(|) %green(%d{yyyy-MM-dd HH:mm:ss.SSS}) %highlight(|) ${LOG_LEVEL_PATTERN:-%5p} %highlight(|) %cyan(%class{0}) %highlight(|) %magenta(%method | Line:%L) %highlight(|) %yellow(%X{correlationId}) %highlight(|)  %red(%thread)  %highlight(|) %blue(%X{userName}) %highlight(|) %m  %n</Pattern>
+            </encoder>
+        </appender>
+
+        <!-- File appender WITHOUT masking -->
+        <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+            <file>/SpringBootVolume/logs/${springApplicationName}.log</file>
+            <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+                <fileNamePattern>${appRollingFileName}</fileNamePattern>
+                <maxHistory>${rollingFileMaxHistory}</maxHistory>
+                <totalSizeCap>${rollingFileMaxSize}</totalSizeCap>
+            </rollingPolicy>
+            <encoder>
+                <Pattern>%green(%d{yyyy-MM-dd HH:mm:ss.SSS}) %highlight(|) ${LOG_LEVEL_PATTERN:-%5p} %highlight(|) %cyan(%class{0}) %highlight(|) %magenta(%method | Line:%L) %highlight(|) %yellow(%X{correlationId}) %highlight(|)  %red(%thread)  %highlight(|) %blue(%X{AgentId}) %highlight(|) %m  %n</Pattern>
+            </encoder>
+        </appender>
+
+        <root level="DEBUG">
+            <appender-ref ref="stdout"/>
+            <appender-ref ref="FILE" />
+        </root>
+
+    </springProfile>
+</configuration>
+

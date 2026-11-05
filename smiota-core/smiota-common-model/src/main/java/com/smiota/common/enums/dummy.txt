@@ -1,0 +1,6 @@
+Placeholder for enums:
+- PackageStatus.java (RECEIVED, STORED, RELEASED)
+- LockerStatus.java (AVAILABLE, OCCUPIED, MAINTENANCE)
+- UserRole.java (ADMIN, RECIPIENT, COURIER)
+- DeliveryType.java (STANDARD, OVERNIGHT, PERISHABLE)
+

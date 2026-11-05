@@ -1,0 +1,5 @@
+Placeholder for locker DTOs:
+- LockerUnitDto.java (Core locker unit details)
+- LockerAvailabilityDto.java (AI & Mobile: Quick status checks)
+- LockerDiagnosticDto.java (Web Admin: Hardware & telemetry data)
+

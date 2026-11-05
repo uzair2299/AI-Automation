@@ -1,0 +1,4 @@
+Placeholder for responses:
+- ApiResponse.java (Generic wrapper: { success, data, error })
+- PageResponse.java (Generic pagination: { content, page, total })
+

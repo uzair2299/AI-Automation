@@ -1,0 +1,7 @@
+Placeholder for package DTOs:
+- PackageSummaryDto.java (Base shared data: ID, tracking, status)
+- PackageAiDto.java (AI/MCP: Token-optimized prompt context)
+- PackageMobileDto.java (Mobile: Includes QR code & PIN)
+- PackageWebDetailDto.java (Web: Full audit logs & raw courier details)
+- PackagePublicDto.java (Public: Sanitized - no PII, no locker codes)
+

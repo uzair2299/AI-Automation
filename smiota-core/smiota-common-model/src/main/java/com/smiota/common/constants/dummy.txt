@@ -1,0 +1,3 @@
+Placeholder for constants:
+- CommonConstants.java (Date formats, error codes, regex)
+

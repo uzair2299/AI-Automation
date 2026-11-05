@@ -1,0 +1,5 @@
+Placeholder for requests:
+- OpenLockerRequest.java (Payload to trigger a door opening)
+- ReleasePackageRequest.java (Payload to mark a package released)
+- ReserveLockerRequest.java (Payload for booking a locker)
+

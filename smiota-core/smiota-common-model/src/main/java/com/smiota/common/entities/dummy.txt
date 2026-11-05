@@ -1,0 +1,2 @@
+Placeholder for JPA entities (e.g. PackageEntity, LockerEntity, UserEntity)
+

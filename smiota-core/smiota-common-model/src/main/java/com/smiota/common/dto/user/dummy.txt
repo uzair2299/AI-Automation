@@ -1,0 +1,4 @@
+Placeholder for user DTOs:
+- UserSummaryDto.java (Minimal user details)
+- RecipientDto.java (Recipient contact & unit info)
+
