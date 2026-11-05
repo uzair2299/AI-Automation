@@ -11,16 +11,16 @@ import java.util.Optional;
 /**
  * JPA Auditing configuration providing current authenticated username for createdBy and updatedBy fields.
  */
-@Configuration
-@EnableJpaAuditing(auditorAwareRef = "auditorAware")
+//@Configuration
+//@EnableJpaAuditing(auditorAwareRef = "auditorAware")
 public class JpaAuditingConfig {
 
-    @Bean
-    public AuditorAware<String> auditorAware() {
-        return () -> {
-            Optional<String> username = SecurityUtils.getCurrentUsernameOptional();
-            return Optional.of(username.orElse("system"));
-        };
-    }
+//    @Bean
+//    public AuditorAware<String> auditorAware() {
+//        return () -> {
+//            Optional<String> username = SecurityUtils.getCurrentUsernameOptional();
+//            return Optional.of(username.orElse("system"));
+//        };
+//    }
 }
 
