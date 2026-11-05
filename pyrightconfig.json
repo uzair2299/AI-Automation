@@ -1,5 +1,6 @@
 {
   "include": [
+    "smiota-agent-gateway/src",
     "src",
     "rag-service",
     "tests",
@@ -9,6 +10,7 @@
     "packages/common"
   ],
   "extraPaths": [
+    "smiota-agent-gateway/src",
     "src",
     "rag-service",
     "mcp-servers/k8s-sre",

@@ -10,7 +10,7 @@ services:
   smiota-agent-gateway:
     build:
       context: .
-      dockerfile: deploy/docker/Dockerfile.api
+      dockerfile: smiota-agent-gateway/Dockerfile
     container_name: smiota-agent-gateway
     restart: unless-stopped
     ports:
