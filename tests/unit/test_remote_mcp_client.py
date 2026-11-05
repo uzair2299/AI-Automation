@@ -2,9 +2,9 @@
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 
-from smiota.mcp.client import MCPClient, RemoteMCPClient
-from smiota.mcp.registry import MCPToolRegistry
-from smiota.schemas.mcp import MCPToolExecutionResult
+from mcp.client import MCPClient, RemoteMCPClient
+from mcp.registry import MCPToolRegistry
+from schemas.mcp import MCPToolExecutionResult
 
 
 def test_remote_mcp_client_tool_routing():

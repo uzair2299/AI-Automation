@@ -1,8 +1,8 @@
 """Unit tests for SourceProcessor, RAG source deduplication, URL validation, and schema compatibility."""
 import pytest
-from smiota.services.source_processor import SourceProcessor, get_source_processor
-from smiota.rag_client.models import DocumentChunk, ScoredChunk
-from smiota.schemas.chat import SourceReference, ChatMessageResponse
+from services.source_processor import SourceProcessor, get_source_processor
+from rag_client.models import DocumentChunk, ScoredChunk
+from schemas.chat import SourceReference, ChatMessageResponse
 
 
 def test_source_processor_defaults():

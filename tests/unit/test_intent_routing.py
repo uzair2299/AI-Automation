@@ -3,9 +3,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from smiota.agents.base import AgentContext
-from smiota.agents.orchestrator import AgentOrchestrator
-from smiota.agents.routing import (
+from agents.base import AgentContext
+from agents.orchestrator import AgentOrchestrator
+from agents.routing import (
     CompositeIntentRouter,
     RouteDecision,
     RuleBasedRouter,
@@ -169,7 +169,7 @@ async def test_orchestrator_routing_metadata_attachment(base_context):
 
 @pytest.mark.asyncio
 async def test_rule_router_greetings_classification(base_context):
-    from smiota.agents.routing.rules import GREETINGS
+    from agents.routing.rules import GREETINGS
 
     router = RuleBasedRouter()
 
@@ -295,7 +295,7 @@ async def test_composite_router_informational_fast_path(base_context):
 async def test_customer_agent_handles_informational_query(base_context):
     from unittest.mock import patch
 
-    from smiota.agents.implementations.customer.agent import CustomerAgent
+    from agents.implementations.customer.agent import CustomerAgent
 
     agent = CustomerAgent()
     with patch("smiota.llm.provider.GeminiProvider.generate_completion", new_callable=AsyncMock) as mock_llm:
@@ -312,7 +312,7 @@ async def test_customer_agent_handles_informational_query(base_context):
 
 @pytest.mark.asyncio
 async def test_rule_router_gratitude_and_farewell_fast_paths(base_context):
-    from smiota.agents.routing.rules import RuleBasedRouter
+    from agents.routing.rules import RuleBasedRouter
 
     router = RuleBasedRouter()
 
@@ -327,7 +327,7 @@ async def test_rule_router_gratitude_and_farewell_fast_paths(base_context):
 async def test_customer_agent_gratitude_and_farewell_deterministic(base_context):
     from unittest.mock import patch
 
-    from smiota.agents.implementations.customer.agent import CustomerAgent
+    from agents.implementations.customer.agent import CustomerAgent
 
     agent = CustomerAgent()
     with patch("smiota.llm.provider.GeminiProvider.generate_completion", new_callable=AsyncMock) as mock_llm:
@@ -345,7 +345,7 @@ async def test_customer_agent_gratitude_and_farewell_deterministic(base_context)
 @pytest.mark.asyncio
 async def test_public_user_webchat_routes_to_knowledge_assistant():
     """Verify that unauthenticated/anonymous visitors without login details are routed to KnowledgeAssistant."""
-    from smiota.agents.routing.rules import RuleBasedRouter
+    from agents.routing.rules import RuleBasedRouter
 
     router = RuleBasedRouter()
     public_context = AgentContext(
@@ -371,7 +371,7 @@ async def test_public_user_webchat_routes_to_knowledge_assistant():
 @pytest.mark.asyncio
 async def test_authenticated_user_specific_integrations_routes_to_knowledge():
     """Verify that specific enterprise integration queries route to KnowledgeAssistant even for logged-in users."""
-    from smiota.agents.routing.rules import RuleBasedRouter
+    from agents.routing.rules import RuleBasedRouter
 
     router = RuleBasedRouter()
     logged_in_context = AgentContext(
@@ -390,7 +390,7 @@ async def test_knowledge_assistant_security_isolation_and_refusals():
     """Verify KnowledgeAssistantAgent has no tools and strictly refuses private/carrier operations."""
     from unittest.mock import AsyncMock
 
-    from smiota.agents.implementations.knowledge.agent import KnowledgeAssistantAgent
+    from agents.implementations.knowledge.agent import KnowledgeAssistantAgent
 
     agent = KnowledgeAssistantAgent()
 
@@ -429,7 +429,7 @@ async def test_knowledge_assistant_security_isolation_and_refusals():
 @pytest.mark.asyncio
 async def test_why_choose_smiota_package_management_system_routes_to_knowledge():
     """Verify that 'why choose smiota package management system?' routes to KnowledgeAssistant."""
-    from smiota.agents.routing.rules import RuleBasedRouter
+    from agents.routing.rules import RuleBasedRouter
 
     router = RuleBasedRouter()
     ctx = AgentContext(

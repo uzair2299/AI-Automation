@@ -6,7 +6,7 @@ import tempfile
 
 def test_webchat_file_contains_markdown_and_telemetry_logging():
     """Verify that webchat HTML contains Markdown functions, styling, tables, and keeps telemetry in logging scope without displaying on UI."""
-    webchat_path = "smiota-agent-gateway/src/smiota/api/v1/channels/webchat.py" if os.path.exists("smiota-agent-gateway/src/smiota/api/v1/channels/webchat.py") else "src/smiota/api/v1/channels/webchat.py"
+    webchat_path = "smiota-agent-gateway/api/v1/channels/webchat.py" if os.path.exists("smiota-agent-gateway/api/v1/channels/webchat.py") else "src/smiota/api/v1/channels/webchat.py"
     with open(webchat_path, "r", encoding="utf-8") as f:
         content = f.read()
 

@@ -11,8 +11,8 @@ Validates:
 import pytest
 from unittest.mock import AsyncMock, patch
 
-from smiota.mcp.context import CallerContext, set_caller_context, reset_caller_context
-from smiota.mcp.errors import (
+from mcp.context import CallerContext, set_caller_context, reset_caller_context
+from mcp.errors import (
     McpAccessDeniedError,
     McpAuthenticationRequiredError,
     McpInvalidInputError,
@@ -21,8 +21,8 @@ from smiota.mcp.errors import (
     McpUpstreamServiceUnavailableError,
     McpUpstreamTimeoutError,
 )
-from smiota.mcp.registry import MCPToolRegistry
-from smiota.mcp.servers.customer.tools import (
+from mcp.registry import MCPToolRegistry
+from mcp.servers.customer.tools import (
     get_my_locker_details,
     get_my_pickup_pin,
     get_package_details,
@@ -32,7 +32,7 @@ from smiota.mcp.servers.customer.tools import (
     create_support_ticket,
     search_packages,
 )
-from smiota.schemas.mcp_tools import (
+from schemas.mcp_tools import (
     GetLockerDetailsInput,
     GetPackageDetailsInput,
     GetPackageTimelineInput,
@@ -40,7 +40,7 @@ from smiota.schemas.mcp_tools import (
     SearchPackagesInput,
     ToolResultCode,
 )
-from smiota.services.smiota_mcp_service import SmiotaMcpService
+from services.smiota_mcp_service import SmiotaMcpService
 
 
 @pytest.fixture
@@ -65,7 +65,7 @@ def auth_caller() -> CallerContext:
 def enable_dummy_mode(monkeypatch):
     """Ensure deterministic synthetic fixtures for offline unit tests."""
     monkeypatch.setenv("SMIOTA_AUTH_DUMMY_MODE", "true")
-    from smiota.clients.smiota_api_client import get_smiota_api_client
+    from clients.smiota_api_client import get_smiota_api_client
     client = get_smiota_api_client()
     original_dummy = client._dummy_mode
     client._dummy_mode = True

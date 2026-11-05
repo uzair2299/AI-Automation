@@ -1,7 +1,7 @@
 """Utility script to seed vector database with baseline engineering runbooks."""
 import asyncio
-from smiota.core.logging import logger
-from smiota.rag_client.client import RAGServiceClient
+from core.logging import logger
+from rag_client.client import RAGServiceClient
 
 SAMPLE_RUNBOOKS = [
     {

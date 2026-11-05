@@ -13,11 +13,11 @@ import json
 import pytest
 import httpx
 
-from smiota.clients.smiota_api_client import SmiotaApiClient, get_smiota_api_client
-from smiota.mcp.client import MCPClient
-from smiota.mcp.context import CallerContext, set_caller_context, reset_caller_context
-from smiota.mcp.errors import McpUpstreamRateLimitedError, McpUpstreamServiceUnavailableError
-from smiota.services.smiota_mcp_service import SmiotaMcpService
+from clients.smiota_api_client import SmiotaApiClient, get_smiota_api_client
+from mcp.client import MCPClient
+from mcp.context import CallerContext, set_caller_context, reset_caller_context
+from mcp.errors import McpUpstreamRateLimitedError, McpUpstreamServiceUnavailableError
+from services.smiota_mcp_service import SmiotaMcpService
 
 
 @pytest.fixture

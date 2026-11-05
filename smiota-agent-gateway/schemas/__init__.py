@@ -1,0 +1,77 @@
+"""Pydantic validation contracts and API schemas."""
+from schemas.chat import ChatMessageRequest, ChatMessageResponse
+from schemas.approvals import (
+    ApprovalStatus,
+    ApprovalRequestCreate,
+    ApprovalDecision,
+)
+from schemas.mcp import (
+    ToolAccessLevel,
+    MCPToolDefinition,
+    MCPToolExecutionResult,
+)
+from schemas.common import (
+    APIResponse,
+    ErrorResponse,
+    PaginationParams,
+    PaginatedResponse,
+)
+from schemas.agents import (
+    AgentCapability,
+    AgentMetadataResponse,
+    IntentClassificationDiagnostic,
+)
+from schemas.rag import (
+    DocumentIngestionRequest,
+    DocumentIngestionResponse,
+    VectorSearchRequest,
+    DocumentSearchResult,
+    VectorSearchResponse,
+)
+from schemas.health import ComponentHealth, SystemHealthResponse
+from schemas.auth import (
+    AuthExchangeRequest,
+    AuthExchangeResponse,
+    UserIdentityInfo,
+)
+
+__all__ = [
+    "AuthExchangeRequest",
+    "AuthExchangeResponse",
+    "UserIdentityInfo",
+    "ChatMessageRequest",
+    "ChatMessageResponse",
+    "ApprovalStatus",
+    "ApprovalRequestCreate",
+    "ApprovalDecision",
+    "ToolAccessLevel",
+    "MCPToolDefinition",
+    "MCPToolExecutionResult",
+    "APIResponse",
+    "ErrorResponse",
+    "PaginationParams",
+    "PaginatedResponse",
+    "AgentCapability",
+    "AgentMetadataResponse",
+    "IntentClassificationDiagnostic",
+    "DocumentIngestionRequest",
+    "DocumentIngestionResponse",
+    "VectorSearchRequest",
+    "DocumentSearchResult",
+    "VectorSearchResponse",
+    "ComponentHealth",
+    "SystemHealthResponse",
+    "PackageStatus",
+    "PackageLifecycleGroup",
+    "PACKAGE_STATUS_CATALOG",
+    "get_status_definition",
+    "get_status_resident_explanation",
+]
+
+from schemas.package_status import (
+    PackageStatus,
+    PackageLifecycleGroup,
+    PACKAGE_STATUS_CATALOG,
+    get_status_definition,
+    get_status_resident_explanation,
+)

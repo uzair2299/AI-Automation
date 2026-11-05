@@ -5,12 +5,12 @@ os.environ["ENVIRONMENT"] = "test"
 import pytest
 from fastapi.testclient import TestClient
 
-from smiota.core.config import get_settings
+from core.config import get_settings
 get_settings.cache_clear()
 
-from smiota.agents import register_default_agents
-from smiota.agents.registry import AgentRegistry
-from smiota.main import app
+from agents import register_default_agents
+from agents.registry import AgentRegistry
+from main import app
 
 
 @pytest.fixture(scope="session", autouse=True)

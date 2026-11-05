@@ -4,9 +4,9 @@ import json
 import os
 import sys
 
-from smiota.agents import register_default_agents
-from smiota.agents.orchestrator import AgentOrchestrator
-from smiota.agents.base import AgentContext
+from agents import register_default_agents
+from agents.orchestrator import AgentOrchestrator
+from agents.base import AgentContext
 
 
 async def run_benchmark():

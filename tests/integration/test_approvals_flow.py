@@ -1,10 +1,10 @@
 """Integration test for /api/v1/approvals endpoint."""
 from fastapi.testclient import TestClient
-from smiota.main import app
+from main import app
 
 client = TestClient(app)
 
-from smiota.core.security import create_session_token
+from core.security import create_session_token
 admin_token, _, _ = create_session_token(
     user_id="usr-admin-1",
     tenant_id="smiota-internal",

@@ -2,8 +2,8 @@
 import json
 import os
 import pytest
-from smiota.agents.orchestrator import AgentOrchestrator
-from smiota.agents.base import AgentContext
+from agents.orchestrator import AgentOrchestrator
+from agents.base import AgentContext
 
 
 def load_golden_dataset():

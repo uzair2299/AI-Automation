@@ -1,0 +1,50 @@
+"""Dynamic plugin registry for Smiota AI Agents."""
+from typing import Any, Optional
+from agents.base import BaseAgent
+from core.logging import logger
+
+
+class AgentRegistry:
+    """Registry supporting dynamic discovery and injection of domain agents."""
+
+    _agents: dict[str, BaseAgent] = {}
+
+    @classmethod
+    def register(cls, agent_instance: BaseAgent) -> None:
+        """Register an instantiated agent into the platform core."""
+        logger.info(f"Registering AI Agent: [{agent_instance.name}] (Domain: {agent_instance.domain})")
+        cls._agents[agent_instance.name.lower()] = agent_instance
+        cls._agents[agent_instance.domain.lower()] = agent_instance
+
+    @classmethod
+    def get(cls, name: str) -> BaseAgent:
+        """Retrieve an agent by name or domain."""
+        if not cls._agents:
+            from agents import register_default_agents
+            register_default_agents()
+        name_key = name.lower()
+        if name_key not in cls._agents:
+            collapsed = name_key.replace("-", "").replace("_", "")
+            for registered_key, agent in cls._agents.items():
+                if registered_key.replace("-", "").replace("_", "") == collapsed:
+                    return agent
+            raise KeyError(f"Agent '{name}' is not registered. Available agents: {list(cls._agents.keys())}")
+        return cls._agents[name_key]
+
+    @classmethod
+    def list_agents(cls) -> list[dict[str, Any]]:
+        """List all unique registered agents and their capabilities."""
+        unique_agents: dict[str, BaseAgent] = {}
+        for agent in cls._agents.values():
+            unique_agents[agent.name.lower()] = agent
+
+        return [
+            {
+                "name": agent.name,
+                "domain": agent.domain,
+                "description": agent.description,
+                "capabilities": [c.model_dump() for c in agent.capabilities],
+                "bound_tools": agent.bound_tools,
+            }
+            for agent in unique_agents.values()
+        ]

@@ -3,7 +3,7 @@ import pytest
 from httpx import AsyncClient, ASGITransport
 from unittest.mock import AsyncMock, patch
 
-from smiota.main import create_app
+from main import create_app
 
 
 @pytest.mark.asyncio
@@ -88,7 +88,7 @@ async def test_ms_teams_inbound_auth_enforcement():
     transport = ASGITransport(app=app)
     
     with patch("smiota.api.v1.channels.teams.get_settings") as mock_settings:
-        from smiota.core.config import ProductionSettings
+        from core.config import ProductionSettings
         prod_settings = ProductionSettings()
         prod_settings.TEAMS_VALIDATE_INBOUND_JWT = True
         prod_settings.TEAMS_ENFORCE_TENANT_ID = True

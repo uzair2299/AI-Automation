@@ -1,6 +1,6 @@
 """Unit tests for Smiota Package Status Catalog, Lifecycle Enums, and Agent Explanations."""
 import pytest
-from smiota.schemas.package_status import (
+from schemas.package_status import (
     PackageStatus,
     PackageLifecycleGroup,
     PACKAGE_STATUS_CATALOG,
@@ -8,10 +8,10 @@ from smiota.schemas.package_status import (
     normalize_status_key,
     get_status_resident_explanation,
 )
-from smiota.schemas.mcp_tools import SearchPackagesInput
-from smiota.agents.implementations.customer.agent import CustomerAgent
-from smiota.agents.base import AgentContext
-from smiota.mcp.context import CallerContext, set_caller_context
+from schemas.mcp_tools import SearchPackagesInput
+from agents.implementations.customer.agent import CustomerAgent
+from agents.base import AgentContext
+from mcp.context import CallerContext, set_caller_context
 
 
 def test_package_status_catalog_completeness():
@@ -139,8 +139,8 @@ def test_format_package_record_with_human_readable_timestamps():
 async def test_customer_agent_uncollected_parcels_inquiry():
     """Verify logged-in user asking 'Show me all my uncollected parcels' returns pending packages directly."""
     from unittest.mock import AsyncMock, patch
-    from smiota.mcp.client import MCPClient
-    from smiota.schemas.mcp import MCPToolExecutionResult
+    from mcp.client import MCPClient
+    from schemas.mcp import MCPToolExecutionResult
 
     agent = CustomerAgent()
     context = AgentContext(
@@ -185,8 +185,8 @@ async def test_customer_agent_uncollected_parcels_inquiry():
 async def test_customer_agent_pickup_history_inquiry():
     """Verify logged-in user asking 'My past 30 days pickup history' queries status_group=RELEASED."""
     from unittest.mock import AsyncMock, patch
-    from smiota.mcp.client import MCPClient
-    from smiota.schemas.mcp import MCPToolExecutionResult
+    from mcp.client import MCPClient
+    from schemas.mcp import MCPToolExecutionResult
 
     agent = CustomerAgent()
     context = AgentContext(
@@ -231,8 +231,8 @@ async def test_customer_agent_pickup_history_inquiry():
 async def test_customer_agent_pending_packages_lookback_inquiry():
     """Verify user asking 'Show me a list of all pending packages over the last 30 days?' queries status_group=PENDING."""
     from unittest.mock import AsyncMock, patch
-    from smiota.mcp.client import MCPClient
-    from smiota.schemas.mcp import MCPToolExecutionResult
+    from mcp.client import MCPClient
+    from schemas.mcp import MCPToolExecutionResult
 
     agent = CustomerAgent()
     context = AgentContext(

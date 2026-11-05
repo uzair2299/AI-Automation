@@ -1,7 +1,7 @@
 """Unit tests for Model Context Protocol (MCP) Security and HITL Enforcement."""
 import pytest
-from smiota.mcp.security import mcp_tool, RemediationApprovalRequiredError
-from smiota.schemas.mcp import ToolAccessLevel
+from mcp.security import mcp_tool, RemediationApprovalRequiredError
+from schemas.mcp import ToolAccessLevel
 
 
 @mcp_tool(name="test_read_tool", access_level=ToolAccessLevel.READ_ONLY)

@@ -1,10 +1,10 @@
 """Integration test for /api/v1/chat endpoint and multi-agent routing."""
 from fastapi.testclient import TestClient
-from smiota.main import app
+from main import app
 
 client = TestClient(app)
 
-from smiota.core.security import create_session_token
+from core.security import create_session_token
 chat_token, _, _ = create_session_token(
     user_id="user-123",
     tenant_id="smiota-internal",

@@ -1,6 +1,6 @@
 """Unit tests for webchat channel endpoints, branding, and welcome message configuration."""
 from fastapi.testclient import TestClient
-from smiota.main import app
+from main import app
 
 client = TestClient(app)
 

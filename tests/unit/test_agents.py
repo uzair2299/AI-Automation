@@ -1,9 +1,9 @@
 """Unit tests for Agent Orchestrator and Agent Registry."""
 import pytest
-from smiota.agents import register_default_agents
-from smiota.agents.registry import AgentRegistry
-from smiota.agents.orchestrator import AgentOrchestrator
-from smiota.agents.base import AgentContext
+from agents import register_default_agents
+from agents.registry import AgentRegistry
+from agents.orchestrator import AgentOrchestrator
+from agents.base import AgentContext
 
 
 @pytest.fixture(autouse=True)

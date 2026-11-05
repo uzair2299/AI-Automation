@@ -22,10 +22,10 @@ import jwt
 import pytest
 from fastapi.testclient import TestClient
 
-from smiota.agents.base import AgentResult
-from smiota.core.config import get_settings
-from smiota.core.security import create_session_token, verify_session_token
-from smiota.main import app
+from agents.base import AgentResult
+from core.config import get_settings
+from core.security import create_session_token, verify_session_token
+from main import app
 
 client = TestClient(app)
 
@@ -530,7 +530,7 @@ def test_code_exchange_inactive_user_rejected():
 @pytest.mark.asyncio
 async def test_code_exchange_session_reattachment_and_expired_replacement():
     """Verify session continuity: re-attach when valid, generate fresh when expired or cross-user."""
-    from smiota.repositories.chat_repository import get_chat_repository
+    from repositories.chat_repository import get_chat_repository
     repo = get_chat_repository()
     await repo.clear_all()
 
@@ -646,9 +646,9 @@ def test_complete_user_information_in_token_and_chat_payloads():
 @pytest.mark.asyncio
 async def test_customer_agent_uses_parent_app_token_for_api_calls():
     """Verify CustomerAgent passes the parent app token rather than static SAVED_SESSION_TOKEN."""
-    from smiota.agents.base import AgentContext
-    from smiota.agents.implementations.customer.agent import CustomerAgent
-    from smiota.services.package_service import package_service
+    from agents.base import AgentContext
+    from agents.implementations.customer.agent import CustomerAgent
+    from services.package_service import package_service
 
     parent_app_token = "parent-app-token-998877"
     context = AgentContext(
@@ -688,9 +688,9 @@ async def test_customer_agent_uses_parent_app_token_for_api_calls():
 @pytest.mark.asyncio
 async def test_customer_agent_blocks_package_lookup_for_unauthenticated_public_user():
     """Verify CustomerAgent requires login when a public user without a parent token checks packages."""
-    from smiota.agents.base import AgentContext
-    from smiota.agents.implementations.customer.agent import CustomerAgent
-    from smiota.services.package_service import package_service
+    from agents.base import AgentContext
+    from agents.implementations.customer.agent import CustomerAgent
+    from services.package_service import package_service
 
     # Guest user with no parent token
     context = AgentContext(
@@ -716,7 +716,7 @@ async def test_customer_agent_blocks_package_lookup_for_unauthenticated_public_u
 @pytest.mark.asyncio
 async def test_package_service_rejects_missing_token():
     """Verify PackageService returns UNAUTHENTICATED error when called without a session token."""
-    from smiota.services.package_service import package_service
+    from services.package_service import package_service
 
     res = await package_service.get_packages(by_name_or_number="d012a7eb840e", token=None)
     assert res["success"] is False

@@ -2,9 +2,9 @@
 import pytest
 from unittest.mock import AsyncMock, patch
 
-from smiota.rag_client.config import RAGConfig
-from smiota.rag_client.models import DocumentChunk, ScoredChunk, RetrievalQuery
-from smiota.rag_client.prompts import (
+from rag_client.config import RAGConfig
+from rag_client.models import DocumentChunk, ScoredChunk, RetrievalQuery
+from rag_client.prompts import (
     SMIOTA_KNOWLEDGE_ASSISTANT_SYSTEM_PROMPT,
     build_rag_prompt,
     format_retrieved_chunks,

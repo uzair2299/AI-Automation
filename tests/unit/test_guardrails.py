@@ -1,7 +1,7 @@
 """Unit tests for safety guardrails and PII redaction."""
 import pytest
-from smiota.llm.guardrails import SafetyGuardrails
-from smiota.core.exceptions import PromptInjectionDetectedError
+from llm.guardrails import SafetyGuardrails
+from core.exceptions import PromptInjectionDetectedError
 
 
 def test_destructive_command_blocking():

@@ -10,10 +10,10 @@ Validates:
 import pytest
 from unittest.mock import AsyncMock
 
-from smiota.core.exceptions import RemediationApprovalRequiredError
-from smiota.mcp.client import MCPClient
-from smiota.mcp.context import CallerContext, set_caller_context, reset_caller_context
-from smiota.mcp.servers.customer.tools import (
+from core.exceptions import RemediationApprovalRequiredError
+from mcp.client import MCPClient
+from mcp.context import CallerContext, set_caller_context, reset_caller_context
+from mcp.servers.customer.tools import (
     get_my_locker_details,
     get_my_pickup_pin,
     get_package_details,
@@ -22,8 +22,8 @@ from smiota.mcp.servers.customer.tools import (
     remote_unlock_locker_door,
     search_packages,
 )
-from smiota.schemas.mcp_tools import ToolResultCode
-from smiota.services.smiota_mcp_service import SmiotaMcpService
+from schemas.mcp_tools import ToolResultCode
+from services.smiota_mcp_service import SmiotaMcpService
 
 
 @pytest.fixture
@@ -46,7 +46,7 @@ def guest_caller() -> CallerContext:
 def enable_dummy_mode(monkeypatch):
     """Ensure deterministic synthetic fixtures for offline security tests."""
     monkeypatch.setenv("SMIOTA_AUTH_DUMMY_MODE", "true")
-    from smiota.clients.smiota_api_client import get_smiota_api_client
+    from clients.smiota_api_client import get_smiota_api_client
     client = get_smiota_api_client()
     original_dummy = client._dummy_mode
     client._dummy_mode = True

@@ -7,8 +7,8 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
 
-from smiota.core.config import get_settings
-from smiota.models import Base
+from core.config import get_settings
+from models import Base
 
 config = context.config
 

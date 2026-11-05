@@ -1,13 +1,13 @@
 """Unit tests for Kubernetes Inspection and SRE Troubleshooting MCP Tools."""
 
 # Ensure DevOps and Kubernetes MCP tools are loaded
-import smiota.mcp.servers.devops.tools  # noqa: F401
-from smiota.agents import register_default_agents
-from smiota.agents.base import AgentContext
-from smiota.agents.registry import AgentRegistry
-from smiota.agents.routing.rules import RuleBasedRouter
-from smiota.mcp.registry import MCPToolRegistry
-from smiota.mcp.servers.devops.k8s_tools import (
+import mcp.servers.devops.tools  # noqa: F401
+from agents import register_default_agents
+from agents.base import AgentContext
+from agents.registry import AgentRegistry
+from agents.routing.rules import RuleBasedRouter
+from mcp.registry import MCPToolRegistry
+from mcp.servers.devops.k8s_tools import (
     analyze_container_logs,
     analyze_pod_events,
     check_dns_resolution,
@@ -46,8 +46,8 @@ from smiota.mcp.servers.devops.k8s_tools import (
     list_services,
     list_statefulsets,
 )
-from smiota.mcp.servers.observability.tools import get_service_logs, search_opensearch_logs
-from smiota.schemas.mcp import ToolAccessLevel
+from mcp.servers.observability.tools import get_service_logs, search_opensearch_logs
+from schemas.mcp import ToolAccessLevel
 
 
 def run_coro(coro):

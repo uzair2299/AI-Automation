@@ -5,14 +5,14 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-from smiota.agents.base import AgentResult
-from smiota.core.security import create_session_token
-from smiota.main import app
-from smiota.repositories.chat_repository import (
+from agents.base import AgentResult
+from core.security import create_session_token
+from main import app
+from repositories.chat_repository import (
     InMemoryChatRepository,
     get_chat_repository,
 )
-from smiota.schemas.chat_session import ChatMessage, ChatSession
+from schemas.chat_session import ChatMessage, ChatSession
 
 client = TestClient(app)
 

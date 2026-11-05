@@ -1,6 +1,6 @@
 """Unit tests for FastAPI health check endpoints."""
 from fastapi.testclient import TestClient
-from smiota.main import app
+from main import app
 
 client = TestClient(app)
 
