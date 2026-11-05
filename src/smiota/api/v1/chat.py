@@ -128,6 +128,7 @@ async def get_chat_history(
     session = await chat_repo.get_session(session_id)
     if not session:
         return ChatHistoryResponse(
+            conversation_id=session_id,
             session_id=session_id,
             user_id=current_user.user_id,
             tenant_id=current_user.tenant_id,

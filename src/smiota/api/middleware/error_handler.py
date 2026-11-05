@@ -14,7 +14,7 @@ from smiota.core.exceptions import (
 )
 
 
-async def smiota_exception_handler(request: Request, exc: SmiotaException) -> JSONResponse:
+async def smiota_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Handle custom Smiota exceptions with appropriate HTTP status codes."""
     status_code = 500
 
@@ -42,14 +42,17 @@ async def smiota_exception_handler(request: Request, exc: SmiotaException) -> JS
     else:
         error_code = "INTERNAL_SERVER_ERROR"
 
-    logger.warning(f"Handled {exc.__class__.__name__}: {exc.message} (status: {status_code})")
+    message = getattr(exc, "message", str(exc))
+    details = getattr(exc, "details", {})
+
+    logger.warning(f"Handled {exc.__class__.__name__}: {message} (status: {status_code})")
 
     return JSONResponse(
         status_code=status_code,
         content={
             "success": False,
             "error_code": error_code,
-            "message": exc.message,
-            "details": exc.details,
+            "message": message,
+            "details": details,
         },
     )

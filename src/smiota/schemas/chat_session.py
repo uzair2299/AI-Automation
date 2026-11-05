@@ -209,8 +209,8 @@ class ChatSession(BaseModel):
 
 class ChatHistoryResponse(BaseModel):
     """Response returned when fetching chat session history."""
-    conversation_id: str = Field(..., description="Parent conversation ID")
-    session_id: str = Field(..., description="Legacy alias for conversation_id")
+    conversation_id: str = Field(default="", description="Parent conversation ID")
+    session_id: str = Field(default="", description="Legacy alias for conversation_id")
     user_id: str
     tenant_id: str
     channel: str
