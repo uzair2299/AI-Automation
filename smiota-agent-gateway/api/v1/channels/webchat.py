@@ -137,15 +137,33 @@ async def embed_widget(
                 </div>
             </div>
 
-            <!-- Interactive Quick Reply Pill Buttons (Commented out for now for webchat channel)
-            <div id="quick-replies-container" class="grid grid-cols-2 gap-2 pt-1 px-8">
-                <button type="button" onclick="sendQuickReply('Where is my package?')" class="text-xs text-indigo-600 bg-white hover:bg-indigo-50/80 border border-indigo-200/80 hover:border-indigo-300 font-medium py-2 px-3 rounded-xl transition text-center shadow-xs truncate">📦 Track package</button>
-                <button type="button" onclick="sendQuickReply('Resend pickup PIN')" class="text-xs text-indigo-600 bg-white hover:bg-indigo-50/80 border border-indigo-200/80 hover:border-indigo-300 font-medium py-2 px-3 rounded-xl transition text-center shadow-xs truncate">🔑 Get pickup PIN</button>
-                <button type="button" onclick="sendQuickReply('What does Smiota offer?')" class="text-xs text-indigo-600 bg-white hover:bg-indigo-50/80 border border-indigo-200/80 hover:border-indigo-300 font-medium py-2 px-3 rounded-xl transition text-center shadow-xs truncate">🏢 Smiota smart lockers</button>
-                <button type="button" onclick="sendQuickReply('Locker door did not open')" class="text-xs text-indigo-600 bg-white hover:bg-indigo-50/80 border border-indigo-200/80 hover:border-indigo-300 font-medium py-2 px-3 rounded-xl transition text-center shadow-xs truncate">🚪 Locker door help</button>
+            <!-- Initial Suggested Action Pills (Max 6) -->
+            <div id="quick-replies-container" class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 px-1 sm:px-2">
+                <button type="button" data-pill-id="has_package" onclick="sendPresetPill('has_package')" class="group text-xs text-left text-slate-700 hover:text-indigo-700 bg-white hover:bg-indigo-50/80 border border-slate-200/90 hover:border-indigo-300 font-medium py-2.5 px-3 rounded-xl transition shadow-2xs hover:shadow-xs flex items-center space-x-2 cursor-pointer">
+                    <span class="text-base shrink-0 select-none">📦</span>
+                    <span class="truncate">Do I have a package?</span>
+                </button>
+                <button type="button" data-pill-id="lost_code" onclick="sendPresetPill('lost_code')" class="group text-xs text-left text-slate-700 hover:text-indigo-700 bg-white hover:bg-indigo-50/80 border border-slate-200/90 hover:border-indigo-300 font-medium py-2.5 px-3 rounded-xl transition shadow-2xs hover:shadow-xs flex items-center space-x-2 cursor-pointer">
+                    <span class="text-base shrink-0 select-none">🔑</span>
+                    <span class="truncate">I lost my code</span>
+                </button>
+                <button type="button" data-pill-id="locker_issue" onclick="sendPresetPill('locker_issue')" class="group text-xs text-left text-slate-700 hover:text-indigo-700 bg-white hover:bg-indigo-50/80 border border-slate-200/90 hover:border-indigo-300 font-medium py-2.5 px-3 rounded-xl transition shadow-2xs hover:shadow-xs flex items-center space-x-2 cursor-pointer">
+                    <span class="text-base shrink-0 select-none">🔒</span>
+                    <span class="truncate">Locker won't open</span>
+                </button>
+                <button type="button" data-pill-id="courier_delivery" onclick="sendPresetPill('courier_delivery')" class="group text-xs text-left text-slate-700 hover:text-indigo-700 bg-white hover:bg-indigo-50/80 border border-slate-200/90 hover:border-indigo-300 font-medium py-2.5 px-3 rounded-xl transition shadow-2xs hover:shadow-xs flex items-center space-x-2 cursor-pointer">
+                    <span class="text-base shrink-0 select-none">🚚</span>
+                    <span class="truncate">Courier says delivered</span>
+                </button>
+                <button type="button" data-pill-id="package_collected" onclick="sendPresetPill('package_collected')" class="group text-xs text-left text-slate-700 hover:text-indigo-700 bg-white hover:bg-indigo-50/80 border border-slate-200/90 hover:border-indigo-300 font-medium py-2.5 px-3 rounded-xl transition shadow-2xs hover:shadow-xs flex items-center space-x-2 cursor-pointer">
+                    <span class="text-base shrink-0 select-none">📦</span>
+                    <span class="truncate">Package already collected</span>
+                </button>
+                <button type="button" data-pill-id="human_support" onclick="sendPresetPill('human_support')" class="group text-xs text-left text-slate-700 hover:text-indigo-700 bg-white hover:bg-indigo-50/80 border border-slate-200/90 hover:border-indigo-300 font-medium py-2.5 px-3 rounded-xl transition shadow-2xs hover:shadow-xs flex items-center space-x-2 cursor-pointer">
+                    <span class="text-base shrink-0 select-none">💬</span>
+                    <span class="truncate">Talk to support</span>
+                </button>
             </div>
-            -->
-            <div id="quick-replies-container" style="display: none;"></div>
         </div>
 
         <!-- Input Bar Toolbar -->
@@ -230,9 +248,11 @@ async def embed_widget(
                         historyRestored = true;
                         console.log(`Restoring ${data.messages.length} previous conversation messages...`);
                         
-                        // Hide initial welcome message if user already has an active history
+                        // Hide initial welcome message and action pills if user already has an active history
                         const initBubble = document.getElementById('initial-welcome-bubble');
                         if (initBubble) initBubble.style.display = 'none';
+                        const quickRepliesEl = document.getElementById('quick-replies-container');
+                        if (quickRepliesEl) quickRepliesEl.style.display = 'none';
 
                         for (const msg of data.messages) {
                             const textContent = (typeof msg.content === 'object' && msg.content !== null) ? (msg.content.text || '') : (msg.content || '');
@@ -1049,6 +1069,24 @@ async def embed_widget(
                 }
             }
         }
+
+        const INITIAL_ACTION_PILLS = [
+            { id: "has_package", label: "📦 Do I have a package?", message: "Do I have a package?" },
+            { id: "lost_code", label: "🔑 I lost my code", message: "I lost my package pickup code." },
+            { id: "locker_issue", label: "🔒 Locker won't open", message: "The locker won't open." },
+            { id: "courier_delivery", label: "🚚 Courier says delivered", message: "My courier says the package was delivered, but I cannot find it." },
+            { id: "package_collected", label: "📦 Package already collected", message: "My package shows as collected, but I haven't collected it." },
+            { id: "human_support", label: "💬 Talk to support", message: "I need help from customer support." },
+        ];
+
+        function sendPresetPill(pillId) {
+            const pill = INITIAL_ACTION_PILLS.find(p => p.id === pillId);
+            if (pill) {
+                sendQuickReply(pill.message);
+            }
+        }
+        window.sendPresetPill = sendPresetPill;
+        window.INITIAL_ACTION_PILLS = INITIAL_ACTION_PILLS;
 
         function sendQuickReply(text) {
             executeQuery(text);

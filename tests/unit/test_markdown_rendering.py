@@ -26,6 +26,31 @@ def test_webchat_file_contains_markdown_and_telemetry_logging():
     assert "[Telemetry & Provenance]" in content
 
 
+def test_webchat_file_contains_initial_action_pills():
+    """Verify that webchat HTML contains the 6 initial suggested action pills and preset handlers."""
+    webchat_path = "smiota-agent-gateway/api/v1/channels/webchat.py" if os.path.exists("smiota-agent-gateway/api/v1/channels/webchat.py") else "src/smiota/api/v1/channels/webchat.py"
+    with open(webchat_path, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    # 6 Pill IDs
+    assert 'data-pill-id="has_package"' in content
+    assert 'data-pill-id="lost_code"' in content
+    assert 'data-pill-id="locker_issue"' in content
+    assert 'data-pill-id="courier_delivery"' in content
+    assert 'data-pill-id="package_collected"' in content
+    assert 'data-pill-id="human_support"' in content
+
+    # Pill labels and presets
+    assert "Do I have a package?" in content
+    assert "I lost my code" in content
+    assert "Locker won't open" in content
+    assert "Courier says delivered" in content
+    assert "Package already collected" in content
+    assert "Talk to support" in content
+    assert "INITIAL_ACTION_PILLS" in content
+    assert "sendPresetPill" in content
+
+
 def test_javascript_markdown_rendering_with_node():
     """Execute the formatMarkdown JavaScript function with Node.js to verify rendering and XSS protection."""
     js_code = r"""
