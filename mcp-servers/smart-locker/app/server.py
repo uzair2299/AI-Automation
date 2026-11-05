@@ -8,15 +8,13 @@ from typing import Any, Dict, List, Optional
 
 try:
     from mcp.server.mcpserver import MCPServer as FastMCP
-except (ImportError, ModuleNotFoundError):
-    from mcp.server.fastmcp import FastMCP
+except (ImportError, ModuleNotFoundError):  # pragma: no cover
+    from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found, import-untyped]
 
 try:
-    from app.config import settings
-    from app.models import CompartmentInfo, LockerStatusResponse
-except ImportError:
     from .config import settings
-    from .models import CompartmentInfo, LockerStatusResponse
+except ImportError:
+    from app.config import settings
 
 try:
     from smiota_common.logging import setup_logging
@@ -192,6 +190,14 @@ async def locker_open_compartment(
         return {
             "status": "requires_approval",
             "error": "RemediationApprovalRequiredError: Operator or resident authorization required to unlock door.",
+            "locker_id": locker_id,
+            "compartment_id": compartment_id,
+        }
+
+    if not is_authorized:
+        return {
+            "status": "unauthorized",
+            "error": "Invalid authorization PIN or approval token.",
             "locker_id": locker_id,
             "compartment_id": compartment_id,
         }

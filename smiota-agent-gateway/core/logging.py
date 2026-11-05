@@ -18,7 +18,7 @@ def setup_logging() -> logging.Logger:
     environment = getattr(settings, "ENVIRONMENT", "development")
     log_level_str = settings.LOG_LEVEL if not settings.DEBUG else "DEBUG"
 
-    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     log_file_path = os.path.join(base_dir, "logs", "smiota.log")
 
     return common_setup_logging(

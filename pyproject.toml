@@ -50,5 +50,12 @@ testpaths = ["tests"]
 pythonpath = ["smiota-agent-gateway", "smiota-agent-gateway", "rag-service", "mcp-servers/k8s-sre", "mcp-servers/observability", "mcp-servers/smart-locker"]
 
 [tool.pyright]
-include = ["smiota-agent-gateway", "rag-service", "tests"]
-extraPaths = ["smiota-agent-gateway", "rag-service"]
+include = ["smiota-agent-gateway", "rag-service", "mcp-servers", "packages/common", "tests"]
+extraPaths = [
+    "smiota-agent-gateway",
+    "packages/common",
+    "mcp-servers/observability",
+    "mcp-servers/smart-locker",
+    "mcp-servers/k8s-sre",
+    "rag-service"
+]

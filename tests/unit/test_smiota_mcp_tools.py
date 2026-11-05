@@ -9,19 +9,22 @@ Validates:
 - Sensitive data isolation and empty-result handling
 """
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 
 from mcp.context import CallerContext, set_caller_context, reset_caller_context
 from mcp.errors import (
-    McpAccessDeniedError,
-    McpAuthenticationRequiredError,
-    McpInvalidInputError,
     McpUpstreamNotFoundError,
     McpUpstreamRateLimitedError,
     McpUpstreamServiceUnavailableError,
     McpUpstreamTimeoutError,
 )
 from mcp.registry import MCPToolRegistry
+from schemas.mcp_tools import (
+    GetPackageDetailsInput,
+    GetPackageTimelineInput,
+    SearchPackagesInput,
+    ToolResultCode,
+)
 from services.smiota_mcp_service import SmiotaMcpService, get_smiota_mcp_service
 
 
@@ -45,12 +48,12 @@ async def get_user_preferences_and_services():
     return res.model_dump()
 
 
-async def get_my_pickup_pin(identifier: str = None):
+async def get_my_pickup_pin(identifier: str | None = None):
     res = await get_smiota_mcp_service().get_my_pickup_pin(identifier=identifier)
     return res.model_dump()
 
 
-async def get_my_locker_details(identifier: str = None):
+async def get_my_locker_details(identifier: str | None = None):
     res = await get_smiota_mcp_service().get_my_locker_details(identifier=identifier)
     return res.model_dump()
 
@@ -74,16 +77,6 @@ async def create_support_ticket(user_id: str, subject: str, description: str, pr
         "priority": priority,
         "status": "assigned_to_support_tier2",
     }
-
-from schemas.mcp_tools import (
-    GetLockerDetailsInput,
-    GetPackageDetailsInput,
-    GetPackageTimelineInput,
-    GetPickupPinInput,
-    SearchPackagesInput,
-    ToolResultCode,
-)
-from services.smiota_mcp_service import SmiotaMcpService
 
 
 @pytest.fixture

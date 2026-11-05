@@ -10,10 +10,13 @@ import httpx
 
 try:
     from mcp.server.mcpserver import MCPServer as FastMCP
-except (ImportError, ModuleNotFoundError):
-    from mcp.server.fastmcp import FastMCP
+except (ImportError, ModuleNotFoundError):  # pragma: no cover
+    from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found, import-untyped]
 
-from app.config import settings
+try:
+    from .config import settings
+except ImportError:
+    from app.config import settings
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("smiota-observability-mcp")

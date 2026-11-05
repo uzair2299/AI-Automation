@@ -37,17 +37,19 @@ async def get_user_preferences_and_services():
     return res.model_dump()
 
 
-async def get_my_pickup_pin(identifier: str = None):
+async def get_my_pickup_pin(identifier: str | None = None):
     res = await get_smiota_mcp_service().get_my_pickup_pin(identifier=identifier)
     return res.model_dump()
 
 
-async def get_my_locker_details(identifier: str = None):
+async def get_my_locker_details(identifier: str | None = None):
     res = await get_smiota_mcp_service().get_my_locker_details(identifier=identifier)
     return res.model_dump()
 
 
-async def remote_unlock_locker_door(locker_id: str, compartment: int, approval_token: str = None):
+async def remote_unlock_locker_door(
+    locker_id: str, compartment: int, approval_token: str | None = None
+):
     if not approval_token:
         raise RemediationApprovalRequiredError("Remediation approval token required for remote unlock.")
     return {
@@ -219,7 +221,7 @@ async def test_injection_characters_rejected():
 
         # Newline / Carriage return / Header injection
         res2 = await service.get_package_details(identifier="10492\r\nX-Injected: evil")
-        # Either schema rejects or service rejects
+        assert res2.success is False or res2.status in [ToolResultCode.NOT_FOUND, ToolResultCode.INVALID_INPUT]
     finally:
         reset_caller_context(token)
 

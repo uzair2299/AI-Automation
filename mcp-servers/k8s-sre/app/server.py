@@ -18,7 +18,10 @@ try:
 except (ImportError, ModuleNotFoundError):
     from mcp.server.fastmcp import FastMCP
 
-from app.config import settings
+try:
+    from .config import settings
+except ImportError:
+    from app.config import settings
 from app.tools.format_validator import build_retry_instruction, validate_format
 
 # Group 1 Inventory Tools
@@ -79,22 +82,22 @@ from app.tools.diagnose_workloads import (
 )
 
 from app.tools.devops import (
-    fetch_github_pr_diff,
-    generate_promql_query,
-    trigger_cicd_pipeline,
-    validate_terraform_plan,
+    fetch_github_pr_diff as fetch_github_pr_diff_impl,
+    generate_promql_query as generate_promql_query_impl,
+    trigger_cicd_pipeline as trigger_cicd_pipeline_impl,
+    validate_terraform_plan as validate_terraform_plan_impl,
 )
 from app.tools.qa import (
-    generate_synthetic_test_data,
-    parse_test_failure_logs,
-    run_load_test,
-    run_playwright_e2e_test,
+    generate_synthetic_test_data as generate_synthetic_test_data_impl,
+    parse_test_failure_logs as parse_test_failure_logs_impl,
+    run_load_test as run_load_test_impl,
+    run_playwright_e2e_test as run_playwright_e2e_test_impl,
 )
 from app.tools.security import (
-    audit_gcp_iam_bindings,
-    query_wazuh_alerts,
-    revoke_compromised_credentials,
-    scan_container_vulnerabilities,
+    audit_gcp_iam_bindings as audit_gcp_iam_bindings_impl,
+    query_wazuh_alerts as query_wazuh_alerts_impl,
+    revoke_compromised_credentials as revoke_compromised_credentials_impl,
+    scan_container_vulnerabilities as scan_container_vulnerabilities_impl,
 )
 
 logging.basicConfig(
@@ -442,46 +445,46 @@ async def k8s_check_network_connectivity(
 @mcp.tool(**_TOOL_ANNOTATIONS)
 async def tool_fetch_github_pr_diff(repo: str, pr_number: int) -> Dict[str, Any]:
     """Fetch pull request code diff and changed files from GitHub / GitLab."""
-    return await fetch_github_pr_diff(repo, pr_number)
+    return await fetch_github_pr_diff_impl(repo, pr_number)
 
 @mcp.tool(**_TOOL_ANNOTATIONS)
 async def fetch_github_pr_diff(repo: str, pr_number: int) -> Dict[str, Any]:
     """Alias: Fetch pull request code diff and changed files."""
-    return await fetch_github_pr_diff(repo, pr_number)
+    return await fetch_github_pr_diff_impl(repo, pr_number)
 
 @mcp.tool(**_TOOL_ANNOTATIONS)
 async def tool_validate_terraform_plan(directory_path: str = ".") -> Dict[str, Any]:
     """Validate Terraform / OpenTofu syntax and simulate dry-run plan."""
-    return await validate_terraform_plan(directory_path)
+    return await validate_terraform_plan_impl(directory_path)
 
 @mcp.tool(**_TOOL_ANNOTATIONS)
 async def validate_terraform_plan(directory_path: str = ".") -> Dict[str, Any]:
     """Alias: Validate Terraform / OpenTofu syntax."""
-    return await validate_terraform_plan(directory_path)
+    return await validate_terraform_plan_impl(directory_path)
 
 @mcp.tool(**_TOOL_ANNOTATIONS)
 async def tool_generate_promql_query(metric_intent: str) -> Dict[str, Any]:
     """Synthesize an optimized PromQL query from natural language requirements."""
-    return await generate_promql_query(metric_intent)
+    return await generate_promql_query_impl(metric_intent)
 
 @mcp.tool(**_TOOL_ANNOTATIONS)
 async def generate_promql_query(metric_intent: str) -> Dict[str, Any]:
     """Alias: Synthesize an optimized PromQL query."""
-    return await generate_promql_query(metric_intent)
+    return await generate_promql_query_impl(metric_intent)
 
 @mcp.tool(readOnlyHint=False, destructiveHint=False, idempotentHint=False)
 async def tool_trigger_cicd_pipeline(
     pipeline_name: str, target_branch: str = "main", approval_token: Optional[str] = None
 ) -> Dict[str, Any]:
     """Trigger deployment or rerun CI/CD pipeline in GitHub Actions / Cloud Build."""
-    return await trigger_cicd_pipeline(pipeline_name, target_branch, approval_token)
+    return await trigger_cicd_pipeline_impl(pipeline_name, target_branch, approval_token)
 
 @mcp.tool(readOnlyHint=False, destructiveHint=False, idempotentHint=False)
 async def trigger_cicd_pipeline(
     pipeline_name: str, target_branch: str = "main", approval_token: Optional[str] = None
 ) -> Dict[str, Any]:
     """Alias: Trigger deployment or rerun CI/CD pipeline."""
-    return await trigger_cicd_pipeline(pipeline_name, target_branch, approval_token)
+    return await trigger_cicd_pipeline_impl(pipeline_name, target_branch, approval_token)
 
 
 # ==============================================================================
@@ -491,46 +494,46 @@ async def trigger_cicd_pipeline(
 @mcp.tool(**_TOOL_ANNOTATIONS)
 async def tool_run_playwright_e2e_test(test_spec: str, environment: str = "staging") -> Dict[str, Any]:
     """Run a headless Playwright test suite against staging web endpoints."""
-    return await run_playwright_e2e_test(test_spec, environment)
+    return await run_playwright_e2e_test_impl(test_spec, environment)
 
 @mcp.tool(**_TOOL_ANNOTATIONS)
 async def run_playwright_e2e_test(test_spec: str, environment: str = "staging") -> Dict[str, Any]:
     """Alias: Run a headless Playwright test suite."""
-    return await run_playwright_e2e_test(test_spec, environment)
+    return await run_playwright_e2e_test_impl(test_spec, environment)
 
 @mcp.tool(**_TOOL_ANNOTATIONS)
 async def tool_parse_test_failure_logs(build_id: str) -> Dict[str, Any]:
     """Parse test runner failure logs, stack traces, and screenshots to identify flakiness."""
-    return await parse_test_failure_logs(build_id)
+    return await parse_test_failure_logs_impl(build_id)
 
 @mcp.tool(**_TOOL_ANNOTATIONS)
 async def parse_test_failure_logs(build_id: str) -> Dict[str, Any]:
     """Alias: Parse test runner failure logs."""
-    return await parse_test_failure_logs(build_id)
+    return await parse_test_failure_logs_impl(build_id)
 
 @mcp.tool(**_TOOL_ANNOTATIONS)
 async def tool_generate_synthetic_test_data(schema_type: str, count: int = 5) -> List[Dict[str, Any]]:
     """Generate realistic mock fixtures, user personas, and IoT payload schemas."""
-    return await generate_synthetic_test_data(schema_type, count)
+    return await generate_synthetic_test_data_impl(schema_type, count)
 
 @mcp.tool(**_TOOL_ANNOTATIONS)
 async def generate_synthetic_test_data(schema_type: str, count: int = 5) -> List[Dict[str, Any]]:
     """Alias: Generate realistic mock fixtures."""
-    return await generate_synthetic_test_data(schema_type, count)
+    return await generate_synthetic_test_data_impl(schema_type, count)
 
 @mcp.tool(readOnlyHint=False, destructiveHint=False, idempotentHint=False)
 async def tool_run_load_test(
     target_url: str, virtual_users: int = 50, approval_token: Optional[str] = None
 ) -> Dict[str, Any]:
     """Execute synthetic load/stress test generating high-concurrency traffic."""
-    return await run_load_test(target_url, virtual_users, approval_token)
+    return await run_load_test_impl(target_url, virtual_users, approval_token)
 
 @mcp.tool(readOnlyHint=False, destructiveHint=False, idempotentHint=False)
 async def run_load_test(
     target_url: str, virtual_users: int = 50, approval_token: Optional[str] = None
 ) -> Dict[str, Any]:
     """Alias: Execute synthetic load/stress test."""
-    return await run_load_test(target_url, virtual_users, approval_token)
+    return await run_load_test_impl(target_url, virtual_users, approval_token)
 
 
 # ==============================================================================
@@ -540,46 +543,46 @@ async def run_load_test(
 @mcp.tool(**_TOOL_ANNOTATIONS)
 async def tool_query_wazuh_alerts(severity_threshold: int = 7, limit: int = 20) -> List[Dict[str, Any]]:
     """Query Wazuh SIEM security events, intrusion alerts, and CIS benchmark findings."""
-    return await query_wazuh_alerts(severity_threshold, limit)
+    return await query_wazuh_alerts_impl(severity_threshold, limit)
 
 @mcp.tool(**_TOOL_ANNOTATIONS)
 async def query_wazuh_alerts(severity_threshold: int = 7, limit: int = 20) -> List[Dict[str, Any]]:
     """Alias: Query Wazuh SIEM security events."""
-    return await query_wazuh_alerts(severity_threshold, limit)
+    return await query_wazuh_alerts_impl(severity_threshold, limit)
 
 @mcp.tool(**_TOOL_ANNOTATIONS)
 async def tool_scan_container_vulnerabilities(image_tag: str) -> Dict[str, Any]:
     """Scan container image or repository dependencies with Trivy / Snyk for CVEs."""
-    return await scan_container_vulnerabilities(image_tag)
+    return await scan_container_vulnerabilities_impl(image_tag)
 
 @mcp.tool(**_TOOL_ANNOTATIONS)
 async def scan_container_vulnerabilities(image_tag: str) -> Dict[str, Any]:
     """Alias: Scan container image with Trivy scanner."""
-    return await scan_container_vulnerabilities(image_tag)
+    return await scan_container_vulnerabilities_impl(image_tag)
 
 @mcp.tool(**_TOOL_ANNOTATIONS)
 async def tool_audit_gcp_iam_bindings(project_id: str = "smiota-prod") -> List[Dict[str, Any]]:
     """Inspect GCP IAM service account permissions and detect over-privileged roles."""
-    return await audit_gcp_iam_bindings(project_id)
+    return await audit_gcp_iam_bindings_impl(project_id)
 
 @mcp.tool(**_TOOL_ANNOTATIONS)
 async def audit_gcp_iam_bindings(project_id: str = "smiota-prod") -> List[Dict[str, Any]]:
     """Alias: Inspect GCP IAM service account permissions."""
-    return await audit_gcp_iam_bindings(project_id)
+    return await audit_gcp_iam_bindings_impl(project_id)
 
 @mcp.tool(readOnlyHint=False, destructiveHint=True, idempotentHint=False)
 async def tool_revoke_compromised_credentials(
     credential_id: str, reason: str, approval_token: Optional[str] = None
 ) -> Dict[str, Any]:
     """Revoke compromised API key or service account key (Requires Approval)."""
-    return await revoke_compromised_credentials(credential_id, reason, approval_token)
+    return await revoke_compromised_credentials_impl(credential_id, reason, approval_token)
 
 @mcp.tool(readOnlyHint=False, destructiveHint=True, idempotentHint=False)
 async def revoke_compromised_credentials(
     credential_id: str, reason: str, approval_token: Optional[str] = None
 ) -> Dict[str, Any]:
     """Alias: Revoke compromised API key or service account key."""
-    return await revoke_compromised_credentials(credential_id, reason, approval_token)
+    return await revoke_compromised_credentials_impl(credential_id, reason, approval_token)
 
 
 def main() -> None:
