@@ -22,19 +22,4 @@ public class SecurityDataSeeder implements CommandLineRunner {
         // Empty implementation - no data seeding
     }
 
-    private Role seedRoleIfMissing(String code, String name, String description, boolean isSystem) {
-        return null;
-    }
-
-    private void seedAdminPermissions(Role adminRole) {
-        // Empty implementation - no data seeding
-    }
-
-    private void seedAdminUser(Role adminRole) {
-        // Empty implementation - no data seeding
-    }
-
-    private void seedSampleUser(Role userRole) {
-        // Empty implementation - no data seeding
-    }
 }
