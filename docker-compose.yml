@@ -1,0 +1,182 @@
+version: '3.8'
+
+# ==============================================================================
+# Smiota Platform - Monorepo Orchestration
+# Services:
+#   1. smiota-core-api     (Java / Spring Boot - Port 8080)
+#   2. smiota-agent-gateway(Python / FastAPI   - Port 8000)
+#   3. rag-service         (Python / FastAPI   - Port 8001)
+#   4. smart-locker-mcp    (Python / MCP       - Port 8082)
+#   5. mysql               (Shared Database    - Port 3306)
+#   6. postgres            (pgvector for AI    - Port 5432)
+#   7. redis               (Cache & Sessions   - Port 6379)
+# ==============================================================================
+
+services:
+  # ----------------------------------------------------------------------------
+  # 1. Java Backend Service: Smiota Core API
+  # ----------------------------------------------------------------------------
+  smiota-core-api:
+    build:
+      context: ./smiota-core
+      dockerfile: Dockerfile
+    container_name: smiota-core-api
+    restart: unless-stopped
+    ports:
+      - "${CORE_API_PORT:-8080}:8080"
+    environment:
+      - SERVER_PORT=8080
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-smiota_db}?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      - SPRING_DATASOURCE_USERNAME=${MYSQL_USER:-smiota_user}
+      - SPRING_DATASOURCE_PASSWORD=${MYSQL_PASSWORD:-smiota_password}
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=validate
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - smiota-mesh
+
+  # ----------------------------------------------------------------------------
+  # 2. Python AI Service: Agent Core Gateway
+  # ----------------------------------------------------------------------------
+  smiota-agent-gateway:
+    build:
+      context: ./smiota-ai
+      dockerfile: smiota-agent-gateway/Dockerfile
+    container_name: smiota-agent-gateway
+    restart: unless-stopped
+    ports:
+      - "${AI_GATEWAY_PORT:-8000}:8000"
+    env_file:
+      - .env
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - DEBUG=${DEBUG:-true}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID:-project-smiota-psi-1}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-3.7-flash}
+      - GEMINI_EMBEDDING_MODEL=${GEMINI_EMBEDDING_MODEL:-text-embedding-004}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - MCP_REMOTE_ENABLED=true
+      - MCP_REMOTE_FALLBACK=true
+      - MCP_LOCKER_SERVER_URL=http://smart-locker-mcp:8082
+      - RAG_SERVICE_URL=http://rag-service:8001
+      - SMIOTA_CORE_API_URL=http://smiota-core-api:8080
+      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-smiota_user}:${POSTGRES_PASSWORD:-smaiops26devdb}@postgres:5432/${POSTGRES_DB:-smiota_ai_dev}
+    depends_on:
+      - rag-service
+      - smart-locker-mcp
+      - postgres
+      - redis
+      - smiota-core-api
+    networks:
+      - smiota-mesh
+
+  # ----------------------------------------------------------------------------
+  # 3. Python AI Service: RAG Service (Embeddings & Knowledge Base)
+  # ----------------------------------------------------------------------------
+  rag-service:
+    build:
+      context: ./smiota-ai
+      dockerfile: rag-service/Dockerfile
+    container_name: smiota-rag-service
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    environment:
+      - PORT=8001
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-smiota_user}:${POSTGRES_PASSWORD:-smaiops26devdb}@postgres:5432/${POSTGRES_DB:-smiota_ai_dev}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+    depends_on:
+      - postgres
+    networks:
+      - smiota-mesh
+
+  # ----------------------------------------------------------------------------
+  # 4. Python MCP Server: Smart Locker MCP Tools
+  # ----------------------------------------------------------------------------
+  smart-locker-mcp:
+    build:
+      context: ./smiota-ai/mcp-servers/smart-locker
+      dockerfile: Dockerfile
+    container_name: smart-locker-mcp
+    restart: unless-stopped
+    ports:
+      - "8082:8082"
+    environment:
+      - PORT=8082
+      - SMIOTA_CORE_API_URL=http://smiota-core-api:8080
+    depends_on:
+      - smiota-core-api
+    networks:
+      - smiota-mesh
+
+  # ----------------------------------------------------------------------------
+  # 5. Infrastructure: Shared MySQL Database
+  # ----------------------------------------------------------------------------
+  mysql:
+    image: mysql:8.0
+    container_name: smiota-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_password}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-smiota_db}
+      MYSQL_USER: ${MYSQL_USER:-smiota_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-smiota_password}
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-root_password}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - smiota-mesh
+
+  # ----------------------------------------------------------------------------
+  # 6. Infrastructure: PostgreSQL with pgvector (AI Embeddings & Sessions)
+  # ----------------------------------------------------------------------------
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: smiota-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-smiota_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-smaiops26devdb}
+      POSTGRES_DB: ${POSTGRES_DB:-smiota_ai_dev}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - smiota-mesh
+
+  # ----------------------------------------------------------------------------
+  # 7. Infrastructure: Redis Cache
+  # ----------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: smiota-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - smiota-mesh
+
+volumes:
+  mysql_data:
+  postgres_data:
+  redis_data:
+
+networks:
+  smiota-mesh:
+    name: smiota-mesh
+    driver: bridge
