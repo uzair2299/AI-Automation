@@ -30,6 +30,11 @@ class MCPToolRegistry:
         logger.debug(f"Registered MCP tool: {name} [{access_level}]")
 
     @classmethod
+    def has_tool(cls, name: str) -> bool:
+        """Check if a tool is registered in MCP registry."""
+        return name in cls._tools
+
+    @classmethod
     def get_tool(cls, name: str) -> Callable:
         """Retrieve registered tool callable."""
         if name not in cls._tools:

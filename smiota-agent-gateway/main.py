@@ -14,13 +14,6 @@ from api.v1.router import api_v1_router
 from api.middleware.correlation import CorrelationIdMiddleware
 from api.middleware.error_handler import smiota_exception_handler
 
-# Ensure MCP domain tools are registered into registry
-import mcp.servers.observability.tools  # noqa: F401
-import mcp.servers.security.tools       # noqa: F401
-import mcp.servers.devops.tools         # noqa: F401
-import mcp.servers.qa.tools             # noqa: F401
-import mcp.servers.customer.tools       # noqa: F401
-
 
 from core.rabbitmq import RabbitMQService
 

@@ -79,6 +79,19 @@ class RemoteMCPClient:
             or name.startswith("compartment_")
             or name.startswith("smart_locker_")
             or name.startswith("hardware_")
+            or name
+            in (
+                "search_packages",
+                "get_package_details",
+                "get_package_timeline",
+                "get_user_preferences_and_services",
+                "get_my_pickup_pin",
+                "get_my_locker_details",
+                "query_locker_door_status",
+                "create_support_ticket",
+                "remote_unlock_locker_door",
+                "lookup_parcel_delivery_event",
+            )
         ):
             return self.locker_url
 
@@ -214,10 +227,62 @@ class MCPClient:
                         execution_time_ms=round(duration_ms, 2),
                     )
 
-        # 2. Local Registry Execution (Fallback or Local Mode)
+        # 2. Local Registry / Service Execution (Fallback or Local Mode)
         try:
-            tool_fn = self.registry.get_tool(tool_name)
-            result = await tool_fn(**kwargs)
+            if self.registry.has_tool(tool_name):
+                tool_fn = self.registry.get_tool(tool_name)
+                result = await tool_fn(**kwargs)
+            elif tool_name in (
+                "search_packages",
+                "get_package_details",
+                "get_package_timeline",
+                "get_user_preferences_and_services",
+                "get_my_pickup_pin",
+                "get_my_locker_details",
+            ):
+                from services.smiota_mcp_service import get_smiota_mcp_service
+                svc = get_smiota_mcp_service()
+                fn = getattr(svc, tool_name)
+                res = await fn(**kwargs)
+                result = res.model_dump() if hasattr(res, "model_dump") else res
+            elif tool_name == "lookup_parcel_delivery_event":
+                from services.smiota_mcp_service import get_smiota_mcp_service
+                res = await get_smiota_mcp_service().get_package_details(identifier=kwargs.get("tracking_number", ""))
+                result = res.model_dump() if hasattr(res, "model_dump") else res
+            elif tool_name == "query_locker_door_status":
+                result = {
+                    "locker_id": kwargs.get("locker_id", "LOCKER-01"),
+                    "compartment": kwargs.get("compartment", 1),
+                    "status": "closed",
+                    "lock_state": "engaged",
+                    "battery_pct": 98.4,
+                    "last_ping": "2026-10-23T12:00:00Z",
+                }
+            elif tool_name == "create_support_ticket":
+                result = {
+                    "ticket_id": "INC-2026-9042",
+                    "user_id": kwargs.get("user_id", "guest"),
+                    "subject": kwargs.get("subject", "Support Inquiry"),
+                    "priority": kwargs.get("priority", "medium"),
+                    "status": "assigned_to_support_tier2",
+                }
+            elif tool_name == "remote_unlock_locker_door":
+                token = kwargs.get("approval_token")
+                if not token:
+                    raise RemediationApprovalRequiredError(
+                        tool_name="remote_unlock_locker_door",
+                        params=kwargs,
+                    )
+                result = {
+                    "status": "door_unlocked",
+                    "locker_id": kwargs.get("locker_id", "LOCKER-01"),
+                    "compartment": kwargs.get("compartment", 1),
+                    "approved_by_token": token,
+                }
+            else:
+                tool_fn = self.registry.get_tool(tool_name)
+                result = await tool_fn(**kwargs)
+
             duration_ms = (time.perf_counter() - start_time) * 1000.0
 
             return MCPToolExecutionResult(

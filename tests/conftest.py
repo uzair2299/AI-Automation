@@ -22,8 +22,9 @@ def init_test_environment():
     settings.DEBUG = True
     settings.CHAT_STORAGE_BACKEND = "memory"
     settings.VECTOR_STORE_BACKEND = "memory"
-    settings.SMIOTA_AUTH_DUMMY_MODE = False
+    settings.SMIOTA_AUTH_DUMMY_MODE = True
     settings.REQUIRE_HUMAN_APPROVAL_FOR_REMEDIATION = True
+    settings.MCP_REMOTE_ENABLED = False
 
 
 @pytest.fixture

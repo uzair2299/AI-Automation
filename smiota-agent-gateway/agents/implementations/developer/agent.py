@@ -5,29 +5,97 @@ import re
 from agents.base import AgentContext, AgentResult, BaseAgent
 from agents.implementations.developer.prompts import DEVELOPER_SYSTEM_PROMPT
 from agents.implementations.developer.tools import DEVELOPER_BOUND_TOOLS
-from mcp.servers.devops.k8s_tools import (
-    check_dns_resolution,
-    check_network_connectivity,
-    check_pvc_status,
-    check_resource_pressure,
-    diagnose_crashloop,
-    diagnose_deployment,
-    diagnose_image_pull,
-    diagnose_node,
-    diagnose_pending_pod,
-    diagnose_pod,
-    get_hpa_status,
-    list_clusters,
-    list_configmaps,
-    list_deployments,
-    list_ingresses,
-    list_namespaces,
-    list_nodes,
-    list_pods,
-    list_secrets_metadata,
-    list_services,
-)
+from mcp.client import MCPClient
 from schemas.agents import AgentCapability
+
+
+async def _call_mcp(tool_name: str, **kwargs) -> dict:
+    """Execute tool through centralized MCPClient."""
+    res = await MCPClient().execute_tool(tool_name, kwargs)
+    if res.success and res.output is not None:
+        return res.output if isinstance(res.output, dict) else {"result": res.output}
+    return {"status": "error", "error": res.error or "Tool execution failed"}
+
+
+async def check_dns_resolution(**kwargs):
+    return await _call_mcp("check_dns_resolution", **kwargs)
+
+
+async def check_network_connectivity(**kwargs):
+    return await _call_mcp("check_network_connectivity", **kwargs)
+
+
+async def check_pvc_status(**kwargs):
+    return await _call_mcp("check_pvc_status", **kwargs)
+
+
+async def check_resource_pressure(**kwargs):
+    return await _call_mcp("check_resource_pressure", **kwargs)
+
+
+async def diagnose_crashloop(**kwargs):
+    return await _call_mcp("diagnose_crashloop", **kwargs)
+
+
+async def diagnose_deployment(**kwargs):
+    return await _call_mcp("diagnose_deployment", **kwargs)
+
+
+async def diagnose_image_pull(**kwargs):
+    return await _call_mcp("diagnose_image_pull", **kwargs)
+
+
+async def diagnose_node(**kwargs):
+    return await _call_mcp("diagnose_node", **kwargs)
+
+
+async def diagnose_pending_pod(**kwargs):
+    return await _call_mcp("diagnose_pending_pod", **kwargs)
+
+
+async def diagnose_pod(**kwargs):
+    return await _call_mcp("diagnose_pod", **kwargs)
+
+
+async def get_hpa_status(**kwargs):
+    return await _call_mcp("get_hpa_status", **kwargs)
+
+
+async def list_clusters(**kwargs):
+    return await _call_mcp("list_clusters", **kwargs)
+
+
+async def list_configmaps(**kwargs):
+    return await _call_mcp("list_configmaps", **kwargs)
+
+
+async def list_deployments(**kwargs):
+    return await _call_mcp("list_deployments", **kwargs)
+
+
+async def list_ingresses(**kwargs):
+    return await _call_mcp("list_ingresses", **kwargs)
+
+
+async def list_namespaces(**kwargs):
+    return await _call_mcp("list_namespaces", **kwargs)
+
+
+async def list_nodes(**kwargs):
+    return await _call_mcp("list_nodes", **kwargs)
+
+
+async def list_pods(**kwargs):
+    return await _call_mcp("list_pods", **kwargs)
+
+
+async def list_secrets_metadata(**kwargs):
+    return await _call_mcp("list_secrets_metadata", **kwargs)
+
+
+async def list_services(**kwargs):
+    return await _call_mcp("list_services", **kwargs)
+
 
 
 class DeveloperAgent(BaseAgent):

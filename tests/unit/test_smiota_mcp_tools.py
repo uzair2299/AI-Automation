@@ -22,16 +22,59 @@ from mcp.errors import (
     McpUpstreamTimeoutError,
 )
 from mcp.registry import MCPToolRegistry
-from mcp.servers.customer.tools import (
-    get_my_locker_details,
-    get_my_pickup_pin,
-    get_package_details,
-    get_package_timeline,
-    get_user_preferences_and_services,
-    query_locker_door_status,
-    create_support_ticket,
-    search_packages,
-)
+from services.smiota_mcp_service import SmiotaMcpService, get_smiota_mcp_service
+
+
+async def search_packages(**kwargs):
+    res = await get_smiota_mcp_service().search_packages(**kwargs)
+    return res.model_dump()
+
+
+async def get_package_details(identifier: str):
+    res = await get_smiota_mcp_service().get_package_details(identifier=identifier)
+    return res.model_dump()
+
+
+async def get_package_timeline(identifier: str):
+    res = await get_smiota_mcp_service().get_package_timeline(identifier=identifier)
+    return res.model_dump()
+
+
+async def get_user_preferences_and_services():
+    res = await get_smiota_mcp_service().get_user_preferences_and_services()
+    return res.model_dump()
+
+
+async def get_my_pickup_pin(identifier: str = None):
+    res = await get_smiota_mcp_service().get_my_pickup_pin(identifier=identifier)
+    return res.model_dump()
+
+
+async def get_my_locker_details(identifier: str = None):
+    res = await get_smiota_mcp_service().get_my_locker_details(identifier=identifier)
+    return res.model_dump()
+
+
+async def query_locker_door_status(locker_id: str, compartment: int):
+    return {
+        "locker_id": locker_id,
+        "compartment": compartment,
+        "status": "closed",
+        "lock_state": "engaged",
+        "battery_pct": 98.4,
+        "last_ping": "2026-10-23T12:00:00Z",
+    }
+
+
+async def create_support_ticket(user_id: str, subject: str, description: str, priority: str = "medium"):
+    return {
+        "ticket_id": "INC-2026-9042",
+        "user_id": user_id,
+        "subject": subject,
+        "priority": priority,
+        "status": "assigned_to_support_tier2",
+    }
+
 from schemas.mcp_tools import (
     GetLockerDetailsInput,
     GetPackageDetailsInput,

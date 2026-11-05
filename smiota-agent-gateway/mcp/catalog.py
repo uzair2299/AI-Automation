@@ -501,5 +501,4 @@ def export_catalog_files(docs_dir: str) -> None:
 
 
 if __name__ == "__main__":
-    import mcp.servers.customer.tools  # Register tools
-    export_catalog_files("d:/repos/smiota-ai/src/smiota/docs")
+    export_catalog_files("smiota-agent-gateway/docs")

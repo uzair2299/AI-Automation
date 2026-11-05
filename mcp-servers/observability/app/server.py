@@ -61,19 +61,22 @@ async def query_prometheus_metrics(promql: str, duration: str = "1h") -> Dict[st
 @mcp.tool()
 async def query_http_error_rates(
     service_name: str = "smiotaserver",
+    time_range_minutes: int = 60,
     namespace: str = "smiota-prod",
-    duration: str = "1h",
+    duration: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Query live HTTP 5xx and 4xx error rate metrics for an ingress or microservice."""
+    dur = duration or f"{time_range_minutes}m"
     promql = f'sum(rate(http_requests_total{{namespace="{namespace}",service="{service_name}",status=~"5.."}}[5m]))'
-    return await query_prometheus_metrics(promql=promql, duration=duration)
+    return await query_prometheus_metrics(promql=promql, duration=dur)
 
 
 @mcp.tool()
 async def query_latency_metrics(
     service_name: str = "smiotaserver",
-    namespace: str = "smiota-prod",
+    time_range_minutes: int = 60,
     percentile: str = "p95",
+    namespace: str = "smiota-prod",
 ) -> Dict[str, Any]:
     """Inspect latency percentiles (p50, p90, p95, p99) across microservice endpoints."""
     q_map = {
@@ -107,7 +110,7 @@ async def get_pod_restart_reason(
 @mcp.tool()
 async def get_cluster_pod_counts(namespace: Optional[str] = None) -> Dict[str, Any]:
     """Get active pod counts grouped by status (Running, Pending, Failed, CrashLoop)."""
-    promql = 'count by (phase) (kube_pod_status_phase)'
+    promql = "count by (phase) (kube_pod_status_phase)"
     if namespace:
         promql = f'count by (phase) (kube_pod_status_phase{{namespace="{namespace}"}})'
     return await query_prometheus_metrics(promql=promql)
@@ -132,15 +135,18 @@ async def get_service_logs(
     service_name: str = "smiotaserver",
     namespace: str = "smiota-prod",
     lines: int = 100,
+    level_filter: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Retrieve tail of container logs for a given service."""
+    lvl = level_filter or "INFO"
     return {
         "service": service_name,
         "namespace": namespace,
         "lines_requested": lines,
+        "level_filter": lvl,
         "logs": [
-            f"{datetime.datetime.now(datetime.timezone.utc).isoformat()} [INFO] {service_name} initialized successfully.",
-            f"{datetime.datetime.now(datetime.timezone.utc).isoformat()} [INFO] Connection pool established. Zero errors.",
+            f"{datetime.datetime.now(datetime.timezone.utc).isoformat()} [{lvl}] {service_name} initialized successfully.",
+            f"{datetime.datetime.now(datetime.timezone.utc).isoformat()} [{lvl}] Connection pool established. Zero errors.",
         ],
     }
 
@@ -148,6 +154,7 @@ async def get_service_logs(
 @mcp.tool()
 async def correlate_deployment_with_incident(
     service_name: str = "smiotaserver",
+    time_window_hours: int = 2,
     namespace: str = "smiota-prod",
     incident_time_iso: Optional[str] = None,
 ) -> Dict[str, Any]:
@@ -155,6 +162,7 @@ async def correlate_deployment_with_incident(
     return {
         "service": service_name,
         "namespace": namespace,
+        "time_window_hours": time_window_hours,
         "incident_time": incident_time_iso or datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "recent_deployments": [],
         "correlation_found": False,
@@ -164,13 +172,16 @@ async def correlate_deployment_with_incident(
 
 @mcp.tool()
 async def get_recent_system_changes(
+    time_range_hours: int = 24,
+    hours_back: Optional[int] = None,
     namespace: str = "smiota-prod",
-    hours_back: int = 4,
 ) -> Dict[str, Any]:
     """Audit recent cluster changes, ConfigMap mutations, and deployment updates."""
+    hb = hours_back if hours_back is not None else time_range_hours
     return {
         "namespace": namespace,
-        "hours_back": hours_back,
+        "hours_back": hb,
+        "time_range_hours": hb,
         "total_changes": 0,
         "changes": [],
     }
@@ -178,7 +189,7 @@ async def get_recent_system_changes(
 
 @mcp.tool()
 async def restart_gke_deployment(
-    deployment_name: str,
+    deployment_name: str = "smiotaserver",
     namespace: str = "smiota-prod",
     reason: str = "",
     approval_token: Optional[str] = None,
@@ -219,4 +230,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

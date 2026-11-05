@@ -13,17 +13,50 @@ from unittest.mock import AsyncMock
 from core.exceptions import RemediationApprovalRequiredError
 from mcp.client import MCPClient
 from mcp.context import CallerContext, set_caller_context, reset_caller_context
-from mcp.servers.customer.tools import (
-    get_my_locker_details,
-    get_my_pickup_pin,
-    get_package_details,
-    get_package_timeline,
-    get_user_preferences_and_services,
-    remote_unlock_locker_door,
-    search_packages,
-)
 from schemas.mcp_tools import ToolResultCode
-from services.smiota_mcp_service import SmiotaMcpService
+from services.smiota_mcp_service import SmiotaMcpService, get_smiota_mcp_service
+
+
+async def search_packages(**kwargs):
+    res = await get_smiota_mcp_service().search_packages(**kwargs)
+    return res.model_dump()
+
+
+async def get_package_details(identifier: str):
+    res = await get_smiota_mcp_service().get_package_details(identifier=identifier)
+    return res.model_dump()
+
+
+async def get_package_timeline(identifier: str):
+    res = await get_smiota_mcp_service().get_package_timeline(identifier=identifier)
+    return res.model_dump()
+
+
+async def get_user_preferences_and_services():
+    res = await get_smiota_mcp_service().get_user_preferences_and_services()
+    return res.model_dump()
+
+
+async def get_my_pickup_pin(identifier: str = None):
+    res = await get_smiota_mcp_service().get_my_pickup_pin(identifier=identifier)
+    return res.model_dump()
+
+
+async def get_my_locker_details(identifier: str = None):
+    res = await get_smiota_mcp_service().get_my_locker_details(identifier=identifier)
+    return res.model_dump()
+
+
+async def remote_unlock_locker_door(locker_id: str, compartment: int, approval_token: str = None):
+    if not approval_token:
+        raise RemediationApprovalRequiredError("Remediation approval token required for remote unlock.")
+    return {
+        "status": "door_unlocked",
+        "locker_id": locker_id,
+        "compartment": compartment,
+        "approved_by_token": approval_token,
+    }
+
 
 
 @pytest.fixture

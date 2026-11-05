@@ -7,27 +7,81 @@ from agents.implementations.aiops.prompts import AIOPS_SYSTEM_PROMPT
 from agents.implementations.aiops.tools import AIOPS_BOUND_TOOLS
 from agents.routing.rules import GREETINGS
 from core.logging import logger
-from mcp.servers.devops.k8s_tools import (
-    check_dns_resolution,
-    check_network_connectivity,
-    check_pvc_status,
-    diagnose_image_pull,
-    diagnose_node,
-    diagnose_pending_pod,
-    get_cluster_info,
-    list_clusters,
-    list_namespaces,
-)
-from mcp.servers.observability.tools import (
-    correlate_deployment_with_incident,
-    get_cluster_pod_counts,
-    get_pod_restart_reason,
-    get_recent_system_changes,
-    get_service_logs,
-    query_http_error_rates,
-    query_latency_metrics,
-)
+from mcp.client import MCPClient
 from schemas.agents import AgentCapability
+
+
+async def _call_mcp(tool_name: str, **kwargs) -> dict:
+    """Execute tool through centralized MCPClient."""
+    res = await MCPClient().execute_tool(tool_name, kwargs)
+    if res.success and res.output is not None:
+        return res.output if isinstance(res.output, dict) else {"result": res.output}
+    return {"status": "error", "error": res.error or "Tool execution failed"}
+
+
+async def check_dns_resolution(**kwargs):
+    return await _call_mcp("check_dns_resolution", **kwargs)
+
+
+async def check_network_connectivity(**kwargs):
+    return await _call_mcp("check_network_connectivity", **kwargs)
+
+
+async def check_pvc_status(**kwargs):
+    return await _call_mcp("check_pvc_status", **kwargs)
+
+
+async def diagnose_image_pull(**kwargs):
+    return await _call_mcp("diagnose_image_pull", **kwargs)
+
+
+async def diagnose_node(**kwargs):
+    return await _call_mcp("diagnose_node", **kwargs)
+
+
+async def diagnose_pending_pod(**kwargs):
+    return await _call_mcp("diagnose_pending_pod", **kwargs)
+
+
+async def get_cluster_info(**kwargs):
+    return await _call_mcp("get_cluster_info", **kwargs)
+
+
+async def list_clusters(**kwargs):
+    return await _call_mcp("list_clusters", **kwargs)
+
+
+async def list_namespaces(**kwargs):
+    return await _call_mcp("list_namespaces", **kwargs)
+
+
+async def correlate_deployment_with_incident(**kwargs):
+    return await _call_mcp("correlate_deployment_with_incident", **kwargs)
+
+
+async def get_cluster_pod_counts(**kwargs):
+    return await _call_mcp("get_cluster_pod_counts", **kwargs)
+
+
+async def get_pod_restart_reason(**kwargs):
+    return await _call_mcp("get_pod_restart_reason", **kwargs)
+
+
+async def get_recent_system_changes(**kwargs):
+    return await _call_mcp("get_recent_system_changes", **kwargs)
+
+
+async def get_service_logs(**kwargs):
+    return await _call_mcp("get_service_logs", **kwargs)
+
+
+async def query_http_error_rates(**kwargs):
+    return await _call_mcp("query_http_error_rates", **kwargs)
+
+
+async def query_latency_metrics(**kwargs):
+    return await _call_mcp("query_latency_metrics", **kwargs)
+
 
 
 class AIOpsAgent(BaseAgent):

@@ -243,6 +243,17 @@ class RuleBasedRouter(BaseIntentRouter):
         "gke",
         "readiness probe",
         "imagepullbackoff",
+        "kubernetes",
+        "k8s",
+        "cluster",
+        "clusters",
+        "namespace",
+        "namespaces",
+        "pod",
+        "pods",
+        "pvc",
+        "dns resolution",
+        "node",
     ]
 
     KNOWLEDGE_KEYWORDS: ClassVar[list[str]] = [

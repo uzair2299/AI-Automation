@@ -37,6 +37,87 @@ _MOCK_COMPARTMENTS: Dict[str, Dict[str, Any]] = {
     "C-06": {"size": "L", "door": "CLOSED", "lock": "LOCKED", "occupied": False, "zone": "refrigerated", "temp_f": 37.8},
 }
 
+_MOCK_PACKAGES: List[Dict[str, Any]] = [
+    {
+        "id": 10492,
+        "uuid": "8f9a2b10-6a5c-4e89-b1d3-92f7a01d5e34",
+        "tracking_number": "1Z9999999999999999",
+        "trackingNumber": "1Z9999999999999999",
+        "po_number": "PO-88421",
+        "carrier": "UPS",
+        "status": "READY_FOR_PICKUP",
+        "status_group": "PENDING",
+        "received_time": "2026-10-23T09:15:00Z",
+        "expiration_time": "2026-10-26T18:00:00Z",
+        "passcode": "482910",
+        "pickup_pin": "482910",
+        "compartment_id": "C-02",
+        "locker_id": "LOCKER-01",
+        "locker_bank": "Main Pod Bank 1",
+        "locker_door": "Door 14",
+        "locker_door_name": "Door 14",
+        "building_name": "East Campus Commons",
+        "storage_type": "LOCKER",
+        "is_perishable": False,
+        "is_at_destination": True,
+        "location": {
+            "building_id": 14,
+            "building_name": "East Campus Commons",
+            "storage_type": "LOCKER",
+            "locker_id": 88,
+            "locker_bank": "Main Pod Bank 1",
+            "locker_door_name": "Door 14",
+            "locker_size": "Medium",
+        },
+        "recipient": {
+            "firstName": "Alex",
+            "lastName": "Johnson",
+            "email": "alex.johnson@example.com",
+            "phone": "+1-555-0199",
+        },
+        "recipientName": "Alex Johnson",
+    },
+    {
+        "id": 10518,
+        "uuid": "3c4d5e6f-7a8b-9c0d-1e2f-3a4b5c6d7e8f",
+        "tracking_number": "1Z8888888888888888",
+        "trackingNumber": "1Z8888888888888888",
+        "po_number": "PO-99120",
+        "carrier": "FedEx",
+        "status": "READY_FOR_PICKUP",
+        "status_group": "PENDING",
+        "received_time": "2026-10-24T14:30:00Z",
+        "expiration_time": "2026-10-27T18:00:00Z",
+        "passcode": "129845",
+        "pickup_pin": "129845",
+        "compartment_id": "C-05",
+        "locker_id": "LOCKER-01",
+        "locker_bank": "Main Pod Bank 1",
+        "locker_door": "Door 18",
+        "locker_door_name": "Door 18",
+        "building_name": "East Campus Commons",
+        "storage_type": "LOCKER",
+        "is_perishable": True,
+        "is_at_destination": True,
+        "location": {
+            "building_id": 14,
+            "building_name": "East Campus Commons",
+            "storage_type": "LOCKER",
+            "locker_id": 88,
+            "locker_bank": "Main Pod Bank 1",
+            "locker_door_name": "Door 18",
+            "locker_size": "Medium (Refrigerated)",
+        },
+        "recipient": {
+            "firstName": "Alex",
+            "lastName": "Johnson",
+            "email": "alex.johnson@example.com",
+            "phone": "+1-555-0199",
+        },
+        "recipientName": "Alex Johnson",
+    },
+]
+
 
 @mcp.tool()
 async def get_locker_status(locker_id: str = "LOCKER-01") -> Dict[str, Any]:
@@ -61,22 +142,28 @@ async def get_locker_status(locker_id: str = "LOCKER-01") -> Dict[str, Any]:
 @mcp.tool()
 async def query_locker_door_status(
     locker_id: str = "LOCKER-01",
-    compartment_id: str = "C-01",
+    compartment: int = 1,
+    compartment_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Query live door sensor, latch solenoid state, and infrared parcel sensor for a specific compartment."""
-    comp = _MOCK_COMPARTMENTS.get(compartment_id, {
+    cid = compartment_id or (f"C-0{compartment}" if compartment < 10 else f"C-{compartment}")
+    comp = _MOCK_COMPARTMENTS.get(cid, {
         "size": "M", "door": "CLOSED", "lock": "LOCKED", "occupied": False, "zone": "ambient", "temp_f": None
     })
     return {
         "status": "success",
         "locker_id": locker_id,
-        "compartment_id": compartment_id,
+        "compartment": compartment,
+        "compartment_id": cid,
         "door_state": comp["door"],
+        "lock_state": comp["lock"],
         "lock_solenoid_state": comp["lock"],
         "infrared_sensor": "BEAM_BROKEN_OCCUPIED" if comp["occupied"] else "BEAM_CLEAR_EMPTY",
         "occupied": comp["occupied"],
+        "battery_pct": 98.4,
         "temperature_f": comp["temp_f"],
         "last_sensor_event": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "last_ping": datetime.datetime.now(datetime.timezone.utc).isoformat(),
     }
 
 
@@ -102,7 +189,6 @@ async def locker_open_compartment(
     elif approval_token and approval_token.startswith("appr-"):
         is_authorized = True
     elif not authorization_pin and not approval_token:
-        # Require approval for unauthenticated direct actuation
         return {
             "status": "requires_approval",
             "error": "RemediationApprovalRequiredError: Operator or resident authorization required to unlock door.",
@@ -110,7 +196,6 @@ async def locker_open_compartment(
             "compartment_id": compartment_id,
         }
 
-    # Simulate solenoid pulse
     comp["door"] = "OPEN"
     comp["lock"] = "UNLOCKED"
 
@@ -235,6 +320,286 @@ async def locker_diagnose_hardware(locker_id: str = "LOCKER-01") -> Dict[str, An
     }
 
 
+# ==============================================================================
+# Aligned Customer & Package Domain Tools (Full 1:1 Parity)
+# ==============================================================================
+
+@mcp.tool()
+async def search_packages(
+    status_group: str = "PENDING",
+    status: Optional[str] = None,
+    carrier: Optional[str] = None,
+    storage_type: str = "ALL",
+    days: Optional[int] = None,
+    is_perishable: Optional[bool] = None,
+) -> Dict[str, Any]:
+    """Search, filter, and list packages for the resident."""
+    matching = []
+    for pkg in _MOCK_PACKAGES:
+        if status_group and status_group != "ALL" and pkg.get("status_group") != status_group:
+            continue
+        if status and pkg.get("status", "").lower() != status.lower():
+            continue
+        if carrier and carrier.lower() not in pkg.get("carrier", "").lower():
+            continue
+        if storage_type and storage_type != "ALL" and pkg.get("storage_type", "").lower() != storage_type.lower():
+            continue
+        if is_perishable is not None and pkg.get("is_perishable") != is_perishable:
+            continue
+        matching.append(pkg)
+
+    if not matching:
+        return {
+            "success": True,
+            "status": "EMPTY_RESULT",
+            "message": "No packages found matching search criteria.",
+            "data": {
+                "total_count": 0,
+                "packages": [],
+            },
+        }
+
+    return {
+        "success": True,
+        "status": "SUCCESS",
+        "message": f"Found {len(matching)} package(s) matching search criteria.",
+        "data": {
+            "total_count": len(matching),
+            "packages": matching,
+        },
+    }
+
+
+@mcp.tool()
+async def get_package_details(identifier: str) -> Dict[str, Any]:
+    """Retrieve comprehensive 360-degree attributes of a specific package."""
+    clean_id = (identifier or "").strip().lower()
+    for pkg in _MOCK_PACKAGES:
+        if (
+            str(pkg.get("id")).lower() == clean_id
+            or pkg.get("uuid", "").lower() == clean_id
+            or pkg.get("tracking_number", "").lower() == clean_id
+            or pkg.get("po_number", "").lower() == clean_id
+        ):
+            return {
+                "success": True,
+                "status": "SUCCESS",
+                "message": f"Retrieved package details for '{identifier}'.",
+                "data": pkg,
+            }
+
+    for cid, comp in _MOCK_COMPARTMENTS.items():
+        if comp.get("package_id", "").lower() == clean_id:
+            pkg_data = {
+                "id": comp.get("package_id"),
+                "tracking_number": comp.get("package_id"),
+                "carrier": "FedEx",
+                "status": "READY_FOR_PICKUP",
+                "compartment_id": cid,
+                "passcode": comp.get("pin"),
+                "storage_type": "LOCKER",
+                "location": {
+                    "building_name": "Main Lobby",
+                    "locker_door_name": cid,
+                    "storage_type": "LOCKER",
+                },
+            }
+            return {
+                "success": True,
+                "status": "SUCCESS",
+                "message": f"Retrieved package details for '{identifier}'.",
+                "data": pkg_data,
+            }
+
+    return {
+        "success": False,
+        "status": "NOT_FOUND",
+        "message": f"We couldn't find any package matching tracking number or identifier '{identifier}'.",
+        "data": None,
+    }
+
+
+@mcp.tool()
+async def get_package_timeline(identifier: str) -> Dict[str, Any]:
+    """Retrieve audit timeline, dock scans, and chain-of-custody for a package."""
+    return {
+        "success": True,
+        "status": "SUCCESS",
+        "message": f"Retrieved 4 timeline events for package '{identifier}'.",
+        "data": {
+            "tracking_number": identifier,
+            "status": "READY_FOR_PICKUP",
+            "timeline": [
+                {
+                    "timestamp": "2026-10-23T09:15:00Z",
+                    "action": "Intake Received at Central Dock",
+                    "handled_by": "Marcus Vance",
+                    "location": "Central Receiving Facility",
+                },
+                {
+                    "timestamp": "2026-10-23T09:45:00Z",
+                    "action": "Dispatched for Intra-Campus Transit",
+                    "handled_by": "Campus Courier Van 2",
+                    "location": "Transit Route B",
+                },
+                {
+                    "timestamp": "2026-10-23T10:05:00Z",
+                    "action": "Received at Destination Building",
+                    "handled_by": "Elena Rostova",
+                    "location": "East Campus Commons Mailroom",
+                },
+                {
+                    "timestamp": "2026-10-23T10:20:00Z",
+                    "action": "Deposited into Smart Locker",
+                    "handled_by": "Elena Rostova",
+                    "location": "Main Pod Bank 1 - Door 14",
+                },
+            ],
+            "chain_of_custody": [
+                {"timestamp": "2026-10-23T09:15:00Z", "action": "Dock Receive"},
+                {"timestamp": "2026-10-23T10:20:00Z", "action": "Locker Deposit"},
+            ],
+        },
+    }
+
+
+@mcp.tool()
+async def get_user_preferences_and_services() -> Dict[str, Any]:
+    """Retrieve resident ADA accessibility preferences, authorized proxies, and day-use pods."""
+    return {
+        "success": True,
+        "status": "SUCCESS",
+        "message": "Retrieved user preferences and services.",
+        "data": {
+            "ada_accessible_locker_required": True,
+            "ada_bottom_tier_only": True,
+            "authorized_proxies": [
+                {"name": "Morgan Vance", "relationship": "Roommate", "phone": "+1-555-0199"}
+            ],
+            "day_use_pods": [],
+        },
+    }
+
+
+@mcp.tool()
+async def get_my_pickup_pin(identifier: Optional[str] = None) -> Dict[str, Any]:
+    """Retrieve 6-digit pickup verification PIN and assigned locker door."""
+    pkg = _MOCK_PACKAGES[0]
+    if identifier:
+        clean_id = identifier.strip().lower()
+        for p in _MOCK_PACKAGES:
+            if clean_id in (str(p.get("id")).lower(), p.get("uuid", "").lower(), p.get("tracking_number", "").lower()):
+                pkg = p
+                break
+    pin = pkg.get("passcode") or pkg.get("pickup_pin") or "482910"
+    door = pkg.get("locker_door_name") or pkg.get("compartment_id") or "Door 14"
+    bank = pkg.get("locker_bank") or "Main Pod Bank 1"
+    bldg = pkg.get("building_name") or "East Campus Commons"
+    tracking = pkg.get("tracking_number") or "1Z9999999999999999"
+
+    return {
+        "success": True,
+        "status": "SUCCESS",
+        "message": f"Pickup PIN is {pin} for locker door {door}.",
+        "data": {
+            "primary_pickup": {
+                "pickup_pin": pin,
+                "locker_bank": bank,
+                "locker_door": door,
+                "tracking_number": tracking,
+                "building_name": bldg,
+                "instructions": "Enter your 6-digit PIN on the central console touchscreen or scan your QR code.",
+            },
+            "active_pickups_count": len(_MOCK_PACKAGES),
+        },
+    }
+
+
+@mcp.tool()
+async def get_my_locker_details(identifier: Optional[str] = None) -> Dict[str, Any]:
+    """Retrieve smart locker physical compartment location, bank name, and door number."""
+    lockers = []
+    for pkg in _MOCK_PACKAGES:
+        lockers.append({
+            "package_id": pkg.get("id"),
+            "tracking_number": pkg.get("tracking_number"),
+            "carrier": pkg.get("carrier"),
+            "storage_type": pkg.get("storage_type", "LOCKER"),
+            "locker_bank": pkg.get("locker_bank", "Main Pod Bank 1"),
+            "locker_door_name": pkg.get("locker_door_name", "Door 14"),
+            "compartment_size": "Medium",
+            "building_name": pkg.get("building_name", "East Campus Commons"),
+        })
+    return {
+        "success": True,
+        "status": "SUCCESS",
+        "message": f"Found {len(lockers)} active locker compartment(s) awaiting pickup.",
+        "data": {
+            "total_active_lockers": len(lockers),
+            "lockers": lockers,
+        },
+    }
+
+
+@mcp.tool()
+async def create_support_ticket(
+    user_id: str,
+    subject: str,
+    description: str,
+    priority: str = "medium",
+) -> Dict[str, Any]:
+    """Create or escalate a customer support case in ServiceNow or Zendesk."""
+    ticket_num = f"INC-2026-{datetime.datetime.now().strftime('%M%S')}"
+    return {
+        "status": "assigned_to_support_tier2",
+        "ticket_id": ticket_num,
+        "user_id": user_id,
+        "subject": subject,
+        "description": description,
+        "priority": priority,
+        "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+    }
+
+
+@mcp.tool()
+async def remote_unlock_locker_door(
+    locker_id: str = "LOCKER-01",
+    compartment: int = 1,
+    compartment_id: Optional[str] = None,
+    approval_token: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Send remote solenoid unlock command to smart locker compartment door (requires HITL approval)."""
+    cid = compartment_id or (f"C-0{compartment}" if compartment < 10 else f"C-{compartment}")
+    if not approval_token:
+        return {
+            "status": "requires_approval",
+            "error": "RemediationApprovalRequiredError: Operator or resident authorization required to unlock door.",
+            "locker_id": locker_id,
+            "compartment": compartment,
+            "compartment_id": cid,
+        }
+
+    comp = _MOCK_COMPARTMENTS.get(cid)
+    if comp:
+        comp["door"] = "OPEN"
+        comp["lock"] = "UNLOCKED"
+
+    return {
+        "status": "door_unlocked",
+        "locker_id": locker_id,
+        "compartment": compartment,
+        "compartment_id": cid,
+        "approved_by_token": approval_token,
+        "unlocked_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+    }
+
+
+@mcp.tool()
+async def lookup_parcel_delivery_event(tracking_number: str) -> Dict[str, Any]:
+    """Lookup parcel delivery status (backward compatibility alias for get_package_details)."""
+    return await get_package_details(identifier=tracking_number)
+
+
 def main() -> None:
     transport = settings.MCP_TRANSPORT.lower().strip()
     logger.info(f"Starting Smiota Smart Locker MCP Server on transport '{transport}', port {settings.MCP_PORT}")
@@ -254,4 +619,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
