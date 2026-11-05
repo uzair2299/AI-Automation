@@ -18,7 +18,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY packages/common /tmp/packages/common
 RUN pip install --no-cache-dir /tmp/packages/common
 
-COPY pyproject.toml README.md ./
+COPY pyproject.toml README.md alembic.ini ./
+COPY alembic/ ./alembic/
 COPY smiota-agent-gateway/ ./smiota-agent-gateway/
 
 RUN pip install --no-cache-dir .
