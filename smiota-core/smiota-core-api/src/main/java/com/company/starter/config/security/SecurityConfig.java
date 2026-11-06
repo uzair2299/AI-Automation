@@ -4,6 +4,7 @@ import com.company.starter.security.handler.CustomAccessDeniedHandler;
 import com.company.starter.security.handler.CustomAuthenticationEntryPoint;
 import com.company.starter.security.jwt.JwtFilter;
 import com.company.starter.security.service.CustomUserDetailsService;
+import com.company.starter.security.service.SmiotaPasswordEncoder;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -90,7 +91,7 @@ public class SecurityConfig {
 
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
+        return new SmiotaPasswordEncoder();
     }
 
     @Bean
