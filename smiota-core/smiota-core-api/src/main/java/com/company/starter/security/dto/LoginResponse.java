@@ -31,6 +31,15 @@ public class LoginResponse {
     @Schema(description = "User primary identifier")
     private UUID userId;
 
+    @Schema(description = "Smiota numeric User ID", example = "1042")
+    private Long smiotaUserId;
+
+    @Schema(description = "Smiota Location ID", example = "12")
+    private Long locationId;
+
+    @Schema(description = "Smiota Customer ID", example = "5")
+    private Long customerId;
+
     @Schema(description = "User account username", example = "admin")
     private String username;
 

@@ -22,6 +22,9 @@ import java.util.UUID;
 public class CustomUserDetails implements UserDetails {
 
     private UUID id;
+    private Long smiotaUserId;
+    private Long locationId;
+    private Long customerId;
     private String username;
     private String email;
     private String password;

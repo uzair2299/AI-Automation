@@ -35,6 +35,15 @@ public class JwtProvider {
     public String generateToken(CustomUserDetails userDetails) {
         Map<String, Object> extraClaims = new HashMap<>();
         extraClaims.put("userId", userDetails.getId() != null ? userDetails.getId().toString() : null);
+        if (userDetails.getSmiotaUserId() != null) {
+            extraClaims.put("smiotaUserId", userDetails.getSmiotaUserId());
+        }
+        if (userDetails.getLocationId() != null) {
+            extraClaims.put("locationId", userDetails.getLocationId());
+        }
+        if (userDetails.getCustomerId() != null) {
+            extraClaims.put("customerId", userDetails.getCustomerId());
+        }
         extraClaims.put("email", userDetails.getEmail());
         extraClaims.put("roles", userDetails.getRoles());
         extraClaims.put("permissions", userDetails.getPermissions());
